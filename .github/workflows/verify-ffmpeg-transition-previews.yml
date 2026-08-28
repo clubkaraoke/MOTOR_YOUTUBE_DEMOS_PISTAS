@@ -35,8 +35,12 @@ jobs:
           set -euo pipefail
           for id in 1 2 3 4; do
             echo "=== C$id ==="
-            body=$(curl -fsS -X POST "http://127.0.0.1:8088/api/channels/$id/animation-preview")
+            body=$(curl -sS -w "\nHTTP_CODE:%{http_code}\n" -X POST "http://127.0.0.1:8088/api/channels/$id/animation-preview")
             echo "$body"
+            code=$(printf "%s" "$body" | sed -n "s/^HTTP_CODE://p" | tail -n1)
+            json=$(printf "%s" "$body" | sed "/^HTTP_CODE:/d")
+            if [ "$code" != "200" ]; then echo "PREVIEW_FAILED C$id HTTP=$code"; break; fi
+            body="$json"
             transition=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["transition"])' <<<"$body")
             label=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["transition_label"])' <<<"$body")
             code=$(curl -sS -o "/tmp/c$id.mp4" -w '%{http_code}' "http://127.0.0.1:8088/api/channels/$id/animation-preview/video")
