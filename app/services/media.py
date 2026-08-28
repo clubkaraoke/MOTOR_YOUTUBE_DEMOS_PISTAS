@@ -9,6 +9,7 @@ class MediaError(RuntimeError):
 
 
 YOUTUBE_AUDIO_BITRATE = "384k"
+# Panel previews use the same FFmpeg installation as production.
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
