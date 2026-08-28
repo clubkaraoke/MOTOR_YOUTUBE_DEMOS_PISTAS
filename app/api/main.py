@@ -389,6 +389,21 @@ def index():
     return FileResponse(Path(__file__).parents[1] / "static" / "index.html")
 
 
+@app.get("/q/app-info", include_in_schema=False)
+def oauth_app_info():
+    return FileResponse(Path(__file__).parents[1] / "static" / "oauth-info.html")
+
+
+@app.get("/q/privacy", include_in_schema=False)
+def oauth_privacy():
+    return FileResponse(Path(__file__).parents[1] / "static" / "oauth-privacy.html")
+
+
+@app.get("/q/terms", include_in_schema=False)
+def oauth_terms():
+    return FileResponse(Path(__file__).parents[1] / "static" / "oauth-terms.html")
+
+
 @app.get("/q/{token}", include_in_schema=False)
 def qr_redirect(token: str, db: Session = Depends(get_db)):
     redirect = db.scalar(select(QrRedirect).where(QrRedirect.token == token))
