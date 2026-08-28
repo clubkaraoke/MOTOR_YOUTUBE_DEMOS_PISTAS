@@ -39,3 +39,22 @@
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.activity-job{grid-template-columns:1fr 55px}.activity-stage{grid-row:2;grid-column:1/-1}.upload-line{grid-template-columns:1fr 55px}.upload-bar{grid-row:2;grid-column:1/-1}}
 .actions .warning{color:#f0c581;border-color:#70552a}.youtube-alerts{background:var(--red-dim);border-color:#743832;box-shadow:inset 3px 0 0 var(--red);color:#ffc2bd}.youtube-alerts b{margin-right:5px}.youtube-alerts button{float:right;margin-top:-5px;color:#ffc2bd;border-color:#743832}
+
+.animation-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#07090d;border:1px solid var(--border)}
+.animation-preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.animation-preview .animation-first{animation:previewFirst 20s linear infinite}
+.animation-preview .animation-qr{animation:previewQr 20s linear infinite}
+.animation-caption{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.animation-caption span,.animation-caption small{color:var(--dim)}
+@keyframes previewFirst{
+  0%,22.5%{opacity:1}
+  25%,47.5%{opacity:0}
+  50%,72.5%{opacity:1}
+  75%,100%{opacity:0}
+}
+@keyframes previewQr{
+  0%,22.5%{opacity:0}
+  25%,47.5%{opacity:1}
+  50%,72.5%{opacity:0}
+  75%,100%{opacity:1}
+}
