@@ -62,6 +62,7 @@ services:
       GOOGLE_MODE: real
       RENDER_CONCURRENCY: "1"
     command: ["python", "-m", "app.workers.worker"]
+    stop_grace_period: 5m
     volumes:
       - ./data:/data
     depends_on:
