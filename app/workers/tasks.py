@@ -25,6 +25,14 @@ from app.services.youtube import YouTubeError, finalize_publication, upload_vide
 
 log = logging.getLogger("djgabo.worker")
 
+# One production transition per YouTube channel during the one-week visual test.
+CHANNEL_IMAGE_TRANSITIONS = {
+    1: "diagtr",
+    2: "smoothleft",
+    3: "circleopen",
+    4: "dissolve",
+}
+
 
 def _setting(db, key: str) -> str | None:
     row = db.get(Setting, key)
@@ -179,9 +187,21 @@ def _process_job(job_id: str) -> None:
 
                     transition_row = _setting(db, "audio_crossfade_seconds")
                     transition = float(transition_row) if transition_row is not None else settings.audio_crossfade_seconds
-                    create_demo_video(job.original_path, intro_frame_path, commercial, job.cut_seconds, output,
-                                      transition, progress, qr_background_image=frame_path,
-                                      image_switch_seconds=20.0)
+                    create_demo_video(
+                        job.original_path,
+                        intro_frame_path,
+                        commercial,
+                        job.cut_seconds,
+                        output,
+                        transition,
+                        progress,
+                        qr_background_image=frame_path,
+                        image_switch_seconds=20.0,
+                        image_transition=CHANNEL_IMAGE_TRANSITIONS.get(channel.id, "fade"),
+                        animation_until_seconds=40.0,
+                        animation_scene_seconds=5.0,
+                        image_transition_seconds=0.5,
+                    )
             job.rendered_path = str(output)
             job.status = JobStatus.MP4_READY.value
             job.progress = 95
