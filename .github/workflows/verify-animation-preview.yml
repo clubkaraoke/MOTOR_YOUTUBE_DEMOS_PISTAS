@@ -41,6 +41,6 @@ jobs:
           assert data["first_url"] and data["qr_url"]
           print("PREVIEW_OK", data["channel"], data.get("artist"), data.get("title"))
           PY
-          curl -fsSI http://127.0.0.1:8088/api/channels/3/animation-preview/first | head -n 5
-          curl -fsSI http://127.0.0.1:8088/api/channels/3/animation-preview/qr | head -n 5
+          curl -fsS -o /dev/null -w 'FIRST_HTTP=%{http_code} SIZE=%{size_download}\n' http://127.0.0.1:8088/api/channels/3/animation-preview/first
+          curl -fsS -o /dev/null -w 'QR_HTTP=%{http_code} SIZE=%{size_download}\n' http://127.0.0.1:8088/api/channels/3/animation-preview/qr
           REMOTE
