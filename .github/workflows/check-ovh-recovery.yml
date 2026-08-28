@@ -78,4 +78,6 @@ jobs:
                   )
           PY
           sudo docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN rq:queue:djgabo
+          echo "=== WORKER LOG TAIL ==="
+          sudo docker compose -f docker-compose.prod.yml logs --tail=220 worker
           REMOTE
