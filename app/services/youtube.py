@@ -119,7 +119,7 @@ def upload_video(
         try:
             status, response = request.next_chunk(num_retries=2)
             attempts = 0
-            if status is not None:
+            if status is not None and response is None:
                 last_percent = max(last_percent, min(99, int(round(status.progress() * 100))))
                 if progress_callback:
                     progress_callback(last_percent)
