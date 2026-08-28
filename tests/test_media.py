@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from app.services.media import MediaError, create_demo_video, probe_duration, validate_demo_video
+from app.services.media import MediaError, _animated_video_filter, create_demo_video, probe_duration, validate_demo_video
 
 
 def run(*args):
@@ -72,3 +72,42 @@ def test_intro_image_switches_to_qr_image_at_twenty_seconds(tmp_path):
         "-frames:v", "1", after)
     assert Image.open(before).getpixel((640, 360))[0] > 240
     assert Image.open(after).getpixel((640, 360))[2] > 240
+
+
+
+def test_ffmpeg_diagonal_animation_alternates_real_frames(tmp_path):
+    original, commercial = tmp_path/"original.wav", tmp_path/"commercial.wav"
+    intro, qr, output = tmp_path/"intro.png", tmp_path/"qr.png", tmp_path/"animated.mp4"
+    sine(original, 440, 12); sine(commercial, 880, 3)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "color=c=red:s=1280x720", "-frames:v", "1", intro)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "color=c=blue:s=1280x720", "-frames:v", "1", qr)
+
+    create_demo_video(
+        original, intro, commercial, 6, output,
+        qr_background_image=qr,
+        image_transition="diagtr",
+        animation_until_seconds=40,
+        animation_scene_seconds=5,
+        image_transition_seconds=.5,
+    )
+
+    red_frame, blue_frame, red_again = (tmp_path/n for n in ("red.png", "blue.png", "red2.png"))
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "2", "-i", output,
+        "-frames:v", "1", red_frame)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "7", "-i", output,
+        "-frames:v", "1", blue_frame)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "11", "-i", output,
+        "-frames:v", "1", red_again)
+
+    assert Image.open(red_frame).getpixel((640, 360))[0] > 220
+    assert Image.open(blue_frame).getpixel((640, 360))[2] > 220
+    assert Image.open(red_again).getpixel((640, 360))[0] > 220
+
+
+def test_animation_switches_stop_at_35_and_qr_remains_after_40():
+    graph = _animated_video_filter(180, 5, .5, 40, "diagtr")
+    assert "offset=5.000000" in graph
+    assert "offset=35.000000" in graph
+    assert "offset=40.000000" not in graph
