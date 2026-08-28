@@ -1,11 +1,15 @@
 import json
 import secrets
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import httplib2
 from cryptography.fernet import Fernet
+from google.auth.exceptions import TransportError
 from google.oauth2.credentials import Credentials
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -20,6 +24,10 @@ from app.services.title_builder import build_youtube_title
 
 class YouTubeError(RuntimeError):
     pass
+
+
+YOUTUBE_HTTP_TIMEOUT_SECONDS = 90
+UploadProgressCallback = Callable[[int], None]
 
 
 def _fernet() -> Fernet:
@@ -57,16 +65,25 @@ def _service(channel: Channel):
         client_secret=client["client_secret"],
         scopes=["https://www.googleapis.com/auth/youtube"],
     )
-    return build("youtube", "v3", credentials=credentials, cache_discovery=False)
+    http = AuthorizedHttp(credentials, http=httplib2.Http(timeout=YOUTUBE_HTTP_TIMEOUT_SECONDS))
+    return build("youtube", "v3", http=http, cache_discovery=False)
 
 
-def upload_video(job: Job, channel: Channel) -> tuple[str, str]:
+def upload_video(
+    job: Job,
+    channel: Channel,
+    progress_callback: UploadProgressCallback | None = None,
+) -> tuple[str, str]:
     settings = get_settings()
     job.youtube_title = job.youtube_title or build_youtube_title(job.filename_original, job.artist, job.title)
     if job.youtube_video_id:
+        if progress_callback:
+            progress_callback(100)
         return job.youtube_video_id, job.youtube_url or ""
     if settings.youtube_mode == "mock":
         video_id = f"mock_{job.id.replace('-', '')[:16]}"
+        if progress_callback:
+            progress_callback(100)
         return video_id, f"{settings.public_base_url.rstrip('/')}/api/jobs/{job.id}/video"
     service = _service(channel)
     channels = service.channels().list(part="contentDetails", mine=True).execute().get("items", [])
@@ -95,14 +112,35 @@ def upload_video(job: Job, channel: Channel) -> tuple[str, str]:
     request = service.videos().insert(part="snippet,status", body=body, media_body=media)
     response = None
     attempts = 0
+    last_percent = 0
+    if progress_callback:
+        progress_callback(0)
     while response is None:
         try:
-            _, response = request.next_chunk()
+            status, response = request.next_chunk(num_retries=2)
+            attempts = 0
+            if status is not None:
+                last_percent = max(last_percent, min(99, int(round(status.progress() * 100))))
+                if progress_callback:
+                    progress_callback(last_percent)
         except HttpError as exc:
             attempts += 1
             if exc.resp.status not in {429, 500, 502, 503, 504} or attempts > 6:
                 raise YouTubeError(str(exc)) from exc
+            if progress_callback:
+                progress_callback(last_percent)
             time.sleep(min(2 ** attempts, 60))
+        except (httplib2.HttpLib2Error, TransportError, OSError, TimeoutError) as exc:
+            attempts += 1
+            if attempts > 6:
+                raise YouTubeError(
+                    f"La conexión con YouTube no respondió después de {attempts} intentos: {exc}"
+                ) from exc
+            if progress_callback:
+                progress_callback(last_percent)
+            time.sleep(min(2 ** attempts, 60))
+    if progress_callback:
+        progress_callback(100)
     video_id = response["id"]
     return video_id, f"https://www.youtube.com/watch?v={video_id}"
 
