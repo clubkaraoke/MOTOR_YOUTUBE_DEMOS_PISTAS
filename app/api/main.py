@@ -992,10 +992,10 @@ ANIMATION_PREVIEW_TRANSITIONS = {
 
 def _render_animation_preview(first_frame: Path, qr_frame: Path, output: Path, transition: str) -> None:
     filter_complex = (
-        "[0:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v0];"
-        "[1:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v1];"
-        "[2:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v2];"
-        "[3:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v3];"
+        "[0:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v0];"
+        "[1:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v1];"
+        "[2:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v2];"
+        "[3:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v3];"
         f"[v0][v1]xfade=transition={transition}:duration=0.5:offset=5.0[x1];"
         f"[x1][v2]xfade=transition={transition}:duration=0.5:offset=10.0[x2];"
         f"[x2][v3]xfade=transition={transition}:duration=0.5:offset=15.0,"
@@ -1003,10 +1003,10 @@ def _render_animation_preview(first_frame: Path, qr_frame: Path, output: Path, t
     )
     command = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-loop", "1", "-i", str(first_frame),
-        "-loop", "1", "-i", str(qr_frame),
-        "-loop", "1", "-i", str(first_frame),
-        "-loop", "1", "-i", str(qr_frame),
+        "-framerate", "25", "-loop", "1", "-i", str(first_frame),
+        "-framerate", "25", "-loop", "1", "-i", str(qr_frame),
+        "-framerate", "25", "-loop", "1", "-i", str(first_frame),
+        "-framerate", "25", "-loop", "1", "-i", str(qr_frame),
         "-filter_complex", filter_complex,
         "-map", "[vout]", "-an", "-t", "20",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
