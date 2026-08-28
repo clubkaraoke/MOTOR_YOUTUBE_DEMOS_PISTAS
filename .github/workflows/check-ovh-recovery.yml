@@ -77,6 +77,25 @@ jobs:
                       f"error_code={job.error_code}",
                   )
           PY
+          sudo docker compose -f docker-compose.prod.yml exec -T worker python - <<'PY'
+          from redis import Redis
+          from rq.job import Job as RQJob
+          from rq.registry import FailedJobRegistry, StartedJobRegistry
+          from app.core.config import get_settings
+
+          connection = Redis.from_url(get_settings().redis_url)
+          failed = FailedJobRegistry("djgabo", connection=connection)
+          started = StartedJobRegistry("djgabo", connection=connection)
+          print("RQ_STARTED", started.get_job_ids())
+          failed_ids = failed.get_job_ids()[-25:]
+          print("RQ_FAILED_COUNT", len(failed.get_job_ids()), "RECENT", failed_ids)
+          for rq_id in failed_ids:
+              try:
+                  rq_job = RQJob.fetch(rq_id, connection=connection)
+                  print("RQ_FAILURE", rq_id, (rq_job.exc_info or "")[-3500:])
+              except Exception as exc:
+                  print("RQ_FAILURE_READ_ERROR", rq_id, type(exc).__name__, str(exc))
+          PY
           sudo docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN rq:queue:djgabo
           echo "=== WORKER LOG TAIL ==="
           sudo docker compose -f docker-compose.prod.yml logs --tail=220 worker
