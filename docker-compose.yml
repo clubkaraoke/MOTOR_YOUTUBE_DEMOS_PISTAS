@@ -1,0 +1,67 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build: .
+    env_file:
+      - path: .env.example
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/db/djgabo_engine.db
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_SYNC_FALLBACK: "false"
+      RENDER_CONCURRENCY: "1"
+      DATA_ROOT: /data
+    command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8088"]
+    ports:
+      - "8088:8088"
+    volumes:
+      - engine_data:/data
+      - ./data/google-auth:/data/google-auth:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file:
+      - path: .env.example
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/db/djgabo_engine.db
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_SYNC_FALLBACK: "false"
+      RENDER_CONCURRENCY: "1"
+      DATA_ROOT: /data
+    command: ["python", "-m", "app.workers.worker"]
+    volumes:
+      - engine_data:/data
+      - ./data/google-auth:/data/google-auth:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  engine_data:
+  redis_data:

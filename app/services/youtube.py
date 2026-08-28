@@ -1,0 +1,205 @@
+import json
+import secrets
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from cryptography.fernet import Fernet
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.models.entities import Channel, ChannelPublication, Job, JobStatus, QrRedirect
+from app.services.oauth_client import youtube_oauth_client
+from app.services.title_builder import build_youtube_title
+
+
+class YouTubeError(RuntimeError):
+    pass
+
+
+def _fernet() -> Fernet:
+    settings = get_settings()
+    key = settings.token_encryption_key
+    if not key:
+        path = settings.token_encryption_key_path
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not path.exists():
+                path.write_bytes(Fernet.generate_key())
+            key = path.read_text(encoding="ascii").strip()
+        except OSError as exc:
+            raise YouTubeError(f"No se pudo preparar la clave cifrada en {path}") from exc
+    return Fernet(key.encode())
+
+
+def encrypt_token(data: dict) -> str:
+    return _fernet().encrypt(json.dumps(data).encode()).decode()
+
+
+def decrypt_token(value: str) -> dict:
+    return json.loads(_fernet().decrypt(value.encode()).decode())
+
+
+def _service(channel: Channel):
+    settings = get_settings()
+    client = youtube_oauth_client()
+    if not channel.token_reference:
+        raise YouTubeError("Canal sin autorización OAuth")
+    token = decrypt_token(channel.token_reference)
+    credentials = Credentials(
+        token=token.get("token"), refresh_token=token.get("refresh_token"),
+        token_uri=client.get("token_uri", "https://oauth2.googleapis.com/token"), client_id=client["client_id"],
+        client_secret=client["client_secret"],
+        scopes=["https://www.googleapis.com/auth/youtube"],
+    )
+    return build("youtube", "v3", credentials=credentials, cache_discovery=False)
+
+
+def upload_video(job: Job, channel: Channel) -> tuple[str, str]:
+    settings = get_settings()
+    job.youtube_title = job.youtube_title or build_youtube_title(job.filename_original, job.artist, job.title)
+    if job.youtube_video_id:
+        return job.youtube_video_id, job.youtube_url or ""
+    if settings.youtube_mode == "mock":
+        video_id = f"mock_{job.id.replace('-', '')[:16]}"
+        return video_id, f"{settings.public_base_url.rstrip('/')}/api/jobs/{job.id}/video"
+    service = _service(channel)
+    channels = service.channels().list(part="contentDetails", mine=True).execute().get("items", [])
+    uploads_playlist = channels[0]["contentDetails"]["relatedPlaylists"]["uploads"] if channels else None
+    candidate_ids: list[str] = []
+    if uploads_playlist:
+        recent = service.playlistItems().list(
+            part="contentDetails", playlistId=uploads_playlist, maxResults=50
+        ).execute()
+        candidate_ids = [
+            item["contentDetails"]["videoId"] for item in recent.get("items", [])
+            if item.get("contentDetails", {}).get("videoId")
+        ]
+    if candidate_ids:
+        found = service.videos().list(part="snippet,status", id=",".join(candidate_ids)).execute()
+        for item in found.get("items", []):
+            if job.id in item.get("snippet", {}).get("tags", []):
+                video_id = item["id"]
+                return video_id, f"https://www.youtube.com/watch?v={video_id}"
+    body = {
+        "snippet": {"title": job.youtube_title, "description": channel.youtube_description or settings.youtube_default_description,
+                    "tags": [job.id, "DJGABO Engine"]},
+        "status": {"privacyStatus": job.privacy_status},
+    }
+    media = MediaFileUpload(job.rendered_path, chunksize=8 * 1024 * 1024, resumable=True)
+    request = service.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    attempts = 0
+    while response is None:
+        try:
+            _, response = request.next_chunk()
+        except HttpError as exc:
+            attempts += 1
+            if exc.resp.status not in {429, 500, 502, 503, 504} or attempts > 6:
+                raise YouTubeError(str(exc)) from exc
+            time.sleep(min(2 ** attempts, 60))
+    video_id = response["id"]
+    return video_id, f"https://www.youtube.com/watch?v={video_id}"
+
+
+def finalize_publication(db: Session, job: Job, channel: Channel, video_id: str, url: str, now: datetime | None = None) -> None:
+    settings = get_settings()
+    now = now or datetime.now(timezone.utc)
+    existing = db.scalar(select(ChannelPublication).where(ChannelPublication.job_id == job.id))
+    job.youtube_video_id = video_id
+    job.youtube_url = url
+    job.published_at = job.published_at or now
+    job.cleanup_at = None if settings.youtube_mode == "mock" else (
+        job.cleanup_at or now + timedelta(minutes=settings.success_retention_minutes)
+    )
+    job.status = JobStatus.PUBLISHED.value
+    job.progress = 100
+    redirect = db.scalar(select(QrRedirect).where(QrRedirect.job_id == job.id))
+    if redirect:
+        redirect.youtube_video_id = video_id
+        redirect.youtube_url = url
+    if existing:
+        existing.channel_id = channel.id
+        existing.youtube_video_id = video_id
+        existing.published_at = job.published_at
+    else:
+        db.add(ChannelPublication(channel_id=channel.id, job_id=job.id, youtube_video_id=video_id, published_at=job.published_at))
+    db.commit()
+
+
+def change_privacy(job: Job, channel: Channel, privacy: str) -> str:
+    if privacy not in {"public", "unlisted", "private"}:
+        raise YouTubeError("Privacidad inválida")
+    actual_privacy = privacy
+    if get_settings().youtube_mode == "real":
+        response = _service(channel).videos().update(
+            part="status", body={"id": job.youtube_video_id, "status": {"privacyStatus": privacy}}
+        ).execute()
+        actual_privacy = response.get("status", {}).get("privacyStatus", privacy)
+    job.privacy_status = actual_privacy
+    job.youtube_actual_privacy = actual_privacy
+    job.youtube_last_checked_at = datetime.now(timezone.utc)
+    return actual_privacy
+
+
+def sync_video_status(job: Job, channel: Channel) -> dict:
+    """Refresh the status YouTube exposes through Data API v3."""
+    now = datetime.now(timezone.utc)
+    if get_settings().youtube_mode != "real" or not job.youtube_video_id or job.youtube_video_id.startswith("mock_"):
+        job.youtube_actual_privacy = job.privacy_status
+        job.youtube_upload_status = "processed"
+        job.youtube_last_checked_at = now
+        return {"available": True, "privacy_status": job.youtube_actual_privacy, "upload_status": job.youtube_upload_status}
+    response = _service(channel).videos().list(part="status,contentDetails", id=job.youtube_video_id).execute()
+    items = response.get("items", [])
+    job.youtube_last_checked_at = now
+    if not items:
+        job.youtube_deleted_at = job.youtube_deleted_at or now
+        job.youtube_upload_status = "deleted_or_unavailable"
+        if job.youtube_restriction_status != "UNAVAILABLE":
+            job.youtube_attention_acknowledged_at = None
+        job.youtube_restriction_status = "UNAVAILABLE"
+        return {"available": False, "upload_status": job.youtube_upload_status}
+    status = items[0].get("status", {})
+    region = items[0].get("contentDetails", {}).get("regionRestriction", {})
+    blocked = region.get("blocked") or []
+    allowed = region.get("allowed")
+    previous_restriction = job.youtube_restriction_status
+    if len(blocked) >= 200 or allowed == []:
+        restriction_status = "WORLDWIDE_BLOCKED"
+    elif "PE" in blocked or (allowed is not None and "PE" not in allowed):
+        restriction_status = "BLOCKED_IN_PE"
+    elif blocked or allowed is not None:
+        restriction_status = "REGION_RESTRICTED"
+    else:
+        restriction_status = None
+    job.youtube_deleted_at = None
+    job.youtube_actual_privacy = status.get("privacyStatus")
+    job.youtube_upload_status = status.get("uploadStatus")
+    job.youtube_failure_reason = status.get("failureReason")
+    job.youtube_rejection_reason = status.get("rejectionReason")
+    job.youtube_restriction_status = restriction_status
+    job.youtube_region_blocked = json.dumps(blocked) if blocked else None
+    job.youtube_region_allowed = json.dumps(allowed) if allowed is not None else None
+    if previous_restriction != restriction_status:
+        job.youtube_attention_acknowledged_at = None
+    if job.youtube_actual_privacy:
+        job.privacy_status = job.youtube_actual_privacy
+    return {
+        "available": True,
+        "privacy_status": job.youtube_actual_privacy,
+        "upload_status": job.youtube_upload_status,
+        "failure_reason": job.youtube_failure_reason,
+        "rejection_reason": job.youtube_rejection_reason,
+        "restriction_status": job.youtube_restriction_status,
+    }
+
+
+def delete_video(job: Job, channel: Channel) -> None:
+    if get_settings().youtube_mode == "real" and job.youtube_video_id:
+        _service(channel).videos().delete(id=job.youtube_video_id).execute()

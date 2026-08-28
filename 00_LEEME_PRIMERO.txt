@@ -1,0 +1,23 @@
+DJGABO YOUTUBE DEMO ENGINE V2 — PAQUETE PARA CODEX
+
+OBJETIVO
+Construir un motor web 24/7 que reciba muchos MP3/WAV, genere MP4 1280x720 con imagen fija, permita escuchar la pista original sólo hasta un punto de corte configurable y desde ese punto hasta el final reemplace completamente el audio por un audio comercial. Luego debe distribuir y subir automáticamente los videos a 3–4 canales de YouTube respetando máximo 7 publicaciones por canal dentro de una ventana móvil de 24 horas.
+
+QUÉ HACER EN CODEX
+1. Abrir este ZIP como proyecto/contexto.
+2. Leer primero 01_PROMPT_MAESTRO_CODEX.md.
+3. Implementar el proyecto completo, no una maqueta.
+4. Ejecutar las pruebas de 05_PRUEBAS_ACEPTACION.md.
+5. Entregar una carpeta ejecutable localmente con Docker Compose y lista para desplegar después en OVH.
+
+IMPORTANTE
+- No copiar código GPL del repositorio archive-to-video. Usarlo sólo como referencia conceptual.
+- No pedir credenciales reales para desarrollar el motor. Crear modo MOCK/local para probar sin YouTube.
+- Las credenciales OAuth reales de YouTube se conectarán al final.
+- El panel visual de referencia existente se llama: djgabo-demo-engine (1).html.
+- Si ese HTML está disponible en el workspace de Codex, usarlo como base visual obligatoria y reemplazar su simulación por backend real.
+
+ÚNICO MATERIAL EXTERNO QUE FALTARÁ AL FINAL
+- Proyecto Google Cloud con YouTube Data API habilitada.
+- client_id / client_secret OAuth.
+- Autorización OAuth independiente de cada canal.

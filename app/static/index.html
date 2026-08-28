@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DJGABO Engine — Panel de producción</title>
+  <link rel="stylesheet" href="./static/styles.css?v=9">
+</head>
+<body>
+<div id="app">
+  <header class="console">
+    <div class="brand"><b>DJGABO ENGINE</b><small>Panel de producción · servidor</small></div>
+    <div class="metrics" id="metrics"></div>
+    <i class="divider"></i>
+    <div class="channels" id="channels"></div>
+    <button class="ghost" id="settingsOpen">⚙ Configuración</button>
+  </header>
+  <nav class="toolbar">
+    <button class="tab active" data-tab="production">Producción</button>
+    <button class="tab" data-tab="history">Historial</button>
+    <button class="link hidden" id="clearFilter">Quitar filtro</button>
+    <button class="mini hidden" id="syncYoutube">↻ Revisar estado YouTube</button>
+    <button class="mini bulk-public hidden" id="publicAll" disabled>Hacer públicos seleccionados (0)</button>
+    <label class="search">⌕ <input id="search" placeholder="Buscar artista, título, canal o estado"></label>
+  </nav>
+  <main>
+    <section class="dropzone" id="dropzone">
+      <input id="fileInput" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" multiple hidden>
+      <span class="uploadIcon">⇧</span>
+      <div><b>Arrastra MP3/WAV aquí o haz clic para seleccionar</b><small>Subida múltiple · ARTISTA - TÍTULO · progreso por archivo</small></div>
+    </section>
+    <section id="uploads" class="uploads hidden"></section>
+    <section id="engineActivity" class="engine-activity hidden" aria-live="polite"></section>
+    <section id="youtubeAlerts" class="notice youtube-alerts hidden" aria-live="polite"></section>
+    <section id="reviewBanner" class="notice hidden"></section>
+    <section class="start-row"><button class="primary" id="start">Iniciar producción</button><span id="startHint"></span></section>
+    <section class="list">
+      <div class="row row-head"><input type="checkbox" id="selectAll" title="Seleccionar todos los videos visibles"><span>Canción</span><span>Estado</span><span>Canal</span><span>Resultado</span><span>Acción</span></div>
+      <div id="jobs"></div>
+    </section>
+  </main>
+</div>
+
+<aside id="drawer" class="drawer">
+  <div class="drawer-head"><b id="drawerTitle">Detalle</b><button id="drawerClose">×</button></div>
+  <div id="drawerBody" class="drawer-body"></div>
+</aside>
+
+<section id="settings" class="settings">
+  <header><button class="ghost" id="settingsClose">← Volver</button><h2>Configuración</h2></header>
+  <div class="settings-body">
+    <article class="panel">
+      <h3>Protección del audio</h3>
+      <p>El video conserva la duración total. El original termina en el corte y desde allí sólo suena el comercial.</p>
+      <div class="grid">
+        <label>Punto de corte predeterminado (segundos)<input id="cutSetting" type="number" min="0.01" max="86400" step="0.01"></label>
+        <label>Transición de protección (segundos)<input id="transitionSetting" type="number" min="0" max="1" step="0.01"></label>
+      </div>
+      <div class="settings-actions"><small>Predeterminado: 80 s. Los nuevos videos usarán el valor guardado.</small><button class="mini" id="saveAudioProtection">Guardar protección</button></div>
+    </article>
+    <article class="panel">
+      <h3>Audio comercial predeterminado</h3>
+      <p>Se repite o recorta automáticamente para cubrir desde el corte hasta el final.</p>
+      <div class="asset-row"><span id="commercialName">Sin configurar</span><button class="mini" id="commercialBtn">Subir audio</button><input hidden id="commercialInput" type="file" accept=".mp3,.wav"></div>
+    </article>
+    <article class="panel">
+      <h3>Fondo general 1280 × 720</h3>
+      <p>Plantilla base exacta. Sólo se aceptan imágenes de 1280×720; el motor no las estira ni recorta.</p>
+      <div class="background-editor">
+        <img id="fallbackPreview" class="background-preview hidden" alt="Vista previa del fondo general">
+        <div class="asset-row"><span id="fallbackName">Sin configurar</span><button class="mini" id="fallbackBtn">Cambiar fondo general</button><input hidden id="fallbackInput" type="file" accept="image/png,image/jpeg,image/webp"></div>
+      </div>
+    </article>
+    <article class="panel">
+      <h3>Catálogo de covers</h3>
+      <p>Se consulta la pestaña 01_CEREBRO2 cada 5 minutos. Los trabajos sin coincidencia quedan esperando y no consumen FFmpeg.</p>
+      <div class="asset-row"><span id="googleMode"></span><button class="mini" id="refreshCoversBtn">Actualizar covers ahora</button></div>
+    </article>
+    <article class="panel"><h3>Secuencia de imágenes por canal</h3><p>La primera imagen aparece durante 20 segundos. Después se muestra la segunda imagen con el QR hasta terminar el video. Ambas deben medir exactamente 1280×720.</p><div id="channelSettings"></div></article>
+    <article class="panel"><h3>YouTube y QR</h3><p id="youtubeMode"></p><p id="qrConfig"></p></article>
+  </div>
+</section>
+
+<div id="toasts"></div>
+<script src="./static/app.js?v=12"></script>
+</body>
+</html>

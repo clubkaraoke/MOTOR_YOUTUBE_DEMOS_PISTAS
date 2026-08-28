@@ -1,0 +1,8 @@
+PANEL VISUAL ORIGINAL
+Nombre: djgabo-demo-engine (1).html
+
+Este paquete contiene la especificación exacta de cambios y elementos visuales en 02_ESPECIFICACION_PANEL.md.
+
+Si el archivo `djgabo-demo-engine (1).html` está disponible en el workspace de Codex, úsalo directamente y conviértelo de simulación a interfaz conectada al backend real. NO lo reemplaces por un diseño genérico.
+
+Si NO está disponible, recrear la misma estructura visual siguiendo 02_ESPECIFICACION_PANEL.md y solicitar/comparar posteriormente contra el HTML original antes de considerar cerrada la UI.

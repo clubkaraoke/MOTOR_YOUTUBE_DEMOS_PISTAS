@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DJGABO · Panel principal</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0d1118;--panel:#171d27;--line:#2a3342;--text:#f4f7fb;--muted:#8f9bad;--cyan:#2ed9cf;--danger:#ff667a}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 5%,#20234a 0,transparent 32%),radial-gradient(circle at 10% 90%,#123a3a 0,transparent 28%),var(--bg);font:15px/1.5 Inter,Segoe UI,sans-serif;color:var(--text)}
+    button,input{font:inherit}.shell{max-width:1180px;margin:auto;padding:28px}.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:20px}.brand b{letter-spacing:.12em}.brand small,.muted{display:block;color:var(--muted)}
+    .logout{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:9px 14px;cursor:pointer}.hero{padding:64px 0 34px}.hero h1{font-size:clamp(34px,6vw,64px);line-height:1;margin:0 0 14px;max-width:750px}.hero p{color:var(--muted);font-size:17px;max-width:650px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.card{position:relative;min-height:260px;padding:28px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));color:var(--text);text-decoration:none;overflow:hidden;transition:.2s transform,.2s border-color}.card:hover{transform:translateY(-4px);border-color:var(--cyan)}.card .code{font:700 12px ui-monospace,monospace;letter-spacing:.15em;color:var(--cyan)}.card h2{font-size:34px;margin:56px 0 5px}.card p{color:var(--muted);margin:0;max-width:430px}.card .arrow{position:absolute;right:28px;top:26px;font-size:28px}.youtube{--cyan:#ff667a}.locked{display:none}
+    .gate{position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:rgba(7,10,15,.93);backdrop-filter:blur(16px);z-index:10}.login{width:min(440px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}.login h1{margin:0 0 8px}.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0 14px}.role{border:1px solid var(--line);background:#111722;color:var(--text);padding:13px;border-radius:9px;cursor:pointer}.role.active{border-color:var(--cyan);color:var(--cyan)}label{color:var(--muted);font-size:13px}input{width:100%;margin:7px 0 14px;padding:13px;border:1px solid var(--line);border-radius:9px;background:#0d121b;color:var(--text)}.enter{width:100%;padding:13px;border:0;border-radius:9px;background:var(--cyan);color:#071313;font-weight:800;cursor:pointer}.error{min-height:22px;color:var(--danger);margin-top:10px}.hidden{display:none!important}
+    @media(max-width:720px){.shell{padding:20px}.hero{padding:46px 0 28px}.grid{grid-template-columns:1fr}.card{min-height:220px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top"><div class="brand"><b>DJGABO · PRODUCCIÓN</b><small id="who">Panel principal</small></div><button class="logout hidden" id="logout">Cerrar sesión</button></header>
+    <section class="hero"><h1>Elige el motor de trabajo.</h1><p>Cada sistema funciona de forma independiente y conserva sus propios archivos, procesos y configuraciones.</p></section>
+    <section class="grid">
+      <a class="card" href="/cdg/"><span class="code">MOTOR 01</span><span class="arrow">↗</span><h2>CD+G</h2><p>Corrección, sincronización y producción del catálogo CD+G.</p></a>
+      <a class="card youtube locked" id="youtubeCard" href="/p-youtube/"><span class="code">MOTOR 02 · ADMIN</span><span class="arrow">↗</span><h2>P‑YouTube</h2><p>Conversión, distribución por canales y publicación automatizada en YouTube.</p></a>
+    </section>
+  </main>
+
+  <section class="gate" id="gate">
+    <form class="login" id="login">
+      <div class="brand"><b>DJGABO · ACCESO</b></div><h1>Panel principal</h1><p class="muted">Ingresa con la cuenta que ya utilizas en CD+G.</p>
+      <div class="roles"><button type="button" class="role active" data-role="ADMIN">Administrador</button><button type="button" class="role" data-role="CORRECTORA">Valeria</button></div>
+      <label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="enter" type="submit">Ingresar</button><div class="error" id="error"></div>
+    </form>
+  </section>
+  <script>
+    const gate=document.getElementById('gate'),error=document.getElementById('error'),password=document.getElementById('password'),youtubeCard=document.getElementById('youtubeCard'),logout=document.getElementById('logout'),who=document.getElementById('who');
+    let role='ADMIN';
+    document.querySelectorAll('[data-role]').forEach(button=>button.onclick=()=>{role=button.dataset.role;document.querySelectorAll('[data-role]').forEach(x=>x.classList.toggle('active',x===button));password.focus()});
+    async function call(fn,...args){const response=await fetch('/api/call/'+encodeURIComponent(fn),{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({args})});const data=await response.json().catch(()=>({}));if(!response.ok||data.ok===false)throw Error(data.error||'No se pudo completar el acceso.');return data}
+    function showSession(session){role=session.rol;gate.classList.add('hidden');logout.classList.remove('hidden');youtubeCard.classList.toggle('locked',role!=='ADMIN');who.textContent=role==='ADMIN'?'Administrador · acceso completo':'Valeria · acceso CD+G'}
+    document.getElementById('login').onsubmit=async event=>{event.preventDefault();error.textContent='';try{const session=await call('iniciarSesionConsola',role,password.value);localStorage.setItem('consola_session_token',session.token);password.value='';showSession(session)}catch(e){error.textContent=e.message}};
+    logout.onclick=async()=>{const token=localStorage.getItem('consola_session_token')||'';try{await call('cerrarSesionConsola',token)}catch{}localStorage.removeItem('consola_session_token');location.reload()};
+    (async()=>{const token=localStorage.getItem('consola_session_token');if(!token)return;try{const session=await call('validarSesionConsola',token);if(session.ok)showSession(session);else localStorage.removeItem('consola_session_token')}catch{localStorage.removeItem('consola_session_token')}})();
+    if(new URLSearchParams(location.search).has('admin_required'))error.textContent='Esta sección requiere la cuenta de administrador.';
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+NO SE NECESITA PARA QUE CODEX EMPIECE A PROGRAMAR.
+
+Para conectar YouTube real al final:
+1. Proyecto de Google Cloud.
+2. YouTube Data API v3 habilitada.
+3. OAuth Client ID tipo Web application apropiado para el despliegue.
+4. Client ID y Client Secret guardados como secretos/env.
+5. Autorizar cada canal de YouTube por OAuth y conservar su refresh token de forma segura.
+6. Dominio/URL HTTPS del servidor para callback OAuth en producción.
+
+No existe necesidad de una API key distinta por canal. Cada canal se autoriza mediante OAuth.
