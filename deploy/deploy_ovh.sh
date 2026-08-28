@@ -6,9 +6,11 @@ revision=${2:?Git revision is required}
 target=/opt/djgabo-youtube
 staging="/tmp/djgabo-youtube-${revision}"
 backup="${target}/backup-before-github-${revision}.tgz"
+backup_tmp="/tmp/backup-before-github-${revision}.tgz"
 
 cleanup() {
   rm -rf -- "$staging" "$archive"
+  sudo rm -f -- "$backup_tmp"
 }
 trap cleanup EXIT
 
@@ -24,8 +26,9 @@ sudo tar \
   --exclude='./.env' \
   --exclude='./data' \
   --exclude='./backup-*.tgz' \
-  -czf "$backup" \
+  -czf "$backup_tmp" \
   -C "$target" .
+sudo mv -- "$backup_tmp" "$backup"
 
 sudo rsync -a --delete \
   --exclude='.env' \
