@@ -141,7 +141,7 @@ def test_wav_stays_identical_and_duplicate_is_found_in_drive(tmp_path: Path):
         assert duplicate is not None
         assert duplicate["id"] == uploaded["id"]
         assert downloaded.read_bytes() == original_bytes
-        assert YOUTUBE_AUDIO_BITRATE == "320k"
+        assert YOUTUBE_AUDIO_BITRATE == "384k"
     finally:
         storage.settings.google_mode = previous_mode
         storage.settings.data_root = previous_data
