@@ -120,7 +120,7 @@ def dispatch_waiting() -> None:
 
 def recover_stalled() -> dict:
     """Recover abandoned stages only when RQ no longer owns the job."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
     recovered: list[str] = []
     failed: list[str] = []
     redis = queue.connection
@@ -140,7 +140,11 @@ def recover_stalled() -> dict:
         for job in jobs:
             guard = f"djgabo:enqueued:{job.id}"
             if redis.exists(guard):
-                continue
+                log.warning(
+                    "stalled_guard_released job_id=%s status=%s updated_at=%s",
+                    job.id, job.status, job.updated_at,
+                )
+                redis.delete(guard)
             if job.status == JobStatus.UPLOADING_TO_DRIVE.value:
                 source = Path(job.original_path) if job.original_path else None
                 try:
