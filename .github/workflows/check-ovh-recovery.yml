@@ -77,6 +77,30 @@ jobs:
                       f"error_code={job.error_code}",
                   )
           PY
+          sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
+          from sqlalchemy import select
+          from app.core.database import SessionLocal
+          from app.models.entities import Channel
+          from app.services.youtube import _service
+
+          with SessionLocal() as db:
+              channels = db.scalars(select(Channel).order_by(Channel.id)).all()
+              for channel in channels:
+                  try:
+                      response = _service(channel).channels().list(part="id,snippet", mine=True).execute()
+                      items = response.get("items", [])
+                      title = items[0].get("snippet", {}).get("title") if items else None
+                      print("CHANNEL_OAUTH", channel.id, channel.display_name, "OK", title or "SIN_CANAL")
+                  except Exception as exc:
+                      message = str(exc)
+                      if "invalid_grant" in message:
+                          reason = "INVALID_GRANT"
+                      elif "expired or revoked" in message:
+                          reason = "EXPIRED_OR_REVOKED"
+                      else:
+                          reason = type(exc).__name__
+                      print("CHANNEL_OAUTH", channel.id, channel.display_name, "ERROR", reason)
+          PY
           sudo docker compose -f docker-compose.prod.yml exec -T worker python - <<'PY'
           from redis import Redis
           from rq.job import Job as RQJob
