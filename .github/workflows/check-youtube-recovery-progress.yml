@@ -27,7 +27,7 @@ jobs:
             printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
             printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
           } > "$HOME/.ssh/known_hosts"
-      - name: Check progress and worker
+      - name: Check recovery errors and progress
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
@@ -46,26 +46,17 @@ jobs:
           with SessionLocal() as db:
               counts = db.execute(select(Job.status, func.count(Job.id)).group_by(Job.status).order_by(Job.status)).all()
               print("STATUS_COUNTS", {status: count for status, count in counts})
-              active = db.scalars(
-                  select(Job).where(Job.status.in_(["QUEUED","UPLOADING_YOUTUBE","VERIFYING","WAITING_SLOT","UPLOAD_ERROR"]))
-                  .order_by(Job.created_at)
+              rows = db.scalars(
+                  select(Job).where(
+                      Job.status.in_(["UPLOAD_ERROR","UPLOADING_YOUTUBE","QUEUED","WAITING_SLOT","VERIFYING"])
+                  ).order_by(Job.updated_at.desc())
               ).all()
-              for job in active[:25]:
+              for job in rows[:25]:
                   updated = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
                   age = int((datetime.now(timezone.utc)-updated).total_seconds())
-                  print("ACTIVE", job.id[:8], job.status, "progress="+str(job.progress), "channel="+str(job.channel_id), "age_sec="+str(age), "error="+str(job.error_code))
+                  print("JOB", job.id[:8], job.status, "progress="+str(job.progress), "channel="+str(job.channel_id), "age_sec="+str(age), "error_code="+str(job.error_code))
+                  if job.error_message:
+                      print("ERROR_MESSAGE", job.id[:8], job.error_message[:1800].replace("\n"," "))
           PY
-          sudo docker compose -f docker-compose.prod.yml exec -T worker python - <<'PY'
-          from redis import Redis
-          from rq.registry import StartedJobRegistry, FailedJobRegistry
-          from app.core.config import get_settings
-          r=Redis.from_url(get_settings().redis_url)
-          started=StartedJobRegistry("djgabo", connection=r)
-          failed=FailedJobRegistry("djgabo", connection=r)
-          print("RQ_STARTED", started.get_job_ids())
-          print("RQ_FAILED_COUNT", len(failed.get_job_ids()))
-          print("RQ_QUEUE_LEN", r.llen("rq:queue:djgabo"))
-          PY
-          echo "=== WORKER LOG TAIL ==="
-          sudo docker compose -f docker-compose.prod.yml logs --tail=120 worker
+          sudo docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN rq:queue:djgabo
           REMOTE
