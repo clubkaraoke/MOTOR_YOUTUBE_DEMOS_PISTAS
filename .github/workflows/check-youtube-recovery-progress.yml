@@ -27,38 +27,45 @@ jobs:
             printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
             printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
           } > "$HOME/.ssh/known_hosts"
-      - name: Check progress
+      - name: Check progress and worker
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
         run: |
           set -euo pipefail
-          sleep 45
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
           set -euo pipefail
           cd /opt/djgabo-youtube
           sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
+          from datetime import datetime, timezone
           from sqlalchemy import func, select
           from app.core.database import SessionLocal
-          from app.models.entities import Job, ChannelPublication
+          from app.models.entities import Job
 
           with SessionLocal() as db:
-              counts = db.execute(
-                  select(Job.status, func.count(Job.id)).group_by(Job.status).order_by(Job.status)
-              ).all()
+              counts = db.execute(select(Job.status, func.count(Job.id)).group_by(Job.status).order_by(Job.status)).all()
               print("STATUS_COUNTS", {status: count for status, count in counts})
-              recent = db.scalars(
-                  select(Job).order_by(Job.updated_at.desc()).limit(15)
+              active = db.scalars(
+                  select(Job).where(Job.status.in_(["QUEUED","UPLOADING_YOUTUBE","VERIFYING","WAITING_SLOT","UPLOAD_ERROR"]))
+                  .order_by(Job.created_at)
               ).all()
-              for job in recent:
-                  print("JOB", job.id[:8], job.status, "progress="+str(job.progress), "channel="+str(job.channel_id), "video="+str(bool(job.youtube_video_id)), "error="+str(job.error_code))
-              pubs = db.execute(
-                  select(ChannelPublication.channel_id, func.count(ChannelPublication.id))
-                  .group_by(ChannelPublication.channel_id)
-                  .order_by(ChannelPublication.channel_id)
-              ).all()
-              print("PUBLICATIONS_TOTAL_BY_CHANNEL", dict(pubs))
+              for job in active[:25]:
+                  updated = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
+                  age = int((datetime.now(timezone.utc)-updated).total_seconds())
+                  print("ACTIVE", job.id[:8], job.status, "progress="+str(job.progress), "channel="+str(job.channel_id), "age_sec="+str(age), "error="+str(job.error_code))
           PY
-          sudo docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN rq:queue:djgabo
+          sudo docker compose -f docker-compose.prod.yml exec -T worker python - <<'PY'
+          from redis import Redis
+          from rq.registry import StartedJobRegistry, FailedJobRegistry
+          from app.core.config import get_settings
+          r=Redis.from_url(get_settings().redis_url)
+          started=StartedJobRegistry("djgabo", connection=r)
+          failed=FailedJobRegistry("djgabo", connection=r)
+          print("RQ_STARTED", started.get_job_ids())
+          print("RQ_FAILED_COUNT", len(failed.get_job_ids()))
+          print("RQ_QUEUE_LEN", r.llen("rq:queue:djgabo"))
+          PY
+          echo "=== WORKER LOG TAIL ==="
+          sudo docker compose -f docker-compose.prod.yml logs --tail=120 worker
           REMOTE
