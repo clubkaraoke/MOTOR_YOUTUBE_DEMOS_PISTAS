@@ -193,10 +193,18 @@ def _process_job(job_id: str) -> None:
             return
         try:
             job.status = JobStatus.UPLOADING_YOUTUBE.value
+            job.progress = 0
             job.upload_operation_id = job.upload_operation_id or f"job:{job.id}"
+            job.error_code = job.error_message = None
             db.commit()
-            video_id, url = upload_video(job, channel)
+
+            def youtube_progress(value: int) -> None:
+                job.progress = max(0, min(100, int(value)))
+                db.commit()
+
+            video_id, url = upload_video(job, channel, progress_callback=youtube_progress)
             job.status = JobStatus.VERIFYING.value
+            job.progress = 100
             db.commit()
             finalize_publication(db, job, channel, video_id, url)
             if settings.youtube_mode == "real":
