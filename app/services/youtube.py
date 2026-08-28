@@ -65,7 +65,13 @@ def _service(channel: Channel):
         client_secret=client["client_secret"],
         scopes=["https://www.googleapis.com/auth/youtube"],
     )
-    http = AuthorizedHttp(credentials, http=httplib2.Http(timeout=YOUTUBE_HTTP_TIMEOUT_SECONDS))
+    transport = httplib2.Http(timeout=YOUTUBE_HTTP_TIMEOUT_SECONDS)
+    # Google resumable uploads use HTTP 308 "Resume Incomplete". httplib2
+    # otherwise treats 308 as a redirect and raises RedirectMissingLocation
+    # because that upload response intentionally has no Location header.
+    if hasattr(transport, "redirect_codes"):
+        transport.redirect_codes = transport.redirect_codes - {308}
+    http = AuthorizedHttp(credentials, http=transport)
     return build("youtube", "v3", http=http, cache_discovery=False)
 
 
