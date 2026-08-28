@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from filelock import FileLock
+from google.auth.exceptions import RefreshError
 from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
@@ -214,11 +215,17 @@ def _process_job(job_id: str) -> None:
             else:
                 job.status = JobStatus.PUBLISHED.value
                 db.commit()
-        except YouTubeError as exc:
+        except (YouTubeError, RefreshError) as exc:
+            message = str(exc)
             job.status = JobStatus.UPLOAD_ERROR.value
             job.retry_count += 1
-            job.error_code = "YOUTUBE_ERROR"
-            job.error_message = str(exc)[-2000:]
+            if "invalid_grant" in message or "expired or revoked" in message:
+                job.error_code = "YOUTUBE_OAUTH_RECONNECT_REQUIRED"
+                job.error_message = "La autorización OAuth del canal venció o fue revocada. Reconecta el canal y pulsa Reintentar."
+                channel.oauth_status = "RECONNECT_REQUIRED"
+            else:
+                job.error_code = "YOUTUBE_ERROR"
+                job.error_message = message[-2000:]
             db.commit()
 
 
