@@ -29,6 +29,7 @@ from app.schemas import AudioProtectionUpdate, BulkPrivacyUpdate, ChannelUpdate,
 from app.services.cleanup import cleanup_due
 from app.services.cover_provider import cover_provider
 from app.services.google_drive import DriveAudioStorage, GoogleStorageError
+from app.services.frame_builder import create_frame
 from app.services.media import MediaError, probe_duration
 from app.services.oauth_client import YouTubeOAuthConfigError, google_client_config
 from app.services.qr import whatsapp_url
@@ -978,6 +979,67 @@ def channel_qr_background_image(channel_id: int, db: Session = Depends(get_db)):
     if not channel or not channel.qr_background_image_path or not Path(channel.qr_background_image_path).is_file():
         raise HTTPException(404, "Fondo QR propio no configurado")
     return FileResponse(Path(channel.qr_background_image_path), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/channels/{channel_id}/animation-preview")
+def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
+    channel = db.get(Channel, channel_id)
+    if not channel:
+        raise HTTPException(404, "Canal no encontrado")
+
+    first_background = Path(channel.background_image_path) if channel.background_image_path else None
+    second_background = Path(channel.qr_background_image_path) if channel.qr_background_image_path else first_background
+    if not first_background or not first_background.is_file() or not second_background or not second_background.is_file():
+        raise HTTPException(409, "Configura las dos imágenes del canal antes de probar la animación")
+
+    job = db.scalar(
+        select(Job)
+        .where(Job.channel_id == channel_id, Job.cover_url.is_not(None))
+        .order_by(Job.updated_at.desc())
+        .limit(1)
+    )
+    if not job or not job.cover_url:
+        raise HTTPException(409, "No hay una canción reciente con cover para crear la prueba")
+
+    preview_dir = settings.assets_dir / "animation_previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    cover_path = preview_dir / f"channel_{channel_id}_cover.png"
+    first_frame = preview_dir / f"channel_{channel_id}_first.png"
+    second_frame = preview_dir / f"channel_{channel_id}_qr.png"
+
+    try:
+        cover_provider.download(job.cover_url, cover_path)
+        qr_url = whatsapp_url(settings.whatsapp_number, job.filename_original)
+        create_frame(
+            first_background, cover_path, job.artist or "", job.title or "",
+            qr_url, first_frame, settings.whatsapp_number, include_qr=False,
+        )
+        create_frame(
+            second_background, cover_path, job.artist or "", job.title or "",
+            qr_url, second_frame, settings.whatsapp_number, include_qr=True,
+        )
+    except (ValueError, OSError) as exc:
+        raise HTTPException(422, f"No se pudo crear la prueba: {exc}") from exc
+
+    stamp = max(first_frame.stat().st_mtime_ns, second_frame.stat().st_mtime_ns)
+    return {
+        "channel": channel.display_name,
+        "artist": job.artist,
+        "title": job.title,
+        "first_url": f"/api/channels/{channel_id}/animation-preview/first?v={stamp}",
+        "qr_url": f"/api/channels/{channel_id}/animation-preview/qr?v={stamp}",
+    }
+
+
+@app.get("/api/channels/{channel_id}/animation-preview/{scene}", include_in_schema=False)
+def channel_animation_preview_image(channel_id: int, scene: str):
+    if scene not in {"first", "qr"}:
+        raise HTTPException(404, "Escena no encontrada")
+    suffix = "first" if scene == "first" else "qr"
+    path = settings.assets_dir / "animation_previews" / f"channel_{channel_id}_{suffix}.png"
+    if not path.is_file():
+        raise HTTPException(404, "Primero genera la prueba de animación")
+    return FileResponse(path, headers={"Cache-Control": "no-store"})
 
 
 @app.delete("/api/channels/{channel_id}/background")
