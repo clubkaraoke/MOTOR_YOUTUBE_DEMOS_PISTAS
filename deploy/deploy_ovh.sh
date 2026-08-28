@@ -51,4 +51,20 @@ curl \
   --max-time 10 \
   http://127.0.0.1:8088/health
 
+printf '\n'
+sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
+from sqlalchemy import func, select
+from app.core.database import SessionLocal
+from app.models.entities import Job
+
+with SessionLocal() as db:
+    counts = db.execute(
+        select(Job.status, func.count(Job.id)).group_by(Job.status).order_by(Job.status)
+    ).all()
+    print("JOB_STATUS_COUNTS", {status: count for status, count in counts})
+    pending = db.scalar(select(func.count(Job.id)).where(Job.youtube_video_id.is_(None))) or 0
+    published = db.scalar(select(func.count(Job.id)).where(Job.youtube_video_id.is_not(None))) or 0
+    print("JOB_RECOVERY_SUMMARY", {"pending_without_video": pending, "with_video_id": published})
+PY
+
 printf '\nDeployment %s completed successfully.\n' "$revision"
