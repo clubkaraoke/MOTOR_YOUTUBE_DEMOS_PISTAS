@@ -3,6 +3,7 @@ import logging
 import os
 from queue import Queue as LocalQueue
 import shutil
+import subprocess
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -981,6 +982,43 @@ def channel_qr_background_image(channel_id: int, db: Session = Depends(get_db)):
     return FileResponse(Path(channel.qr_background_image_path), headers={"Cache-Control": "no-store"})
 
 
+ANIMATION_PREVIEW_TRANSITIONS = {
+    1: ("diagtr", "Diagonal"),
+    2: ("smoothleft", "Barrido suave"),
+    3: ("circleopen", "Círculo"),
+    4: ("dissolve", "Disolución"),
+}
+
+
+def _render_animation_preview(first_frame: Path, qr_frame: Path, output: Path, transition: str) -> None:
+    filter_complex = (
+        "[0:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v0];"
+        "[1:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v1];"
+        "[2:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v2];"
+        "[3:v]scale=1280:720,fps=25,format=yuv420p,trim=duration=5.5,setpts=PTS-STARTPTS[v3];"
+        f"[v0][v1]xfade=transition={transition}:duration=0.5:offset=5.0[x1];"
+        f"[x1][v2]xfade=transition={transition}:duration=0.5:offset=10.0[x2];"
+        f"[x2][v3]xfade=transition={transition}:duration=0.5:offset=15.0,"
+        "trim=duration=20,setpts=PTS-STARTPTS[vout]"
+    )
+    command = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-loop", "1", "-i", str(first_frame),
+        "-loop", "1", "-i", str(qr_frame),
+        "-loop", "1", "-i", str(first_frame),
+        "-loop", "1", "-i", str(qr_frame),
+        "-filter_complex", filter_complex,
+        "-map", "[vout]", "-an", "-t", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output),
+    ]
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True, timeout=120)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        detail = getattr(exc, "stderr", None) or str(exc)
+        raise RuntimeError(detail[-2000:]) from exc
+
+
 @app.post("/api/channels/{channel_id}/animation-preview")
 def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
     channel = db.get(Channel, channel_id)
@@ -1001,11 +1039,15 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
     if not job or not job.cover_url:
         raise HTTPException(409, "No hay una canción reciente con cover para crear la prueba")
 
+    transition, transition_label = ANIMATION_PREVIEW_TRANSITIONS.get(
+        channel_id, ("fade", "Fade")
+    )
     preview_dir = settings.assets_dir / "animation_previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     cover_path = preview_dir / f"channel_{channel_id}_cover.png"
     first_frame = preview_dir / f"channel_{channel_id}_first.png"
     second_frame = preview_dir / f"channel_{channel_id}_qr.png"
+    video_path = preview_dir / f"channel_{channel_id}_{transition}.mp4"
 
     try:
         cover_provider.download(job.cover_url, cover_path)
@@ -1018,25 +1060,35 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
             second_background, cover_path, job.artist or "", job.title or "",
             qr_url, second_frame, settings.whatsapp_number, include_qr=True,
         )
-    except (ValueError, OSError) as exc:
+        _render_animation_preview(first_frame, second_frame, video_path, transition)
+    except (ValueError, OSError, RuntimeError) as exc:
         raise HTTPException(422, f"No se pudo crear la prueba: {exc}") from exc
 
-    stamp = max(first_frame.stat().st_mtime_ns, second_frame.stat().st_mtime_ns)
+    stamp = max(first_frame.stat().st_mtime_ns, second_frame.stat().st_mtime_ns, video_path.stat().st_mtime_ns)
     return {
         "channel": channel.display_name,
         "artist": job.artist,
         "title": job.title,
+        "transition": transition,
+        "transition_label": transition_label,
         "first_url": f"/api/channels/{channel_id}/animation-preview/first?v={stamp}",
         "qr_url": f"/api/channels/{channel_id}/animation-preview/qr?v={stamp}",
+        "video_url": f"/api/channels/{channel_id}/animation-preview/video?v={stamp}",
     }
 
 
 @app.get("/api/channels/{channel_id}/animation-preview/{scene}", include_in_schema=False)
-def channel_animation_preview_image(channel_id: int, scene: str):
-    if scene not in {"first", "qr"}:
+def channel_animation_preview_asset(channel_id: int, scene: str):
+    transition, _ = ANIMATION_PREVIEW_TRANSITIONS.get(channel_id, ("fade", "Fade"))
+    preview_dir = settings.assets_dir / "animation_previews"
+    if scene == "first":
+        path = preview_dir / f"channel_{channel_id}_first.png"
+    elif scene == "qr":
+        path = preview_dir / f"channel_{channel_id}_qr.png"
+    elif scene == "video":
+        path = preview_dir / f"channel_{channel_id}_{transition}.mp4"
+    else:
         raise HTTPException(404, "Escena no encontrada")
-    suffix = "first" if scene == "first" else "qr"
-    path = settings.assets_dir / "animation_previews" / f"channel_{channel_id}_{suffix}.png"
     if not path.is_file():
         raise HTTPException(404, "Primero genera la prueba de animación")
     return FileResponse(path, headers={"Cache-Control": "no-store"})
