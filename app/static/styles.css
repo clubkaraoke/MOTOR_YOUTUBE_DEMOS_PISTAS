@@ -58,3 +58,5 @@
   50%,72.5%{opacity:0}
   75%,100%{opacity:1}
 }
+
+.animation-video{display:block;width:100%;aspect-ratio:16/9;background:#05070a;border:1px solid var(--border);object-fit:contain}
