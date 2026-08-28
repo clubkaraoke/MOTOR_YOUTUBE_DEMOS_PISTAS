@@ -991,33 +991,46 @@ ANIMATION_PREVIEW_TRANSITIONS = {
 
 
 def _render_animation_preview(first_frame: Path, qr_frame: Path, output: Path, transition: str) -> None:
+    """Render a 20 s real FFmpeg xfade preview from two still-image scenes."""
+    first_clip = output.with_name(f"{output.stem}_first_clip.mp4")
+    qr_clip = output.with_name(f"{output.stem}_qr_clip.mp4")
+
+    def encode_still(frame: Path, clip: Path) -> None:
+        command = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-framerate", "25", "-loop", "1", "-i", str(frame),
+            "-t", "5.5", "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-r", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            str(clip),
+        ]
+        subprocess.run(command, check=True, capture_output=True, text=True, timeout=90)
+
     filter_complex = (
-        "[0:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v0];"
-        "[1:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v1];"
-        "[2:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v2];"
-        "[3:v]scale=1280:720,fps=25,settb=AVTB,trim=duration=5.5,setpts=N/(25*TB),format=yuv420p[v3];"
-        f"[v0][v1]xfade=transition={transition}:duration=0.5:offset=5.0[x1];"
-        f"[x1][v2]xfade=transition={transition}:duration=0.5:offset=10.0[x2];"
-        f"[x2][v3]xfade=transition={transition}:duration=0.5:offset=15.0,"
-        "trim=duration=20,setpts=PTS-STARTPTS[vout]"
+        f"[0:v][1:v]xfade=transition={transition}:duration=0.5:offset=5.0[x1];"
+        f"[x1][2:v]xfade=transition={transition}:duration=0.5:offset=10.0[x2];"
+        f"[x2][3:v]xfade=transition={transition}:duration=0.5:offset=15.0[vout]"
     )
-    command = [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-framerate", "25", "-loop", "1", "-i", str(first_frame),
-        "-framerate", "25", "-loop", "1", "-i", str(qr_frame),
-        "-framerate", "25", "-loop", "1", "-i", str(first_frame),
-        "-framerate", "25", "-loop", "1", "-i", str(qr_frame),
-        "-filter_complex", filter_complex,
-        "-map", "[vout]", "-an", "-t", "20",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(output),
-    ]
+
     try:
-        subprocess.run(command, check=True, capture_output=True, text=True, timeout=120)
+        encode_still(first_frame, first_clip)
+        encode_still(qr_frame, qr_clip)
+        subprocess.run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(first_clip), "-i", str(qr_clip),
+            "-i", str(first_clip), "-i", str(qr_clip),
+            "-filter_complex", filter_complex,
+            "-map", "[vout]", "-an", "-t", "20",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-r", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            str(output),
+        ], check=True, capture_output=True, text=True, timeout=120)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
         detail = getattr(exc, "stderr", None) or str(exc)
         raise RuntimeError(detail[-2000:]) from exc
-
+    finally:
+        first_clip.unlink(missing_ok=True)
+        qr_clip.unlink(missing_ok=True)
 
 @app.post("/api/channels/{channel_id}/animation-preview")
 def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
