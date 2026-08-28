@@ -65,6 +65,86 @@ def validate_demo_video(path: str | Path, expected_duration: float, tolerance: f
     return {"duration": actual, "video": video, "audio": audio}
 
 
+def _encode_still_clip(image_path: Path, output_path: Path) -> None:
+    """Encode a still image as a tiny 25 fps CFR clip suitable for xfade."""
+    _run([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-framerate", "25", "-loop", "1", "-i", str(image_path),
+        "-t", "1.0", "-an",
+        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage",
+        "-r", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        str(output_path),
+    ])
+
+
+def _animated_video_filter(duration: float, scene_seconds: float, transition_seconds: float,
+                           animation_until_seconds: float, transition_name: str) -> str:
+    """Build laptop/QR alternation through animation_until, then keep QR."""
+    if duration <= scene_seconds:
+        return f"[2:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS[vout]"
+
+    final_change = min(float(animation_until_seconds), duration)
+    starts = [0.0]
+    cursor = float(scene_seconds)
+    while cursor < final_change - 1e-6:
+        starts.append(cursor)
+        cursor += float(scene_seconds)
+
+    # If duration extends beyond the animated window, the last segment must be QR.
+    if duration > animation_until_seconds and (len(starts) - 1) % 2 == 0:
+        starts.append(float(animation_until_seconds) - float(scene_seconds))
+
+    # De-duplicate/sort in case the guard above adds an existing boundary.
+    starts = sorted(set(round(x, 6) for x in starts if x < duration))
+    intro_indices = [i for i in range(len(starts)) if i % 2 == 0]
+    qr_indices = [i for i in range(len(starts)) if i % 2 == 1]
+
+    parts: list[str] = []
+    if len(intro_indices) == 1:
+        parts.append("[2:v]null[intro0]")
+    else:
+        labels = "".join(f"[intro{n}]" for n in range(len(intro_indices)))
+        parts.append(f"[2:v]split={len(intro_indices)}{labels}")
+    if len(qr_indices) == 1:
+        parts.append("[3:v]null[qr0]")
+    elif len(qr_indices) > 1:
+        labels = "".join(f"[qr{n}]" for n in range(len(qr_indices)))
+        parts.append(f"[3:v]split={len(qr_indices)}{labels}")
+
+    intro_seen = qr_seen = 0
+    segment_labels: list[str] = []
+    fade = max(0.05, min(float(transition_seconds), float(scene_seconds) / 2))
+    for index, start in enumerate(starts):
+        is_intro = index % 2 == 0
+        if is_intro:
+            source = f"intro{intro_seen}"
+            intro_seen += 1
+        else:
+            source = f"qr{qr_seen}"
+            qr_seen += 1
+        next_start = starts[index + 1] if index + 1 < len(starts) else duration
+        seg_duration = max(fade + 0.04, next_start - start + (fade if index + 1 < len(starts) else 0))
+        label = f"seg{index}"
+        parts.append(
+            f"[{source}]trim=duration={seg_duration:.6f},setpts=PTS-STARTPTS[{label}]"
+        )
+        segment_labels.append(label)
+
+    chain = segment_labels[0]
+    for index in range(1, len(segment_labels)):
+        offset = starts[index]
+        out = "vout" if index == len(segment_labels) - 1 else f"x{index}"
+        parts.append(
+            f"[{chain}][{segment_labels[index]}]xfade=transition={transition_name}:"
+            f"duration={fade:.6f}:offset={offset:.6f}[{out}]"
+        )
+        chain = out
+    if len(segment_labels) == 1:
+        parts.append(f"[{chain}]null[vout]")
+    return ";".join(parts)
+
+
 def create_demo_video(
     original_audio: str | Path,
     background_image: str | Path,
@@ -75,6 +155,10 @@ def create_demo_video(
     progress_callback: Callable[[int], None] | None = None,
     qr_background_image: str | Path | None = None,
     image_switch_seconds: float = 20.0,
+    image_transition: str | None = None,
+    animation_until_seconds: float = 40.0,
+    animation_scene_seconds: float = 5.0,
+    image_transition_seconds: float = 0.5,
 ) -> dict:
     """Render the intro image first and the QR image for the remainder of the MP4."""
     original_audio = Path(original_audio)
@@ -100,30 +184,54 @@ def create_demo_video(
         f"afade=t=in:st=0:d={transition:.6f}[ad];"
         "[orig][ad]concat=n=2:v=0:a=1[aout]"
     )
-    video_filters = (
-        f"[2:v]scale=1280:720:force_original_aspect_ratio=decrease,"
-        f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,"
-        f"trim=duration={image_switch:.6f},setpts=PTS-STARTPTS[vintro];"
-        f"[3:v]scale=1280:720:force_original_aspect_ratio=decrease,"
-        f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,"
-        f"trim=duration={qr_image_duration:.6f},setpts=PTS-STARTPTS[vqr];"
-        "[vintro][vqr]concat=n=2:v=1:a=0[vout]"
-    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-i", str(original_audio), "-stream_loop", "-1", "-i", str(commercial_audio),
-        "-loop", "1", "-i", str(background_image),
-        "-loop", "1", "-i", str(qr_background_image),
-        "-filter_complex", f"{audio_filters};{video_filters}",
-        "-map", "[vout]", "-map", "[aout]", "-t", f"{duration:.6f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "25",
-        "-c:a", "aac", "-b:a", YOUTUBE_AUDIO_BITRATE, "-ar", "48000", "-movflags", "+faststart",
-        "-shortest", str(output_path),
-    ]
-    if progress_callback:
-        progress_callback(10)
-    _run(command)
+    temp_intro_clip = output_path.with_name(f".{output_path.stem}.intro-cfr.mp4")
+    temp_qr_clip = output_path.with_name(f".{output_path.stem}.qr-cfr.mp4")
+    try:
+        if image_transition:
+            _encode_still_clip(background_image, temp_intro_clip)
+            _encode_still_clip(qr_background_image, temp_qr_clip)
+            video_filters = _animated_video_filter(
+                duration,
+                max(1.0, float(animation_scene_seconds)),
+                max(0.05, float(image_transition_seconds)),
+                max(float(animation_until_seconds), float(animation_scene_seconds) * 2),
+                image_transition,
+            )
+            video_inputs = [
+                "-stream_loop", "-1", "-i", str(temp_intro_clip),
+                "-stream_loop", "-1", "-i", str(temp_qr_clip),
+            ]
+        else:
+            video_filters = (
+                f"[2:v]scale=1280:720:force_original_aspect_ratio=decrease,"
+                f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,"
+                f"trim=duration={image_switch:.6f},setpts=PTS-STARTPTS[vintro];"
+                f"[3:v]scale=1280:720:force_original_aspect_ratio=decrease,"
+                f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,"
+                f"trim=duration={qr_image_duration:.6f},setpts=PTS-STARTPTS[vqr];"
+                "[vintro][vqr]concat=n=2:v=1:a=0[vout]"
+            )
+            video_inputs = [
+                "-loop", "1", "-i", str(background_image),
+                "-loop", "1", "-i", str(qr_background_image),
+            ]
+        command = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(original_audio), "-stream_loop", "-1", "-i", str(commercial_audio),
+            *video_inputs,
+            "-filter_complex", f"{audio_filters};{video_filters}",
+            "-map", "[vout]", "-map", "[aout]", "-t", f"{duration:.6f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "25",
+            "-c:a", "aac", "-b:a", YOUTUBE_AUDIO_BITRATE, "-ar", "48000", "-movflags", "+faststart",
+            "-shortest", str(output_path),
+        ]
+        if progress_callback:
+            progress_callback(10)
+        _run(command)
+    finally:
+        temp_intro_clip.unlink(missing_ok=True)
+        temp_qr_clip.unlink(missing_ok=True)
     if progress_callback:
         progress_callback(90)
     result = validate_demo_video(output_path, duration)
