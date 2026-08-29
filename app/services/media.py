@@ -109,10 +109,16 @@ def _animated_video_filter(duration: float, scene_seconds: float, transition_sec
     animated_end = min(float(duration), until)
     if duration > until:
         hold = max(0.0, float(duration) - until)
+        tail_input_index = 2 + segment_count
         parts.append(
-            f"[{chain}]trim=duration={until:.6f},setpts=PTS-STARTPTS,"
-            f"tpad=stop_mode=clone:stop_duration={hold:.6f}[vout]"
+            f"[{chain}]trim=duration={until:.6f},setpts=PTS-STARTPTS[vanim]"
         )
+        parts.append(
+            f"[{tail_input_index}:v]scale=1280:720:force_original_aspect_ratio=decrease,"
+            f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,format=yuv420p,"
+            f"trim=duration={hold:.6f},setpts=PTS-STARTPTS[vtail]"
+        )
+        parts.append("[vanim][vtail]concat=n=2:v=1:a=0[vout]")
     else:
         parts.append(
             f"[{chain}]trim=duration={animated_end:.6f},setpts=PTS-STARTPTS[vout]"
@@ -182,6 +188,12 @@ def create_demo_video(
             for index in range(segment_count):
                 scene_path = temp_intro_clip if index % 2 == 0 else temp_qr_clip
                 video_inputs.extend(["-i", str(scene_path)])
+            if duration > until:
+                hold = max(0.001, duration - until)
+                video_inputs.extend([
+                    "-framerate", "25", "-loop", "1", "-t", f"{hold:.6f}",
+                    "-i", str(qr_background_image),
+                ])
         else:
             video_filters = (
                 f"[2:v]scale=1280:720:force_original_aspect_ratio=decrease,"
