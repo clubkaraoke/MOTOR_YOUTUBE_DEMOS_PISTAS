@@ -1,0 +1,80 @@
+name: Verify long xfade render and retry affected jobs
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" "$OVH_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null
+      - name: Verify long render and retry only affected jobs
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/djgabo-youtube
+          echo '=== 42-second production self-test ==='
+          sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
+          import subprocess, tempfile
+          from pathlib import Path
+          from app.services.media import create_demo_video, validate_demo_video
+          def run(*args):
+              subprocess.run([str(x) for x in args], check=True, capture_output=True)
+          with tempfile.TemporaryDirectory() as td:
+              root=Path(td)
+              original=root/'original.wav'; commercial=root/'commercial.wav'
+              intro=root/'intro.png'; qr=root/'qr.png'; out=root/'long.mp4'
+              run('ffmpeg','-y','-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=42','-c:a','pcm_s16le',original)
+              run('ffmpeg','-y','-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=2','-c:a','pcm_s16le',commercial)
+              run('ffmpeg','-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=red:s=1280x720','-frames:v','1',intro)
+              run('ffmpeg','-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=1280x720','-frames:v','1',qr)
+              create_demo_video(original,intro,commercial,20,out,qr_background_image=qr,image_transition='diagtr',animation_until_seconds=40,animation_scene_seconds=5,image_transition_seconds=.5)
+              info=validate_demo_video(out,42)
+              print('LONG_XFADE_OK',info['duration'])
+          PY
+          echo '=== retry previous xfade/duration failures ==='
+          python3 - <<'PY'
+          import json, urllib.request
+          base='http://127.0.0.1:8088'
+          jobs=json.load(urllib.request.urlopen(base+'/api/jobs'))
+          targets=[]
+          for j in jobs:
+              msg=(j.get('error_message') or '')
+              if j.get('status')=='RENDER_ERROR' and (
+                  'Parsed_xfade' in msg or
+                  'constant frame rate' in msg or
+                  ('duración 40.000s fuera de tolerancia' in msg and j.get('error_code')=='FFMPEG_OR_FRAME_ERROR')
+              ):
+                  targets.append(j)
+          print('RETRY_COUNT',len(targets))
+          for j in targets:
+              req=urllib.request.Request(base+f"/api/jobs/{j['id']}/retry",method='POST')
+              with urllib.request.urlopen(req) as resp:
+                  body=resp.read().decode('utf-8','replace')
+              print('RETRIED',j.get('artist'),'-',j.get('title'),body[:120])
+          PY
+          sleep 5
+          curl -fsS http://127.0.0.1:8088/health
+          echo
+          REMOTE
