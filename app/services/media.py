@@ -1,4 +1,5 @@
 import json
+import math
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -65,12 +66,12 @@ def validate_demo_video(path: str | Path, expected_duration: float, tolerance: f
     return {"duration": actual, "video": video, "audio": audio}
 
 
-def _encode_still_clip(image_path: Path, output_path: Path) -> None:
-    """Encode a still image as a tiny 25 fps CFR clip suitable for xfade."""
+def _encode_still_clip(image_path: Path, output_path: Path, duration_seconds: float) -> None:
+    """Encode one still scene as a real 25 fps CFR clip for xfade."""
     _run([
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-framerate", "25", "-loop", "1", "-i", str(image_path),
-        "-t", "1.0", "-an",
+        "-t", f"{duration_seconds:.6f}", "-an",
         "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
         "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage",
         "-r", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
@@ -78,70 +79,51 @@ def _encode_still_clip(image_path: Path, output_path: Path) -> None:
     ])
 
 
+def _animation_segment_count(duration: float, scene_seconds: float, animation_until_seconds: float) -> int:
+    animated_end = min(float(duration), float(animation_until_seconds))
+    return max(1, int(math.ceil(animated_end / float(scene_seconds))))
+
+
 def _animated_video_filter(duration: float, scene_seconds: float, transition_seconds: float,
                            animation_until_seconds: float, transition_name: str) -> str:
-    """Build laptop/QR alternation through animation_until, then keep QR."""
-    if duration <= scene_seconds:
-        return f"[2:v]trim=duration={duration:.6f},setpts=PTS-STARTPTS[vout]"
-
-    final_change = min(float(animation_until_seconds), duration)
-    starts = [0.0]
-    cursor = float(scene_seconds)
-    while cursor < final_change - 1e-6:
-        starts.append(cursor)
-        cursor += float(scene_seconds)
-
-    # If duration extends beyond the animated window, the last segment must be QR.
-    if duration > animation_until_seconds and (len(starts) - 1) % 2 == 0:
-        starts.append(float(animation_until_seconds) - float(scene_seconds))
-
-    # De-duplicate/sort in case the guard above adds an existing boundary.
-    starts = sorted(set(round(x, 6) for x in starts if x < duration))
-    intro_indices = [i for i in range(len(starts)) if i % 2 == 0]
-    qr_indices = [i for i in range(len(starts)) if i % 2 == 1]
+    """Alternate independent CFR clip inputs, then hold the final QR frame."""
+    scene = max(1.0, float(scene_seconds))
+    fade = max(0.05, min(float(transition_seconds), scene / 2))
+    until = max(scene * 2, float(animation_until_seconds))
+    segment_count = _animation_segment_count(duration, scene, until)
 
     parts: list[str] = []
-    if len(intro_indices) == 1:
-        parts.append("[2:v]null[intro0]")
-    else:
-        labels = "".join(f"[intro{n}]" for n in range(len(intro_indices)))
-        parts.append(f"[2:v]split={len(intro_indices)}{labels}")
-    if len(qr_indices) == 1:
-        parts.append("[3:v]null[qr0]")
-    elif len(qr_indices) > 1:
-        labels = "".join(f"[qr{n}]" for n in range(len(qr_indices)))
-        parts.append(f"[3:v]split={len(qr_indices)}{labels}")
-
-    intro_seen = qr_seen = 0
-    segment_labels: list[str] = []
-    fade = max(0.05, min(float(transition_seconds), float(scene_seconds) / 2))
-    for index, start in enumerate(starts):
-        is_intro = index % 2 == 0
-        if is_intro:
-            source = f"intro{intro_seen}"
-            intro_seen += 1
-        else:
-            source = f"qr{qr_seen}"
-            qr_seen += 1
-        next_start = starts[index + 1] if index + 1 < len(starts) else duration
-        seg_duration = max(fade + 0.04, next_start - start + (fade if index + 1 < len(starts) else 0))
-        label = f"seg{index}"
+    prepared: list[str] = []
+    for index in range(segment_count):
+        label = f"scene{index}"
+        # Each scene arrives as an independent MP4 input. Reassert CFR/timebase so
+        # xfade sees identical 25 fps streams on every FFmpeg build.
         parts.append(
-            f"[{source}]trim=duration={seg_duration:.6f},setpts=PTS-STARTPTS[{label}]"
+            f"[{2 + index}:v]fps=25,settb=AVTB,setpts=PTS-STARTPTS,"
+            f"format=yuv420p[{label}]"
         )
-        segment_labels.append(label)
+        prepared.append(label)
 
-    chain = segment_labels[0]
-    for index in range(1, len(segment_labels)):
-        offset = starts[index]
-        out = "vout" if index == len(segment_labels) - 1 else f"x{index}"
+    chain = prepared[0]
+    for index in range(1, len(prepared)):
+        out = f"x{index}"
         parts.append(
-            f"[{chain}][{segment_labels[index]}]xfade=transition={transition_name}:"
-            f"duration={fade:.6f}:offset={offset:.6f}[{out}]"
+            f"[{chain}][{prepared[index]}]xfade=transition={transition_name}:"
+            f"duration={fade:.6f}:offset={scene * index:.6f}[{out}]"
         )
         chain = out
-    if len(segment_labels) == 1:
-        parts.append(f"[{chain}]null[vout]")
+
+    animated_end = min(float(duration), until)
+    if duration > until:
+        hold = max(0.0, float(duration) - until)
+        parts.append(
+            f"[{chain}]trim=duration={until:.6f},setpts=PTS-STARTPTS,"
+            f"tpad=stop_mode=clone:stop_duration={hold:.6f}[vout]"
+        )
+    else:
+        parts.append(
+            f"[{chain}]trim=duration={animated_end:.6f},setpts=PTS-STARTPTS[vout]"
+        )
     return ";".join(parts)
 
 
@@ -189,19 +171,24 @@ def create_demo_video(
     temp_qr_clip = output_path.with_name(f".{output_path.stem}.qr-cfr.mp4")
     try:
         if image_transition:
-            _encode_still_clip(background_image, temp_intro_clip)
-            _encode_still_clip(qr_background_image, temp_qr_clip)
+            scene = max(1.0, float(animation_scene_seconds))
+            fade = max(0.05, min(float(image_transition_seconds), scene / 2))
+            until = max(float(animation_until_seconds), scene * 2)
+            clip_duration = scene + fade
+            _encode_still_clip(background_image, temp_intro_clip, clip_duration)
+            _encode_still_clip(qr_background_image, temp_qr_clip, clip_duration)
             video_filters = _animated_video_filter(
                 duration,
-                max(1.0, float(animation_scene_seconds)),
-                max(0.05, float(image_transition_seconds)),
-                max(float(animation_until_seconds), float(animation_scene_seconds) * 2),
+                scene,
+                fade,
+                until,
                 image_transition,
             )
-            video_inputs = [
-                "-stream_loop", "-1", "-i", str(temp_intro_clip),
-                "-stream_loop", "-1", "-i", str(temp_qr_clip),
-            ]
+            segment_count = _animation_segment_count(duration, scene, until)
+            video_inputs = []
+            for index in range(segment_count):
+                scene_path = temp_intro_clip if index % 2 == 0 else temp_qr_clip
+                video_inputs.extend(["-i", str(scene_path)])
         else:
             video_filters = (
                 f"[2:v]scale=1280:720:force_original_aspect_ratio=decrease,"
