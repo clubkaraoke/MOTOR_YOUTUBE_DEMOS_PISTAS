@@ -93,22 +93,15 @@ def _animated_video_filter(duration: float, scene_seconds: float, transition_sec
     segment_count = _animation_segment_count(duration, scene, until)
 
     parts: list[str] = []
-    prepared: list[str] = []
-    for index in range(segment_count):
-        label = f"scene{index}"
-        # Each scene arrives as an independent MP4 input. Reassert CFR/timebase so
-        # xfade sees identical 25 fps streams on every FFmpeg build.
-        parts.append(
-            f"[{2 + index}:v]fps=25,settb=AVTB,setpts=PTS-STARTPTS,"
-            f"format=yuv420p[{label}]"
-        )
-        prepared.append(label)
-
-    chain = prepared[0]
-    for index in range(1, len(prepared)):
+    # The temporary scene MP4s are already 25 fps CFR with identical geometry,
+    # pixel format and timebase. Feed them directly to xfade. Adding fps/setpts
+    # here makes some FFmpeg builds advertise an unknown 1/0 frame rate.
+    chain = f"{2}:v"
+    for index in range(1, segment_count):
         out = f"x{index}"
+        right = f"{2 + index}:v"
         parts.append(
-            f"[{chain}][{prepared[index]}]xfade=transition={transition_name}:"
+            f"[{chain}][{right}]xfade=transition={transition_name}:"
             f"duration={fade:.6f}:offset={scene * index:.6f}[{out}]"
         )
         chain = out
