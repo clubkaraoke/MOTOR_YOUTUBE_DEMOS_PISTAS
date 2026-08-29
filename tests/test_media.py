@@ -111,8 +111,10 @@ def test_animation_switches_stop_at_35_and_qr_remains_after_40():
     assert "offset=5.000000" in graph
     assert "offset=35.000000" in graph
     assert "offset=40.000000" not in graph
-    assert "[2:v]fps=25,settb=AVTB" in graph
-    assert "[9:v]fps=25,settb=AVTB" in graph
+    assert "[2:v][3:v]xfade=transition=diagtr" in graph
+    assert "[x6][9:v]xfade=transition=diagtr" in graph
+    assert "fps=25" not in graph
+    assert "setpts=PTS-STARTPTS" in graph
     assert "split=" not in graph
     assert "tpad=stop_mode=clone:stop_duration=140.000000" in graph
 
