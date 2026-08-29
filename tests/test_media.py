@@ -116,7 +116,8 @@ def test_animation_switches_stop_at_35_and_qr_remains_after_40():
     assert "fps=25" not in graph
     assert "setpts=PTS-STARTPTS" in graph
     assert "split=" not in graph
-    assert "tpad=stop_mode=clone:stop_duration=140.000000" in graph
+    assert "[10:v]scale=1280:720" in graph
+    assert "[vanim][vtail]concat=n=2:v=1:a=0[vout]" in graph
 
 
 @pytest.mark.parametrize("transition_name", ["diagtr", "smoothleft", "circleopen", "dissolve"])
@@ -139,3 +140,29 @@ def test_all_channel_xfade_transitions_render_from_independent_cfr_clips(tmp_pat
     info = validate_demo_video(output, 6)
     assert info["video"]["width"] == 1280
     assert info["video"]["height"] == 720
+
+
+
+def test_long_animation_keeps_qr_to_full_duration(tmp_path):
+    original, commercial = tmp_path/"original.wav", tmp_path/"commercial.wav"
+    intro, qr, output = tmp_path/"intro.png", tmp_path/"qr.png", tmp_path/"long.mp4"
+    sine(original, 440, 42); sine(commercial, 880, 2)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "color=c=red:s=1280x720", "-frames:v", "1", intro)
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "color=c=blue:s=1280x720", "-frames:v", "1", qr)
+
+    create_demo_video(
+        original, intro, commercial, 20, output,
+        qr_background_image=qr,
+        image_transition="diagtr",
+        animation_until_seconds=40,
+        animation_scene_seconds=5,
+        image_transition_seconds=.5,
+    )
+    info = validate_demo_video(output, 42)
+    assert abs(info["duration"] - 42) < .75
+    final_frame = tmp_path/"final.png"
+    run("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "41", "-i", output,
+        "-frames:v", "1", final_frame)
+    assert Image.open(final_frame).getpixel((640, 360))[2] > 220
