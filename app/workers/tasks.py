@@ -24,15 +24,6 @@ from app.services.youtube import YouTubeError, finalize_publication, upload_vide
 
 log = logging.getLogger("djgabo.worker")
 
-# One production transition per YouTube channel during the one-week visual test.
-CHANNEL_IMAGE_TRANSITIONS = {
-    1: "diagtr",
-    2: "smoothleft",
-    3: "circleopen",
-    4: "dissolve",
-}
-
-
 def _setting(db, key: str) -> str | None:
     row = db.get(Setting, key)
     return row.value if row else None
@@ -125,17 +116,16 @@ def _process_job(job_id: str) -> None:
             job.channel_id = channel.id
         commercial = _setting(db, "commercial_audio_path")
         background = channel.background_image_path or _setting(db, "general_background_path") or _setting(db, "fallback_background_path")
-        qr_background = channel.qr_background_image_path or background
         if not commercial or not Path(commercial).is_file():
             job.status = JobStatus.RENDER_ERROR.value
             job.error_code = "COMMERCIAL_AUDIO_MISSING"
             job.error_message = "Configura el audio comercial predeterminado"
             db.commit()
             return
-        if not background or not Path(background).is_file() or not qr_background or not Path(qr_background).is_file():
+        if not background or not Path(background).is_file():
             job.status = JobStatus.RENDER_ERROR.value
             job.error_code = "BACKGROUND_MISSING"
-            job.error_message = "Configura las dos imágenes 1280×720 del canal"
+            job.error_message = "Configura la plantilla 1280×720 del canal"
             db.commit()
             return
         workdir = settings.processing_dir / job.id
@@ -174,8 +164,7 @@ def _process_job(job_id: str) -> None:
             job.original_path = str(audio_path)
             db.commit()
         redirect = _ensure_qr(db, job)
-        intro_frame_path = workdir / "frame_intro.png"
-        frame_path = workdir / "frame_qr.png"
+        frame_path = workdir / "frame.png"
         qr_url = f"{settings.public_base_url.rstrip('/')}/q/{redirect.token}"
         output = settings.ready_dir / f"{job.id}.mp4"
         job.youtube_title = build_youtube_title(job.filename_original, job.artist, job.title)
@@ -189,10 +178,18 @@ def _process_job(job_id: str) -> None:
                     reusable = False
             if not reusable:
                 with FileLock(str(settings.processing_dir / "ffmpeg.lock"), timeout=12 * 60 * 60):
-                    create_frame(Path(background), cover_path, job.artist or "", job.title or Path(job.filename_original).stem,
-                                 qr_url, intro_frame_path, settings.whatsapp_number, include_qr=False)
-                    create_frame(Path(qr_background), cover_path, job.artist or "", job.title or Path(job.filename_original).stem,
-                                 qr_url, frame_path, settings.whatsapp_number, include_qr=True)
+                    # Nuevo flujo: una sola plantilla por canal y un solo frame
+                    # compuesto con cover + QR durante todo el video.
+                    create_frame(
+                        Path(background),
+                        cover_path,
+                        job.artist or "",
+                        job.title or Path(job.filename_original).stem,
+                        qr_url,
+                        frame_path,
+                        settings.whatsapp_number,
+                        include_qr=True,
+                    )
                     job.frame_path = str(frame_path)
                     job.status = JobStatus.RENDERING.value
                     job.progress = 5
@@ -206,18 +203,18 @@ def _process_job(job_id: str) -> None:
                     transition = float(transition_row) if transition_row is not None else settings.audio_crossfade_seconds
                     create_demo_video(
                         job.original_path,
-                        intro_frame_path,
+                        frame_path,
                         commercial,
                         job.cut_seconds,
                         output,
                         transition,
                         progress,
+                        # Se entrega el mismo frame en ambas entradas para
+                        # mantener compatibilidad con el render actual sin
+                        # alternar imágenes ni transiciones visuales.
                         qr_background_image=frame_path,
                         image_switch_seconds=20.0,
-                        image_transition=CHANNEL_IMAGE_TRANSITIONS.get(channel.id, "fade"),
-                        animation_until_seconds=40.0,
-                        animation_scene_seconds=5.0,
-                        image_transition_seconds=0.5,
+                        image_transition=None,
                     )
             job.rendered_path = str(output)
             job.status = JobStatus.MP4_READY.value
