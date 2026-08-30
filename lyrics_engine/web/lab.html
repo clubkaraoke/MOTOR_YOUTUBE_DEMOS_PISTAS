@@ -44,7 +44,42 @@
 <body>
 <div class="wrap">
   <h1>CDG LYRICS LAB</h1>
-  <p class="sub">LAB V1 · procesa muchos CDG, compara resultados y encuentra patrones del lote.</p>
+  <p class="sub">LAB V1.1 · Dropbox directo + cola persistente + análisis masivo.</p>
+
+  <section class="card">
+    <h3 class="section-title">DROPBOX DIRECTO</h3>
+    <p class="muted">Indexa los Pack Top Hits -7 a -15 sin descargarlos todos. El worker procesa 1 CDG por vez y guarda el progreso en el servidor.</p>
+
+    <div class="metrics">
+      <div class="metric"><strong id="dbTotal">0</strong><span>INDEXADOS</span></div>
+      <div class="metric"><strong id="dbPending">0</strong><span>PENDIENTES</span></div>
+      <div class="metric"><strong id="dbProcessing">0</strong><span>PROCESANDO</span></div>
+      <div class="metric"><strong id="dbDone">0</strong><span>TERMINADOS</span></div>
+      <div class="metric"><strong id="dbError">0</strong><span>ERROR</span></div>
+    </div>
+
+    <div id="dropboxState" class="status">Consultando Dropbox…</div>
+
+    <div id="packChecks" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0"></div>
+
+    <div class="actions">
+      <button class="secondary" id="connectDropboxBtn">CONECTAR DROPBOX</button>
+      <button class="secondary" id="indexDropboxBtn">INDEXAR SELECCIONADOS</button>
+      <button class="secondary" id="startWorkerBtn">INICIAR COLA</button>
+      <button class="secondary" id="pauseWorkerBtn">PAUSAR</button>
+      <button class="secondary" id="retryErrorsBtn">REINTENTAR ERRORES</button>
+    </div>
+
+    <div id="workerState" class="status"></div>
+
+    <h3 class="section-title" style="margin-top:18px">ÚLTIMOS TRABAJOS</h3>
+    <div style="overflow:auto;max-height:280px">
+      <table>
+        <thead><tr><th>ARCHIVO</th><th>PACK</th><th>ESTADO</th><th>LAB</th><th>OCR</th></tr></thead>
+        <tbody id="queueBody"></tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="card">
     <div class="drop" id="dropZone">
@@ -114,6 +149,186 @@
 </div>
 
 <script>
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderDropboxStatus(body) {
+  dropboxStatus = body;
+  const db = body.dropbox || {};
+  const worker = body.worker || {};
+  const counts = worker.counts || {};
+
+  setText('dbTotal', counts.TOTAL || 0);
+  setText('dbPending', counts.PENDING || 0);
+  setText('dbProcessing', counts.PROCESSING || 0);
+  setText('dbDone', counts.DONE || 0);
+  setText('dbError', counts.ERROR || 0);
+
+  const state = document.getElementById('dropboxState');
+
+  if (db.connected) {
+    state.textContent =
+      'Dropbox: CONECTADO ✓ · ' +
+      (db.display_name || db.email || 'cuenta autorizada');
+    state.className = 'status ok';
+  } else if (db.configured) {
+    state.textContent = 'Dropbox configurado pero todavía no autorizado.';
+    state.className = 'status warn';
+  } else {
+    state.textContent =
+      'Dropbox todavía requiere APP KEY/SECRET en el servidor para hacer la autorización única.';
+    state.className = 'status warn';
+  }
+
+  const current = worker.current;
+  const mem = Number(worker.memory_percent || 0).toFixed(1);
+  document.getElementById('workerState').textContent =
+    (worker.enabled ? 'COLA ACTIVA' : 'COLA PAUSADA') +
+    ' · RAM ' + mem + '% / límite ' +
+    Number(worker.memory_limit_percent || 75).toFixed(0) + '%' +
+    (current ? ' · Ahora: ' + current.name : '');
+
+  const packChecks = document.getElementById('packChecks');
+  if (!packChecks.childElementCount) {
+    (body.packs || []).forEach(item => {
+      const label = document.createElement('label');
+      label.style.cssText =
+        'background:#0a111e;border:1px solid #202c42;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = item.number;
+      input.checked = true;
+      input.className = 'pack-check';
+      label.appendChild(input);
+      label.appendChild(
+        document.createTextNode('Pack -' + item.number)
+      );
+      packChecks.appendChild(label);
+    });
+  }
+
+  const queueBody = document.getElementById('queueBody');
+  queueBody.replaceChildren();
+
+  (body.recent || []).forEach(item => {
+    const tr = document.createElement('tr');
+    [
+      item.name,
+      item.pack || '',
+      item.status,
+      item.lab_score == null ? '—' : Math.round(item.lab_score),
+      item.ocr_confidence == null ? '—' : Math.round(item.ocr_confidence) + '%'
+    ].forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+    queueBody.appendChild(tr);
+  });
+}
+
+async function refreshDropboxStatus() {
+  try {
+    const response = await fetch('api/lab/dropbox/status', {
+      cache: 'no-store'
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || 'HTTP ' + response.status);
+    renderDropboxStatus(body);
+  } catch (error) {
+    document.getElementById('dropboxState').textContent =
+      'No se pudo consultar el estado del LAB: ' + error.message;
+  }
+}
+
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: payload === undefined ? '{}' : JSON.stringify(payload)
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.detail || ('HTTP ' + response.status));
+  return body;
+}
+
+document.getElementById('connectDropboxBtn').addEventListener('click', async () => {
+  try {
+    const body = await postJson('api/lab/dropbox/connect');
+    window.location.href = body.authorization_url;
+  } catch (error) {
+    document.getElementById('dropboxState').textContent =
+      'Falta configurar Dropbox: ' + error.message;
+  }
+});
+
+document.getElementById('indexDropboxBtn').addEventListener('click', async () => {
+  const packs = Array.from(
+    document.querySelectorAll('.pack-check:checked')
+  ).map(input => Number(input.value));
+
+  if (!packs.length) {
+    document.getElementById('dropboxState').textContent =
+      'Selecciona al menos un Pack.';
+    return;
+  }
+
+  document.getElementById('dropboxState').textContent =
+    'Indexando Dropbox… no se descargan los CDG todavía.';
+
+  try {
+    const body = await postJson(
+      'api/lab/dropbox/index',
+      {packs}
+    );
+    document.getElementById('dropboxState').textContent =
+      'Indexación lista: ' + body.total_cdg_found +
+      ' CDG encontrados.';
+    await refreshDropboxStatus();
+  } catch (error) {
+    document.getElementById('dropboxState').textContent =
+      'ERROR INDEXANDO: ' + error.message;
+  }
+});
+
+document.getElementById('startWorkerBtn').addEventListener('click', async () => {
+  try {
+    await postJson('api/lab/dropbox/worker/start');
+    await refreshDropboxStatus();
+  } catch (error) {
+    document.getElementById('workerState').textContent =
+      'No se pudo iniciar: ' + error.message;
+  }
+});
+
+document.getElementById('pauseWorkerBtn').addEventListener('click', async () => {
+  try {
+    await postJson('api/lab/dropbox/worker/pause');
+    await refreshDropboxStatus();
+  } catch (error) {
+    document.getElementById('workerState').textContent =
+      'No se pudo pausar: ' + error.message;
+  }
+});
+
+document.getElementById('retryErrorsBtn').addEventListener('click', async () => {
+  try {
+    const body = await postJson('api/lab/dropbox/retry-errors');
+    document.getElementById('workerState').textContent =
+      'Reintentando ' + body.retried + ' trabajos.';
+    await refreshDropboxStatus();
+  } catch (error) {
+    document.getElementById('workerState').textContent =
+      'No se pudo reintentar: ' + error.message;
+  }
+});
+
+refreshDropboxStatus();
+setInterval(refreshDropboxStatus, 5000);
+
+
 const dropZone = document.getElementById('dropZone');
 const dropTitle = document.getElementById('dropTitle');
 const filesList = document.getElementById('filesList');
@@ -125,6 +340,7 @@ let selectedFiles = [];
 let extractedResults = [];
 let labSummary = null;
 let failures = [];
+let dropboxStatus = null;
 
 function preventDefaults(event) {
   event.preventDefault();
