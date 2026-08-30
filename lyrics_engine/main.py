@@ -122,7 +122,34 @@ def dropbox_lab_status() -> dict:
             for number, path in PACK_PATHS.items()
         ],
         "recent": lab_queue.recent(25),
+        "recent_done": lab_queue.recent_done(10),
         "worst": lab_queue.worst_done(20),
+    }
+
+
+@app.get("/api/lab/dropbox/result/{job_id}")
+def dropbox_lab_result(job_id: int) -> dict:
+    result = lab_queue.load_job_result(job_id)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Resultado LAB no encontrado",
+        )
+
+    return {
+        "job": result.get("_job", {}),
+        "filename": result.get("filename", ""),
+        "duration_seconds": result.get("duration_seconds", 0),
+        "strategy": result.get("strategy", ""),
+        "quality": result.get("quality", ""),
+        "average_confidence": result.get("average_confidence", 0),
+        "pages_detected": result.get("pages_detected", 0),
+        "lines_detected": result.get("lines_detected", 0),
+        "corrections_count": result.get("corrections_count", 0),
+        "lyrics": result.get("lyrics", ""),
+        "lines": result.get("lines", []),
+        "corrections": result.get("corrections", [])[:120],
+        "lab": result.get("lab", {}),
     }
 
 
