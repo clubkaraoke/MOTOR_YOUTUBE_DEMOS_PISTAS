@@ -5,6 +5,7 @@ from PIL import Image
 
 from app.services.cover_provider import CoverEntry, CoverProvider, normalize_music_text
 from app.services.frame_builder import (
+    COVER_BORDER,
     COVER_POSITION,
     COVER_SIZE,
     QR_CARD_POSITION,
@@ -100,6 +101,12 @@ def test_frame_uses_new_fixed_cover_and_qr_contract(tmp_path: Path):
             COVER_POSITION[1] + COVER_SIZE[1] // 2,
         )
         assert image.getpixel(cover_center) == (216, 44, 85)
+        # El cover deja visible el marco blanco restaurado.
+        border_point = (
+            COVER_POSITION[0] + COVER_BORDER // 2,
+            COVER_POSITION[1] + COVER_SIZE[1] // 2,
+        )
+        assert image.getpixel(border_point) == (255, 255, 255)
 
         qr_center = (
             QR_CARD_POSITION[0] + QR_CARD_SIZE[0] // 2,
@@ -107,6 +114,15 @@ def test_frame_uses_new_fixed_cover_and_qr_contract(tmp_path: Path):
         )
         assert image.getpixel(qr_center) in {(0, 0, 0), (255, 255, 255)}
     assert first.read_bytes() != second.read_bytes()
+
+
+def test_packaged_default_templates_are_exact_1280x720():
+    root = Path("app/assets/default_templates")
+    for channel in ("C1", "C2", "C3", "C4"):
+        path = root / f"{channel}.webp"
+        assert path.is_file()
+        with Image.open(path) as image:
+            assert image.size == (1280, 720)
 
 
 def test_frame_rejects_a_background_that_would_need_resizing(tmp_path: Path):
