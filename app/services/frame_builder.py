@@ -9,9 +9,17 @@ CANVAS_SIZE = (1280, 720)
 # Contrato visual de las plantillas nuevas 1280×720.
 # El cover es INAMOVIBLE: estas coordenadas coinciden con el cuadro fijo
 # reservado para la imagen jalada desde 01_CEREBRO2.
+# Caja exterior reservada en la plantilla. Se conserva exactamente en su sitio.
 COVER_POSITION = (142, 189)
 COVER_SIZE = (381, 381)
 COVER_RADIUS = 61
+
+# El cover real va 8 px hacia dentro para recuperar el marco blanco visible
+# que tenían las miniaturas originales, sin mover la caja exterior.
+COVER_BORDER = 8
+COVER_IMAGE_POSITION = (COVER_POSITION[0] + COVER_BORDER, COVER_POSITION[1] + COVER_BORDER)
+COVER_IMAGE_SIZE = (COVER_SIZE[0] - COVER_BORDER * 2, COVER_SIZE[1] - COVER_BORDER * 2)
+COVER_IMAGE_RADIUS = max(1, COVER_RADIUS - COVER_BORDER)
 
 # El QR dinámico se genera dentro del nuevo recuadro del diseño, sin invadir
 # el texto "ESCANEA Y RECÍBELA". La tarjeta blanca tapa cualquier QR de muestra
@@ -40,7 +48,7 @@ def _cover_crop(path: Path) -> Image.Image:
     with Image.open(path) as image:
         return ImageOps.fit(
             image.convert("RGB"),
-            COVER_SIZE,
+            COVER_IMAGE_SIZE,
             method=Image.Resampling.LANCZOS,
             centering=(0.5, 0.5),
         )
@@ -86,8 +94,18 @@ def create_frame(base_background: Path, cover_path: Path, artist: str, title: st
             )
         canvas = source.convert("RGBA")
 
+    # Marco blanco real del motor. Así no dependemos de que la plantilla
+    # tenga el borde dibujado y el cover nunca vuelve a taparlo.
+    cover_frame = Image.new("RGBA", COVER_SIZE, (255, 255, 255, 255))
+    cover_frame.putalpha(_rounded_mask(COVER_SIZE, COVER_RADIUS))
+    canvas.alpha_composite(cover_frame, COVER_POSITION)
+
     cover = _cover_crop(cover_path)
-    canvas.paste(cover, COVER_POSITION, _rounded_mask(COVER_SIZE, COVER_RADIUS))
+    canvas.paste(
+        cover,
+        COVER_IMAGE_POSITION,
+        _rounded_mask(COVER_IMAGE_SIZE, COVER_IMAGE_RADIUS),
+    )
 
     if include_qr:
         qr_card = Image.new("RGBA", QR_CARD_SIZE, (255, 255, 255, 0))
