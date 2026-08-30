@@ -1,5 +1,5 @@
 name: CDG LAB Status
-# poll 3
+# comparisons
 
 on:
   push:
@@ -36,3 +36,16 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "curl -fsS http://127.0.0.1:8090/api/lab/dropbox/status"
+
+      - name: Read five comparisons
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          for job_id in 1 2 3 4 5; do
+            echo "=== JOB $job_id ==="
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "curl -fsS http://127.0.0.1:8090/api/lab/dropbox/result/$job_id"
+            echo
+          done
