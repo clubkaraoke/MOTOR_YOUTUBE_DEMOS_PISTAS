@@ -122,6 +122,43 @@ grep -q 'MOTOR 03' /opt/djgabo-portal/index.html
 sudo grep -q 'location /cdg-lyrics/' "$nginx_target"
 
 printf '\n'
+lab_test_start="$(curl \
+  --fail \
+  --silent \
+  --show-error \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  --data '{"max_jobs":5}' \
+  http://127.0.0.1:8090/api/lab/dropbox/worker/start-limited)"
+printf 'CDG_LAB_TEST_START %s\n' "$lab_test_start"
+
+LAB_TEST_START="$lab_test_start" python3 - <<'PY'
+import json
+import os
+
+status = json.loads(os.environ["LAB_TEST_START"])
+assert status.get("enabled") is True, status
+assert int(status.get("run_remaining", -1)) == 5, status
+assert int(status.get("counts", {}).get("PENDING", 0)) > 0, status
+print(
+    "CDG_LAB_LIMITED_RUN_OK",
+    {
+        "remaining": status["run_remaining"],
+        "pending": status["counts"].get("PENDING", 0),
+        "memory_percent": status.get("memory_percent"),
+        "memory_limit_percent": status.get("memory_limit_percent"),
+    },
+)
+PY
+
+sleep 3
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  http://127.0.0.1:8090/api/lab/dropbox/status
+printf '\n'
+
 sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
 from sqlalchemy import func, select
 from app.core.database import SessionLocal
