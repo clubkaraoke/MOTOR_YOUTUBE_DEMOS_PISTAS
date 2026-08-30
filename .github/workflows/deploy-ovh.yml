@@ -1,12 +1,6 @@
 name: Deploy to OVH
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "deploy/nginx-panel-integrado.conf"
-      - "lyrics_engine/web/index.html"
-      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
