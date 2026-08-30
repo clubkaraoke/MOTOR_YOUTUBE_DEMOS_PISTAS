@@ -92,6 +92,40 @@ class LabQueueTests(unittest.TestCase):
         second = LabQueue(Path(self.tmp.name))
         self.assertTrue(second.worker_enabled())
 
+    def test_recent_done_and_result_lookup(self) -> None:
+        self.queue.add_jobs(
+            [{
+                "name": "done.cdg",
+                "path_display": "/Pack/done.cdg",
+                "size": 100,
+            }],
+            pack="Pack -15",
+        )
+        job = self.queue.claim_next()
+        assert job is not None
+
+        result = {
+            "filename": "done.cdg",
+            "average_confidence": 91.0,
+            "quality": "REVISAR",
+            "pages_detected": 10,
+            "lines_detected": 25,
+            "corrections_count": 3,
+            "lyrics": "UNO\nDOS",
+        }
+        result_path = self.queue.save_result(job, result)
+        self.queue.finish(job["id"], result_path, result, 88.0)
+
+        recent = self.queue.recent_done(5)
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0]["name"], "done.cdg")
+        self.assertEqual(recent[0]["lab_score"], 88.0)
+
+        loaded = self.queue.load_job_result(job["id"])
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["lyrics"], "UNO\nDOS")
+        self.assertEqual(loaded["_job"]["name"], "done.cdg")
+
     def test_limited_run_auto_pauses(self) -> None:
         self.queue.set_run_limit(2)
         self.queue.set_worker_enabled(True)
