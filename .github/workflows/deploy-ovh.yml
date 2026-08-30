@@ -115,7 +115,10 @@ jobs:
             --exclude='backup-*.tgz' \
             -czf "$archive" .
 
-          if ! tar -tzf "$archive" | grep -Fqx './lyrics_engine/data/es_50k.txt'; then
+          archive_list="$RUNNER_TEMP/djgabo-release-files.txt"
+          tar -tzf "$archive" > "$archive_list"
+
+          if ! grep -Fqx './lyrics_engine/data/es_50k.txt' "$archive_list"; then
             echo "ERROR: lyrics_engine/data/es_50k.txt is missing from release archive" >&2
             exit 1
           fi
