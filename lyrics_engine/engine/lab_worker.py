@@ -61,6 +61,7 @@ class LabWorker:
             ),
             "memory_percent": memory_percent(),
             "memory_limit_percent": self.max_memory_percent,
+            "run_remaining": self.queue.run_remaining(),
             "current": current,
             "counts": self.queue.counts(),
         }
@@ -68,6 +69,11 @@ class LabWorker:
     def _run(self) -> None:
         while not self._stop.is_set():
             if not self.queue.worker_enabled():
+                time.sleep(self.poll_seconds)
+                continue
+
+            if self.queue.run_remaining() == 0:
+                self.queue.set_worker_enabled(False)
                 time.sleep(self.poll_seconds)
                 continue
 
@@ -101,6 +107,7 @@ class LabWorker:
                     f"{type(exc).__name__}: {exc}",
                 )
             finally:
+                self.queue.consume_run_slot()
                 with self._lock:
                     self._current = None
 
