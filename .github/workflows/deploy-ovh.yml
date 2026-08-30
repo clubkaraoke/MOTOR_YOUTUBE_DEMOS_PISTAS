@@ -1,6 +1,11 @@
 name: Deploy to OVH
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.prod.yml"
+      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
