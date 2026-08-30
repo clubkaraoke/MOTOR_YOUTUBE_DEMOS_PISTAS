@@ -79,7 +79,7 @@ services:
     env_file: .env
     environment:
       CDG_LAB_DATA_DIR: /data/cdg_lab
-      DROPBOX_APP_KEY: ${DROPBOX_APP_KEY:-}
+      DROPBOX_APP_KEY: guz0zl0p94fhw6n
       DROPBOX_APP_SECRET: ${DROPBOX_APP_SECRET:-}
       DROPBOX_REDIRECT_URI: https://panel.kitkaraoke.com/cdg-lyrics/api/lab/dropbox/callback
     ports:
