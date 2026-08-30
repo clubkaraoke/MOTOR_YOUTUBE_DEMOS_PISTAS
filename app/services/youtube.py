@@ -216,26 +216,18 @@ def change_privacy(job: Job, channel: Channel, privacy: str) -> str:
     return actual_privacy
 
 
-def sync_video_status(job: Job, channel: Channel) -> dict:
-    """Refresh the status YouTube exposes through Data API v3."""
-    now = datetime.now(timezone.utc)
-    if get_settings().youtube_mode != "real" or not job.youtube_video_id or job.youtube_video_id.startswith("mock_"):
-        job.youtube_actual_privacy = job.privacy_status
-        job.youtube_upload_status = "processed"
-        job.youtube_last_checked_at = now
-        return {"available": True, "privacy_status": job.youtube_actual_privacy, "upload_status": job.youtube_upload_status}
-    response = _service(channel).videos().list(part="status,contentDetails", id=job.youtube_video_id).execute()
-    items = response.get("items", [])
+def _apply_video_status(job: Job, item: dict | None, now: datetime) -> dict:
     job.youtube_last_checked_at = now
-    if not items:
+    if not item:
         job.youtube_deleted_at = job.youtube_deleted_at or now
         job.youtube_upload_status = "deleted_or_unavailable"
         if job.youtube_restriction_status != "UNAVAILABLE":
             job.youtube_attention_acknowledged_at = None
         job.youtube_restriction_status = "UNAVAILABLE"
         return {"available": False, "upload_status": job.youtube_upload_status}
-    status = items[0].get("status", {})
-    region = items[0].get("contentDetails", {}).get("regionRestriction", {})
+
+    status = item.get("status", {})
+    region = item.get("contentDetails", {}).get("regionRestriction", {})
     blocked = region.get("blocked") or []
     allowed = region.get("allowed")
     previous_restriction = job.youtube_restriction_status
@@ -247,6 +239,7 @@ def sync_video_status(job: Job, channel: Channel) -> dict:
         restriction_status = "REGION_RESTRICTED"
     else:
         restriction_status = None
+
     job.youtube_deleted_at = None
     job.youtube_actual_privacy = status.get("privacyStatus")
     job.youtube_upload_status = status.get("uploadStatus")
@@ -267,6 +260,46 @@ def sync_video_status(job: Job, channel: Channel) -> dict:
         "rejection_reason": job.youtube_rejection_reason,
         "restriction_status": job.youtube_restriction_status,
     }
+
+
+def sync_video_statuses(jobs: list[Job], channel: Channel) -> dict[str, dict]:
+    """Refresh up to 50 videos with one videos.list quota unit."""
+    now = datetime.now(timezone.utc)
+    results: dict[str, dict] = {}
+    real_jobs: list[Job] = []
+    for job in jobs:
+        if get_settings().youtube_mode != "real" or not job.youtube_video_id or job.youtube_video_id.startswith("mock_"):
+            job.youtube_actual_privacy = job.privacy_status
+            job.youtube_upload_status = "processed"
+            job.youtube_last_checked_at = now
+            results[job.id] = {
+                "available": True,
+                "privacy_status": job.youtube_actual_privacy,
+                "upload_status": job.youtube_upload_status,
+            }
+        else:
+            real_jobs.append(job)
+
+    if not real_jobs:
+        return results
+    if len(real_jobs) > 50:
+        raise YouTubeError("sync_video_statuses admite como máximo 50 videos por llamada")
+
+    response = _execute(
+        _service(channel).videos().list(
+            part="status,contentDetails",
+            id=",".join(job.youtube_video_id for job in real_jobs if job.youtube_video_id),
+        )
+    )
+    items_by_id = {item.get("id"): item for item in response.get("items", []) if item.get("id")}
+    for job in real_jobs:
+        results[job.id] = _apply_video_status(job, items_by_id.get(job.youtube_video_id), now)
+    return results
+
+
+def sync_video_status(job: Job, channel: Channel) -> dict:
+    """Refresh one video status; batch callers should use sync_video_statuses."""
+    return sync_video_statuses([job], channel)[job.id]
 
 
 def delete_video(job: Job, channel: Channel) -> None:
