@@ -39,6 +39,8 @@ from app.services.youtube import YouTubeError, change_privacy, delete_video, enc
 
 log = logging.getLogger("djgabo.api")
 settings = get_settings()
+DEFAULT_TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "assets" / "default_templates"
+DEFAULT_TEMPLATE_MIGRATION_KEY = "single_template_defaults_v1"
 queue = Queue("djgabo", connection=Redis.from_url(settings.redis_url), default_timeout="12h")
 scheduler = BackgroundScheduler(timezone="UTC")
 local_running: set[str] = set()
@@ -230,6 +232,24 @@ def initialize() -> None:
             for index in range(1, 5):
                 db.add(Channel(display_name=f"C{index}", max_uploads_24h=settings.max_uploads_per_channel_24h,
                                oauth_status="MOCK" if settings.youtube_mode == "mock" else "DISCONNECTED"))
+            db.flush()
+
+        # Migración única al nuevo sistema: una sola plantilla 1280×720 por canal.
+        # Las cuatro plantillas vienen empaquetadas con la aplicación y se copian
+        # al volumen persistente para que después puedan reemplazarse desde el panel.
+        if not db.get(Setting, DEFAULT_TEMPLATE_MIGRATION_KEY):
+            for index in range(1, 5):
+                channel = db.scalar(select(Channel).where(Channel.display_name == f"C{index}"))
+                source = DEFAULT_TEMPLATE_DIR / f"C{index}.webp"
+                if not channel or not source.is_file():
+                    raise RuntimeError(f"No se encontró la plantilla predeterminada C{index}: {source}")
+                target = settings.assets_dir / f"channel_{channel.id}_template.webp"
+                shutil.copy2(source, target)
+                channel.background_image_path = str(target)
+                # La segunda imagen del sistema anterior queda fuera de uso.
+                channel.qr_background_image_path = None
+            db.merge(Setting(key=DEFAULT_TEMPLATE_MIGRATION_KEY, value="1"))
+
         if not db.get(Setting, "default_cut_seconds"):
             db.add(Setting(key="default_cut_seconds", value=str(settings.default_cut_seconds)))
         if not db.get(Setting, "audio_crossfade_seconds"):
@@ -904,19 +924,24 @@ def list_channels(db: Session = Depends(get_db)):
     rows = []
     for slot in channel_slots(db):
         channel = slot.channel
-        background = Path(channel.background_image_path) if channel.background_image_path else None
-        qr_background = Path(channel.qr_background_image_path) if channel.qr_background_image_path else None
-        has_background = bool(background and background.is_file())
-        has_qr_background = bool(qr_background and qr_background.is_file())
+        template = Path(channel.background_image_path) if channel.background_image_path else None
+        has_template = bool(template and template.is_file())
+        template_url = (
+            f"/api/channels/{channel.id}/background/image?v={template.stat().st_mtime_ns}"
+            if has_template else None
+        )
         rows.append({
-            "id": channel.id, "display_name": channel.display_name, "enabled": channel.enabled,
-            "oauth_status": channel.oauth_status, "background_image_path": channel.background_image_path,
-            "background_name": background.name if has_background else None,
-            "background_url": f"/api/channels/{channel.id}/background/image?v={background.stat().st_mtime_ns}" if has_background else None,
-            "qr_background_image_path": channel.qr_background_image_path,
-            "qr_background_name": qr_background.name if has_qr_background else None,
-            "qr_background_url": f"/api/channels/{channel.id}/qr-background/image?v={qr_background.stat().st_mtime_ns}" if has_qr_background else None,
-            "max_uploads_24h": channel.max_uploads_24h, "used_24h": slot.used,
+            "id": channel.id,
+            "display_name": channel.display_name,
+            "enabled": channel.enabled,
+            "oauth_status": channel.oauth_status,
+            "background_image_path": channel.background_image_path,
+            "background_name": template.name if has_template else None,
+            "background_url": template_url,
+            "template_name": template.name if has_template else None,
+            "template_url": template_url,
+            "max_uploads_24h": channel.max_uploads_24h,
+            "used_24h": slot.used,
             "youtube_description": channel.youtube_description,
             "next_slot": slot.next_slot.isoformat() if slot.next_slot else None,
         })
@@ -994,10 +1019,16 @@ def channel_background(channel_id: int, file: UploadFile = File(...), db: Sessio
     channel = db.get(Channel, channel_id)
     if not channel:
         raise HTTPException(404, "Canal no encontrado")
-    target = _save_background_asset(file, f"channel_{channel_id}")
+    target = _save_background_asset(file, f"channel_{channel_id}_template")
     channel.background_image_path = str(target)
+    channel.qr_background_image_path = None
     db.commit()
-    return {"filename": file.filename, "channel_id": channel.id, "channel": channel.display_name}
+    return {
+        "filename": file.filename,
+        "channel_id": channel.id,
+        "channel": channel.display_name,
+        "template_url": f"/api/channels/{channel.id}/background/image?v={target.stat().st_mtime_ns}",
+    }
 
 
 @app.post("/api/channels/{channel_id}/qr-background")
@@ -1087,14 +1118,14 @@ def _render_animation_preview(first_frame: Path, qr_frame: Path, output: Path, t
 
 @app.post("/api/channels/{channel_id}/animation-preview")
 def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
+    """Render the exact single-template production frame without publishing."""
     channel = db.get(Channel, channel_id)
     if not channel:
         raise HTTPException(404, "Canal no encontrado")
 
-    first_background = Path(channel.background_image_path) if channel.background_image_path else None
-    second_background = Path(channel.qr_background_image_path) if channel.qr_background_image_path else first_background
-    if not first_background or not first_background.is_file() or not second_background or not second_background.is_file():
-        raise HTTPException(409, "Configura las dos imágenes del canal antes de probar la animación")
+    template = Path(channel.background_image_path) if channel.background_image_path else None
+    if not template or not template.is_file():
+        raise HTTPException(409, "Configura la plantilla 1280×720 del canal antes de probar")
 
     job = db.scalar(
         select(Job)
@@ -1105,21 +1136,13 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
     if not job or not job.cover_url:
         raise HTTPException(409, "No hay una canción reciente con cover para crear la prueba")
 
-    transition, transition_label = ANIMATION_PREVIEW_TRANSITIONS.get(
-        channel_id, ("fade", "Fade")
-    )
     preview_dir = settings.assets_dir / "animation_previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     cover_path = preview_dir / f"channel_{channel_id}_cover.png"
-    first_frame = preview_dir / f"channel_{channel_id}_first.png"
-    second_frame = preview_dir / f"channel_{channel_id}_qr.png"
-    video_path = preview_dir / f"channel_{channel_id}_{transition}.mp4"
+    frame_path = preview_dir / f"channel_{channel_id}_single.png"
 
     try:
         cover_provider.download(job.cover_url, cover_path)
-
-        # Use the same short, real redirect format as production. This keeps
-        # the QR compact and lets the user actually scan the panel preview.
         redirect = db.scalar(select(QrRedirect).where(QrRedirect.job_id == job.id))
         if not redirect:
             token = uuid.uuid4().hex
@@ -1133,49 +1156,44 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
             db.add(redirect)
             db.commit()
         qr_target = f"{settings.public_base_url.rstrip('/')}/q/{redirect.token}"
-
         create_frame(
-            first_background, cover_path, job.artist or "", job.title or "",
-            qr_target, first_frame, settings.whatsapp_number, include_qr=False,
+            template,
+            cover_path,
+            job.artist or "",
+            job.title or "",
+            qr_target,
+            frame_path,
+            settings.whatsapp_number,
+            include_qr=True,
         )
-        create_frame(
-            second_background, cover_path, job.artist or "", job.title or "",
-            qr_target, second_frame, settings.whatsapp_number, include_qr=True,
-        )
-        _render_animation_preview(first_frame, second_frame, video_path, transition)
     except (ValueError, OSError, RuntimeError) as exc:
         raise HTTPException(422, f"No se pudo crear la prueba: {exc}") from exc
 
-    stamp = max(first_frame.stat().st_mtime_ns, second_frame.stat().st_mtime_ns, video_path.stat().st_mtime_ns)
+    stamp = frame_path.stat().st_mtime_ns
     return {
         "channel": channel.display_name,
         "artist": job.artist,
         "title": job.title,
-        "transition": transition,
-        "transition_label": transition_label,
-        "first_url": f"/api/channels/{channel_id}/animation-preview/first?v={stamp}",
-        "qr_url": f"/api/channels/{channel_id}/animation-preview/qr?v={stamp}",
-        "video_url": f"/api/channels/{channel_id}/animation-preview/video?v={stamp}",
+        "image_url": f"/api/channels/{channel_id}/animation-preview/frame?v={stamp}",
+        # Aliases temporales para clientes del panel que aún tengan JS en caché.
+        "first_url": f"/api/channels/{channel_id}/animation-preview/frame?v={stamp}",
+        "qr_url": f"/api/channels/{channel_id}/animation-preview/frame?v={stamp}",
         "qr_target": qr_target,
-        "cover_box": {"x": 142, "y": 189, "width": 381, "height": 381},
+        "cover_box": {"x": 142, "y": 189, "width": 381, "height": 381, "border": 8},
         "qr_box": {"x": 1066, "y": 419, "width": 138, "height": 138},
+        "single_template": True,
     }
 
 
 @app.get("/api/channels/{channel_id}/animation-preview/{scene}", include_in_schema=False)
 def channel_animation_preview_asset(channel_id: int, scene: str):
-    transition, _ = ANIMATION_PREVIEW_TRANSITIONS.get(channel_id, ("fade", "Fade"))
     preview_dir = settings.assets_dir / "animation_previews"
-    if scene == "first":
-        path = preview_dir / f"channel_{channel_id}_first.png"
-    elif scene == "qr":
-        path = preview_dir / f"channel_{channel_id}_qr.png"
-    elif scene == "video":
-        path = preview_dir / f"channel_{channel_id}_{transition}.mp4"
+    if scene in {"frame", "first", "qr"}:
+        path = preview_dir / f"channel_{channel_id}_single.png"
     else:
         raise HTTPException(404, "Escena no encontrada")
     if not path.is_file():
-        raise HTTPException(404, "Primero genera la prueba de animación")
+        raise HTTPException(404, "Primero genera la prueba de cover + QR")
     return FileResponse(path, headers={"Cache-Control": "no-store"})
 
 
@@ -1219,7 +1237,7 @@ def get_public_settings(db: Session = Depends(get_db)):
     return {
         "default_cut_seconds": _stored_float(db, "default_cut_seconds", settings.default_cut_seconds),
         "transition_seconds": _stored_float(db, "audio_crossfade_seconds", settings.audio_crossfade_seconds),
-        "image_switch_seconds": 20.0,
+        "single_template_mode": True,
         "youtube_mode": settings.youtube_mode,
         "google_mode": settings.google_mode,
         "public_base_url": settings.public_base_url,
