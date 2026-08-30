@@ -6,15 +6,20 @@ from PIL import Image, ImageDraw, ImageOps
 
 CANVAS_SIZE = (1280, 720)
 
-# Medidas tomadas de PLANTILLA VACIA.png y DISEÑO FINAL.png. Estas coordenadas
-# son parte del contrato visual: no deben adaptarse al contenido.
-COVER_POSITION = (145, 193)
-COVER_SIZE = (374, 373)
+# Contrato visual de las plantillas nuevas 1280×720.
+# El cover es INAMOVIBLE: estas coordenadas coinciden con el cuadro fijo
+# reservado para la imagen jalada desde 01_CEREBRO2.
+COVER_POSITION = (142, 189)
+COVER_SIZE = (381, 381)
 COVER_RADIUS = 61
-QR_CARD_POSITION = (841, 216)
-QR_CARD_SIZE = (317, 317)
-QR_CARD_RADIUS = 18
-QR_MAX_SIZE = 309
+
+# El QR dinámico se genera dentro del nuevo recuadro del diseño, sin invadir
+# el texto "ESCANEA Y RECÍBELA". La tarjeta blanca tapa cualquier QR de muestra
+# de la plantilla y deja visible el borde verde exterior.
+QR_CARD_POSITION = (1066, 419)
+QR_CARD_SIZE = (138, 138)
+QR_CARD_RADIUS = 8
+QR_MAX_SIZE = 138
 
 
 def _rounded_mask(size: tuple[int, int], radius: int, scale: int = 4) -> Image.Image:
@@ -42,10 +47,12 @@ def _cover_crop(path: Path) -> Image.Image:
 
 
 def _qr_image(value: str) -> Image.Image:
-    """Render a large sharp QR matching the supplied final-design footprint."""
+    """Render a sharp QR sized for the small TV/thumbnail QR slot."""
     code = qrcode.QRCode(
         version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        # A clean, high-contrast rendered QR does not need embedded-logo
+        # recovery. L keeps the matrix smaller so modules stay larger on TV.
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=1,
         border=4,
     )
@@ -68,7 +75,7 @@ def _qr_image(value: str) -> Image.Image:
 
 def create_frame(base_background: Path, cover_path: Path, artist: str, title: str, qr_url: str,
                  output_path: Path, whatsapp_number: str, include_qr: bool = True) -> Path:
-    """Composite the cover and, when requested, the QR over an immutable template."""
+    """Composite the fixed cover and optional dynamic QR over a 1280×720 template."""
     del artist, title, whatsapp_number
     with Image.open(base_background) as source:
         if source.size != CANVAS_SIZE:
