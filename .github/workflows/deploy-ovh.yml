@@ -154,3 +154,13 @@ jobs:
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
             "bash -s -- '/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz' '${GITHUB_SHA}'" \
             < deploy/deploy_ovh.sh
+
+      - name: Start controlled V0.9 reprocess
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          response="$(ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "curl -fsS -X POST -H 'Content-Type: application/json' --data '{\"limit\":5}' http://127.0.0.1:8090/api/lab/dropbox/reprocess-recent")"
+          echo "CDG_LAB_REPROCESS_STARTED $response"
