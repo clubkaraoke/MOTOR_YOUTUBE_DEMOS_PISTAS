@@ -38,7 +38,7 @@
 <div class="wrap">
   <div class="top">
     <h1>CDG → LETRA</h1>
-    <p class="sub">V0.4 · Arrastra un CDG y extrae su letra.</p>
+    <p class="sub">V0.5 · OCR + corrección conservadora.</p>
   </div>
 
   <section class="card">
@@ -59,7 +59,7 @@
       <div class="metric"><strong id="ocrFrames">0</strong><span>PANTALLAS OCR</span></div>
       <div class="metric"><strong id="pagesCount">0</strong><span>PÁGINAS CDG</span></div>
       <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>
-      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>
+      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>\n      <div class="metric"><strong id="correctionsCount">0</strong><span>CORRECCIONES AUTO</span></div>
     </div>
 
     <textarea id="lyrics" spellcheck="true"></textarea>
@@ -183,14 +183,14 @@ extractBtn.addEventListener('click', async () => {
     document.getElementById('ocrFrames').textContent = body.frames_ocr ?? 0;
     document.getElementById('pagesCount').textContent = body.pages_detected ?? 0;
     document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
-    document.getElementById('quality').textContent = body.quality || '—';
+    document.getElementById('quality').textContent = body.quality || '—';\n    document.getElementById('correctionsCount').textContent = body.corrections_count ?? 0;
 
     resultCard.classList.remove('hidden');
 
     if (body.quality === 'BUENA') {
-      statusEl.textContent = 'Extracción buena. Revisa rápidamente el texto.';
+      statusEl.textContent = 'Extracción buena. Revisión rápida recomendada antes de aprobar.';
     } else if (body.quality === 'REVISAR') {
-      statusEl.textContent = 'Resultado intermedio: conviene revisar la letra.';
+      statusEl.textContent = 'REVISAR: el motor corrigió automáticamente varios errores, pero esta letra aún no debe publicarse sin revisión.';
     } else {
       statusEl.textContent = 'RESULTADO MALO: no usar todavía; hay que seguir ajustando este tipo de CDG.';
     }
