@@ -38,6 +38,24 @@ lab_worker = LabWorker(lab_queue)
 lab_worker.start_thread()
 
 
+def container_memory_limit_bytes() -> int:
+    for candidate in (
+        Path("/sys/fs/cgroup/memory.max"),
+        Path("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+    ):
+        try:
+            raw = candidate.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if not raw or raw == "max":
+            continue
+        try:
+            return int(raw)
+        except ValueError:
+            continue
+    return 0
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return (BASE_DIR / "web" / "index.html").read_text(encoding="utf-8")
@@ -61,6 +79,8 @@ def health() -> dict:
         "dropbox_configured": dropbox.configured,
         "dropbox_connected": dropbox.connected,
         "lab_queue": lab_queue.counts(),
+        "lab_worker_memory_limit_percent": lab_worker.max_memory_percent,
+        "container_memory_limit_bytes": container_memory_limit_bytes(),
     }
 
 
