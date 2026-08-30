@@ -1,4 +1,5 @@
 name: Deploy to OVH
+# One-time trigger: deploy pending privacy queue.
 
 on:
   workflow_dispatch:
