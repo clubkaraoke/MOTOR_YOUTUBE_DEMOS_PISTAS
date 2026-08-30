@@ -7,13 +7,14 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 
 from engine import CDGLyricsExtractor
+from engine.text_corrector import TextCorrector
 
 BASE_DIR = Path(__file__).resolve().parent
 MAX_CDG_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.5.0",
+    version="0.5.1",
 )
 
 
@@ -24,7 +25,14 @@ def home() -> str:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "engine": "CDG_LYRICS_ENGINE", "version": "0.5.0"}
+    corrector = TextCorrector()
+    return {
+        "ok": True,
+        "engine": "CDG_LYRICS_ENGINE",
+        "version": "0.5.1",
+        "lexicon_words": len(corrector.freq),
+        "lexicon_con": corrector.frequency("con"),
+    }
 
 
 @app.post("/api/extract")
