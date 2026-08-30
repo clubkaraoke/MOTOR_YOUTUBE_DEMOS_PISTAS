@@ -1,13 +1,6 @@
 name: Deploy to OVH
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "lyrics_engine/main.py"
-      - "lyrics_engine/engine/lab_worker.py"
-      - "docker-compose.prod.yml"
-      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
