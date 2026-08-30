@@ -277,6 +277,10 @@ def _process_job(job_id: str) -> None:
                 and not upload_limit_retry
             )
 
+            # Auto-public mode: new videos are uploaded directly as public,
+            # avoiding a later videos.update call and its general quota cost.
+            job.privacy_status = "public"
+            job.pending_privacy_status = None
             job.status = JobStatus.UPLOADING_YOUTUBE.value
             job.progress = 0
             job.upload_operation_id = job.upload_operation_id or f"job:{job.id}"
