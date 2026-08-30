@@ -66,16 +66,34 @@ jobs:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EjvmXCx1jj7XEhW7ym3mdvmmbCf+XQxqpbe/XRKnz70"
         run: |
           set -euo pipefail
           install -m 700 -d "$HOME/.ssh"
           printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
-          {
-            printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
-            printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
-          } > "$HOME/.ssh/known_hosts"
+
+          keyscan_file="$(mktemp)"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$keyscan_file"
+          test -s "$keyscan_file"
+
+          actual_fingerprint="$(
+            ssh-keygen -lf "$keyscan_file" -E sha256 |
+            awk 'NR==1 {print $2}'
+          )"
+
+          echo "Verified OVH ED25519 fingerprint: $actual_fingerprint"
+
+          if [ "$actual_fingerprint" != "$OVH_EXPECTED_FINGERPRINT" ]; then
+            echo "ERROR: OVH SSH host fingerprint does not match the independently verified fingerprint." >&2
+            echo "Expected: $OVH_EXPECTED_FINGERPRINT" >&2
+            echo "Actual:   $actual_fingerprint" >&2
+            exit 1
+          fi
+
+          cp "$keyscan_file" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
+          rm -f "$keyscan_file"
 
       - name: Package application
         run: |
