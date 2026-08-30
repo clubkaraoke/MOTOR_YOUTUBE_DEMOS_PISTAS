@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CDG Lyrics Engine</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#090d18}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#17203b 0,#090d18 48%);padding:32px 18px}
+    .wrap{max-width:980px;margin:auto}
+    .top{margin-bottom:22px}
+    h1{font-size:28px;margin:0 0 7px}
+    .sub{color:#9aa7bd;margin:0}
+    .card{background:rgba(17,24,39,.92);border:1px solid #26324a;border-radius:18px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25);margin-bottom:18px}
+    .drop{display:block;border:1px dashed #485873;border-radius:14px;padding:28px;text-align:center;cursor:pointer;background:#0c1323}
+    .drop:hover{border-color:#7c9cff}
+    input[type=file]{display:none}
+    button{border:0;border-radius:11px;padding:12px 18px;font-weight:800;cursor:pointer}
+    .primary{background:#5f7cff;color:white;margin-top:14px;width:100%}
+    .primary:disabled{opacity:.5;cursor:not-allowed}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .secondary{background:#1d2940;color:#e8edff}
+    .status{margin-top:12px;color:#a7b3c8;min-height:22px}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .metric{background:#0b1220;border:1px solid #202c42;border-radius:12px;padding:12px}
+    .metric strong{display:block;font-size:20px;margin-bottom:4px}
+    .metric span{font-size:12px;color:#8796ad}
+    textarea{width:100%;min-height:440px;resize:vertical;background:#070c15;color:#f7f9ff;border:1px solid #2a3851;border-radius:12px;padding:18px;font:16px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+    .hidden{display:none}
+    @media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>CDG → LETRA</h1>
+    <p class="sub">V0.2 · Extrae texto directamente del gráfico CD+G.</p>
+  </div>
+
+  <section class="card">
+    <label class="drop" for="cdgFile">
+      <strong id="fileLabel">Seleccionar un archivo .CDG</strong>
+      <div style="color:#7f8da5;margin-top:7px">Primera prueba: un CDG real</div>
+    </label>
+    <input id="cdgFile" type="file" accept=".cdg">
+    <button id="extractBtn" class="primary" disabled>EXTRAER LETRA</button>
+    <div id="status" class="status"></div>
+  </section>
+
+  <section id="resultCard" class="card hidden">
+    <div class="metrics">
+      <div class="metric"><strong id="lineCount">0</strong><span>LÍNEAS</span></div>
+      <div class="metric"><strong id="confidence">0%</strong><span>CONFIANZA OCR</span></div>
+      <div class="metric"><strong id="ocrFrames">0</strong><span>PANTALLAS OCR</span></div>
+      <div class="metric"><strong id="pagesCount">0</strong><span>PÁGINAS CDG</span></div>
+      <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>
+    </div>
+
+    <textarea id="lyrics" spellcheck="true"></textarea>
+
+    <div class="actions">
+      <button class="secondary" id="txtBtn">DESCARGAR TXT</button>
+      <button class="secondary" id="lrcBtn">DESCARGAR LRC</button>
+      <button class="secondary" id="jsonBtn">DESCARGAR JSON</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const fileInput = document.getElementById('cdgFile');
+const fileLabel = document.getElementById('fileLabel');
+const extractBtn = document.getElementById('extractBtn');
+const statusEl = document.getElementById('status');
+const resultCard = document.getElementById('resultCard');
+const lyricsEl = document.getElementById('lyrics');
+let result = null;
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  fileLabel.textContent = file ? file.name : 'Seleccionar un archivo .CDG';
+  extractBtn.disabled = !file;
+});
+
+function fmtDuration(value) {
+  const s = Math.max(0, Math.round(Number(value) || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+extractBtn.addEventListener('click', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  extractBtn.disabled = true;
+  statusEl.textContent = 'Decodificando CDG y buscando pantallas de letra…';
+  resultCard.classList.add('hidden');
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const response = await fetch('api/extract', { method: 'POST', body: form });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || 'Error procesando el CDG');
+
+    result = body;
+    lyricsEl.value = body.lyrics || '';
+    document.getElementById('lineCount').textContent = body.lines_detected ?? 0;
+    document.getElementById('confidence').textContent =
+      Math.round(body.average_confidence || 0) + '%';
+    document.getElementById('ocrFrames').textContent = body.frames_ocr ?? 0;
+    document.getElementById('pagesCount').textContent = body.pages_detected ?? 0;
+    document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
+    resultCard.classList.remove('hidden');
+    statusEl.textContent = body.lines_detected
+      ? 'Extracción terminada. Revisa el texto antes de descargar.'
+      : 'Terminó, pero no se detectaron líneas. Necesitamos ajustar esta marca de CDG.';
+  } catch (error) {
+    statusEl.textContent = 'ERROR: ' + error.message;
+  } finally {
+    extractBtn.disabled = false;
+  }
+});
+
+function download(name, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('txtBtn').addEventListener('click', () => {
+  if (!result) return;
+  const base = (result.filename || 'letra').replace(/\.cdg$/i, '');
+  download(base + '.txt', lyricsEl.value, 'text/plain;charset=utf-8');
+});
+
+function lrcTimestamp(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(value / 60);
+  const remainder = value - minutes * 60;
+  return String(minutes).padStart(2, '0') + ':' + remainder.toFixed(2).padStart(5, '0');
+}
+
+document.getElementById('lrcBtn').addEventListener('click', () => {
+  if (!result) return;
+  const base = (result.filename || 'letra').replace(/\.cdg$/i, '');
+  const editedLines = lyricsEl.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+  const detected = Array.isArray(result.lines) ? result.lines : [];
+  const lrc = editedLines.map((text, index) => {
+    const time = detected[index]?.time ?? detected[detected.length - 1]?.time ?? 0;
+    return '[' + lrcTimestamp(time) + ']' + text;
+  }).join('\n');
+  download(base + '.lrc', lrc, 'text/plain;charset=utf-8');
+});
+
+document.getElementById('jsonBtn').addEventListener('click', () => {
+  if (!result) return;
+  const base = (result.filename || 'letra').replace(/\.cdg$/i, '');
+  const edited = { ...result, lyrics: lyricsEl.value };
+  download(base + '.json', JSON.stringify(edited, null, 2), 'application/json');
+});
+</script>
+</body>
+</html>
