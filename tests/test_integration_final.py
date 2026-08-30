@@ -4,7 +4,13 @@ import pytest
 from PIL import Image
 
 from app.services.cover_provider import CoverEntry, CoverProvider, normalize_music_text
-from app.services.frame_builder import COVER_POSITION, QR_CARD_POSITION, create_frame
+from app.services.frame_builder import (
+    COVER_POSITION,
+    COVER_SIZE,
+    QR_CARD_POSITION,
+    QR_CARD_SIZE,
+    create_frame,
+)
 from app.services.google_drive import DriveAudioStorage
 from app.services.media import YOUTUBE_AUDIO_BITRATE
 from app.services.qr import whatsapp_message, whatsapp_url
@@ -64,7 +70,12 @@ def test_cover_download_ignores_broken_desktop_proxy(monkeypatch, tmp_path: Path
     assert observed["session"].trust_env is False
 
 
-def test_frame_is_1280x720_and_each_qr_changes_pixels(tmp_path: Path):
+def test_frame_uses_new_fixed_cover_and_qr_contract(tmp_path: Path):
+    assert COVER_POSITION == (142, 189)
+    assert COVER_SIZE == (381, 381)
+    assert QR_CARD_POSITION == (1066, 419)
+    assert QR_CARD_SIZE == (138, 138)
+
     background = tmp_path / "background.png"
     cover = tmp_path / "cover.png"
     Image.new("RGB", (1280, 720), "#101722").save(background)
@@ -76,10 +87,17 @@ def test_frame_is_1280x720_and_each_qr_changes_pixels(tmp_path: Path):
     with Image.open(first) as image:
         assert image.size == (1280, 720)
         assert image.getpixel((0, 0)) == (16, 23, 34)
-        assert image.getpixel((COVER_POSITION[0] + 180, COVER_POSITION[1] + 180)) == (216, 44, 85)
-        assert image.getpixel((QR_CARD_POSITION[0] + 158, QR_CARD_POSITION[1] + 158)) in {
-            (0, 0, 0), (255, 255, 255)
-        }
+        cover_center = (
+            COVER_POSITION[0] + COVER_SIZE[0] // 2,
+            COVER_POSITION[1] + COVER_SIZE[1] // 2,
+        )
+        assert image.getpixel(cover_center) == (216, 44, 85)
+
+        qr_center = (
+            QR_CARD_POSITION[0] + QR_CARD_SIZE[0] // 2,
+            QR_CARD_POSITION[1] + QR_CARD_SIZE[1] // 2,
+        )
+        assert image.getpixel(qr_center) in {(0, 0, 0), (255, 255, 255)}
     assert first.read_bytes() != second.read_bytes()
 
 
