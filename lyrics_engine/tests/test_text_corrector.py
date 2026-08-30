@@ -1,6 +1,22 @@
 import unittest
 
-from engine.text_corrector import TextCorrector
+import importlib.util
+from pathlib import Path
+
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "engine"
+    / "text_corrector.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "cdg_text_corrector",
+    MODULE_PATH,
+)
+assert SPEC is not None
+assert SPEC.loader is not None
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+TextCorrector = MODULE.TextCorrector
 
 
 class TextCorrectorTests(unittest.TestCase):
