@@ -213,6 +213,20 @@ def _process_job(job_id: str) -> None:
             db.commit()
             return
         try:
+            previous_error = job.error_message or ""
+            # If the prior failure was specifically the non-uploading
+            # channels.list quota preflight, no video bytes were sent in that
+            # attempt. Retry directly against videos.insert.
+            preflight_quota_only = (
+                job.retry_count == 1
+                and "quotaExceeded" in previous_error
+                and "/youtube/v3/channels" in previous_error
+            )
+            # On later retries after a real upload error, keep the duplicate
+            # recovery scan so a crash after YouTube accepted the video cannot
+            # create another copy.
+            check_existing = job.retry_count > 0 and not preflight_quota_only
+
             job.status = JobStatus.UPLOADING_YOUTUBE.value
             job.progress = 0
             job.upload_operation_id = job.upload_operation_id or f"job:{job.id}"
@@ -223,7 +237,12 @@ def _process_job(job_id: str) -> None:
                 job.progress = max(0, min(100, int(value)))
                 db.commit()
 
-            video_id, url = upload_video(job, channel, progress_callback=youtube_progress)
+            video_id, url = upload_video(
+                job,
+                channel,
+                progress_callback=youtube_progress,
+                check_existing=check_existing,
+            )
             job.status = JobStatus.VERIFYING.value
             job.progress = 100
             db.commit()
