@@ -19,7 +19,7 @@ from app.services.frame_builder import create_frame
 from app.services.google_drive import DriveAudioStorage, GoogleStorageError
 from app.services.media import MediaError, create_demo_video, validate_demo_video
 from app.services.qr import whatsapp_url
-from app.services.scheduler import choose_channel
+from app.services.scheduler import channel_slots, choose_channel
 from app.services.title_builder import build_youtube_title
 from app.services.youtube import YouTubeError, finalize_publication, upload_video
 
@@ -96,6 +96,24 @@ def _process_job(job_id: str) -> None:
         if job.previous_status in {JobStatus.UPLOADING_YOUTUBE.value, JobStatus.VERIFYING.value} and job.channel_id:
             recovery_channel = db.get(Channel, job.channel_id)
         if recovery_channel:
+            # Recovery/retry must obey the same 24h channel cap as new jobs.
+            # Keeping the original channel avoids reusing a rendered MP4 with
+            # another channel's background/QR, but we never upload above cap.
+            recovery_slot = next(
+                (slot for slot in channel_slots(db) if slot.channel.id == recovery_channel.id),
+                None,
+            )
+            if not recovery_slot or recovery_slot.used >= recovery_channel.max_uploads_24h:
+                job.status = JobStatus.WAITING_SLOT.value
+                job.progress = 0
+                job.error_code = "CHANNEL_24H_LIMIT"
+                job.error_message = (
+                    f"{recovery_channel.display_name} alcanzó su límite de 24 h "
+                    f"({recovery_slot.used if recovery_slot else 0}/"
+                    f"{recovery_channel.max_uploads_24h}). El reintento esperará cupo."
+                )
+                db.commit()
+                return
             channel = recovery_channel
         else:
             slot = choose_channel(db)
