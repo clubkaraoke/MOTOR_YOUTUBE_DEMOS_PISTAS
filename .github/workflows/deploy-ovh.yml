@@ -70,7 +70,7 @@ jobs:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
-          OVH_EXPECTED_FINGERPRINT: "SHA256:EjvmXCx1jj7XEhW7ym3mdvmmbCf+XQxqpbe/XRKnz70"
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EJvmNCxljj7XEHw7ym3mdvmmbCf+XQxqpbc/XRKnz70"
         run: |
           set -euo pipefail
           install -m 700 -d "$HOME/.ssh"
