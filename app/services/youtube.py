@@ -94,6 +94,7 @@ def upload_video(
     job: Job,
     channel: Channel,
     progress_callback: UploadProgressCallback | None = None,
+    check_existing: bool = False,
 ) -> tuple[str, str]:
     settings = get_settings()
     job.youtube_title = job.youtube_title or build_youtube_title(job.filename_original, job.artist, job.title)
@@ -107,23 +108,32 @@ def upload_video(
             progress_callback(100)
         return video_id, f"{settings.public_base_url.rstrip('/')}/api/jobs/{job.id}/video"
     service = _service(channel)
-    channels = _execute(service.channels().list(part="contentDetails", mine=True)).get("items", [])
-    uploads_playlist = channels[0]["contentDetails"]["relatedPlaylists"]["uploads"] if channels else None
-    candidate_ids: list[str] = []
-    if uploads_playlist:
-        recent = _execute(service.playlistItems().list(
-            part="contentDetails", playlistId=uploads_playlist, maxResults=50
-        ))
-        candidate_ids = [
-            item["contentDetails"]["videoId"] for item in recent.get("items", [])
-            if item.get("contentDetails", {}).get("videoId")
-        ]
-    if candidate_ids:
-        found = _execute(service.videos().list(part="snippet,status", id=",".join(candidate_ids)))
-        for item in found.get("items", []):
-            if job.id in item.get("snippet", {}).get("tags", []):
-                video_id = item["id"]
-                return video_id, f"https://www.youtube.com/watch?v={video_id}"
+    # Normal uploads go straight to videos.insert. Since June 2026 YouTube
+    # separates videos.insert into its own quota bucket; calling channels.list
+    # and playlistItems.list before every upload can exhaust the general quota
+    # and block uploads even when upload quota is still available.
+    #
+    # We only perform the duplicate-recovery scan when explicitly requested,
+    # e.g. after a prior upload attempt may have reached YouTube but the local
+    # worker did not persist the returned video id.
+    if check_existing:
+        channels = _execute(service.channels().list(part="contentDetails", mine=True)).get("items", [])
+        uploads_playlist = channels[0]["contentDetails"]["relatedPlaylists"]["uploads"] if channels else None
+        candidate_ids: list[str] = []
+        if uploads_playlist:
+            recent = _execute(service.playlistItems().list(
+                part="contentDetails", playlistId=uploads_playlist, maxResults=50
+            ))
+            candidate_ids = [
+                item["contentDetails"]["videoId"] for item in recent.get("items", [])
+                if item.get("contentDetails", {}).get("videoId")
+            ]
+        if candidate_ids:
+            found = _execute(service.videos().list(part="snippet,status", id=",".join(candidate_ids)))
+            for item in found.get("items", []):
+                if job.id in item.get("snippet", {}).get("tags", []):
+                    video_id = item["id"]
+                    return video_id, f"https://www.youtube.com/watch?v={video_id}"
     body = {
         "snippet": {"title": job.youtube_title, "description": channel.youtube_description or settings.youtube_default_description,
                     "tags": [job.id, "DJGABO Engine"]},
