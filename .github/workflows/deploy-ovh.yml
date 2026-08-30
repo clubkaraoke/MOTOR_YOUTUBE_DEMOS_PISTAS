@@ -35,15 +35,21 @@ jobs:
           set -euo pipefail
           python3 -m compileall -q lyrics_engine
           python3 lyrics_engine/tests/test_text_corrector.py
+          python3 -m unittest lyrics_engine.tests.test_lab -v
           test -s lyrics_engine/data/es_50k.txt
           python3 - <<'PY'
           from pathlib import Path
-          html = Path("lyrics_engine/web/index.html").read_text(encoding="utf-8")
-          start = html.index("<script>") + len("<script>")
-          end = html.index("</script>", start)
-          Path("/tmp/cdg-lyrics-panel.js").write_text(html[start:end], encoding="utf-8")
+          for source, target in [
+              ("lyrics_engine/web/index.html", "/tmp/cdg-lyrics-panel.js"),
+              ("lyrics_engine/web/lab.html", "/tmp/cdg-lyrics-lab.js"),
+          ]:
+              html = Path(source).read_text(encoding="utf-8")
+              start = html.index("<script>") + len("<script>")
+              end = html.index("</script>", start)
+              Path(target).write_text(html[start:end], encoding="utf-8")
           PY
           node --check /tmp/cdg-lyrics-panel.js
+          node --check /tmp/cdg-lyrics-lab.js
           grep -q 'MOTOR 03' deploy/portal/index.html
           grep -q 'location /cdg-lyrics/' deploy/nginx-panel-integrado.conf
           grep -q '127.0.0.1:8090:8090' docker-compose.prod.yml
