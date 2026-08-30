@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ from app.services.google_drive import DriveAudioStorage
 from app.services.media import YOUTUBE_AUDIO_BITRATE
 from app.services.qr import whatsapp_message, whatsapp_url
 from app.services.title_builder import build_youtube_title
-from app.services.youtube import is_quota_exceeded
+from app.services.youtube import is_quota_exceeded, next_general_quota_reset_utc
 from app.workers.tasks import _is_youtube_upload_limit
 
 
@@ -35,6 +36,12 @@ def test_youtube_quota_detection_for_privacy_queue():
     assert is_quota_exceeded("reason: quotaExceeded")
     assert is_quota_exceeded("The request cannot be completed because you have exceeded your quota")
     assert not is_quota_exceeded("uploadLimitExceeded")
+
+
+def test_general_quota_reset_uses_pacific_midnight_with_margin():
+    now = datetime(2026, 8, 30, 6, 30, tzinfo=timezone.utc)
+    reset = next_general_quota_reset_utc(now)
+    assert reset == datetime(2026, 8, 30, 7, 5, tzinfo=timezone.utc)
 
 
 def test_smart_youtube_title_handles_chorus_and_limit():
