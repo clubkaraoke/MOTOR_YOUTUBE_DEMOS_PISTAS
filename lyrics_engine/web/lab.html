@@ -50,7 +50,7 @@
 <body>
 <div class="wrap">
   <h1>CDG LYRICS LAB</h1>
-  <p class="sub">LAB V1.1 · Dropbox directo + cola persistente + análisis masivo.</p>
+  <p class="sub">LAB V1.2 · híbrido CDG + Dropbox directo + análisis masivo.</p>
 
   <section class="card">
     <h3 class="section-title">DROPBOX DIRECTO</h3>
@@ -307,13 +307,23 @@ async function openLabResult(jobId) {
     if (!response.ok) throw new Error(body.detail || ('HTTP ' + response.status));
 
     title.textContent = body.filename || ('Resultado #' + jobId);
+    const comparison = body.comparison || {};
+    const baseline = body.baseline || {};
+    const deltas = baseline && Object.keys(baseline).length
+      ? ' · Δ páginas ' + (comparison.pages_delta ?? 0) +
+        ' · Δ líneas ' + (comparison.lines_delta ?? 0) +
+        ' · Δ OCR ' + Number(comparison.ocr_confidence_delta ?? 0).toFixed(1) +
+        ' · Δ LAB ' + Number(comparison.lab_score_delta ?? 0).toFixed(1)
+      : '';
+
     meta.textContent =
       'Calidad ' + (body.quality || '—') +
       ' · OCR ' + Math.round(Number(body.average_confidence || 0)) + '%' +
       ' · LAB ' + Math.round(Number(body.lab?.score || body.job?.lab_score || 0)) +
       ' · páginas ' + Number(body.pages_detected || 0) +
       ' · líneas ' + Number(body.lines_detected || 0) +
-      ' · correcciones ' + Number(body.corrections_count || 0);
+      ' · correcciones ' + Number(body.corrections_count || 0) +
+      deltas;
 
     const lyricText = typeof body.lyrics === 'string'
       ? body.lyrics
