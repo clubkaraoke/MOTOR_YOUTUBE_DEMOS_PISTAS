@@ -46,6 +46,9 @@ class TextCorrectorTests(unittest.TestCase):
                 "goro": 288,
                 "candeleras": 0,
                 "gandeleras": 0,
+                "ahora": 1_088_174,
+                "sola": 82_229,
+                "engañaste": 2_079,
             }
         )
 
@@ -244,7 +247,6 @@ class TextCorrectorTests(unittest.TestCase):
         )
 
     def test_enganaste_becomes_enganaste_with_enye(self) -> None:
-        self.corrector.freq["engañaste"] = 2079
         corrected, kind = (
             self.corrector.correct_token(
                 "ENGANASTE"
