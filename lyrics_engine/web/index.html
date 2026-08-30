@@ -38,7 +38,7 @@
 <div class="wrap">
   <div class="top">
     <h1>CDG → LETRA</h1>
-    <p class="sub">V0.5 · OCR + corrección conservadora.</p>
+    <p class="sub">V0.6 · OCR adaptativo + contexto de la canción.</p>
   </div>
 
   <section class="card">
@@ -59,10 +59,17 @@
       <div class="metric"><strong id="ocrFrames">0</strong><span>PANTALLAS OCR</span></div>
       <div class="metric"><strong id="pagesCount">0</strong><span>PÁGINAS CDG</span></div>
       <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>
-      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>\n      <div class="metric"><strong id="correctionsCount">0</strong><span>CORRECCIONES AUTO</span></div>
+      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>
+      <div class="metric"><strong id="correctionsCount">0</strong><span>CORRECCIONES AUTO</span></div>
+      <div class="metric"><strong id="fallbackPages">0</strong><span>PÁGINAS OCR EXTRA</span></div>
     </div>
 
     <textarea id="lyrics" spellcheck="true"></textarea>
+
+    <details id="correctionsBox" class="hidden" style="margin-top:14px">
+      <summary style="cursor:pointer;font-weight:800;color:#cbd6ff">VER CORRECCIONES AUTOMÁTICAS</summary>
+      <div id="correctionsList" style="margin-top:10px;max-height:260px;overflow:auto;background:#0b1220;border:1px solid #202c42;border-radius:10px;padding:12px;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace"></div>
+    </details>
 
     <div class="actions">
       <button class="secondary" id="txtBtn">DESCARGAR TXT</button>
@@ -185,6 +192,33 @@ extractBtn.addEventListener('click', async () => {
     document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
     document.getElementById('quality').textContent = body.quality || '—';
     document.getElementById('correctionsCount').textContent = body.corrections_count ?? 0;
+    document.getElementById('fallbackPages').textContent = body.ocr_fallback_pages ?? 0;
+
+    const correctionsBox = document.getElementById('correctionsBox');
+    const correctionsList = document.getElementById('correctionsList');
+    const corrections = Array.isArray(body.corrections) ? body.corrections : [];
+
+    correctionsList.replaceChildren();
+    if (corrections.length) {
+      corrections.slice(0, 120).forEach(change => {
+        const row = document.createElement('div');
+        const pageLine = Number.isInteger(change.line_index)
+          ? 'L' + (change.line_index + 1) + ' · '
+          : '';
+        row.textContent =
+          pageLine +
+          (change.from || '') +
+          ' → ' +
+          (change.to || '') +
+          '  [' +
+          (change.type || 'auto') +
+          ']';
+        correctionsList.appendChild(row);
+      });
+      correctionsBox.classList.remove('hidden');
+    } else {
+      correctionsBox.classList.add('hidden');
+    }
 
     resultCard.classList.remove('hidden');
 
