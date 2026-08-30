@@ -786,7 +786,16 @@ def update_job(job_id: str, patch: JobUpdate, db: Session = Depends(get_db)):
     if job.youtube_deleted_at and "privacy_status" in data:
         raise HTTPException(409, "El video ya fue eliminado de YouTube")
     if job.status == JobStatus.PUBLISHED.value and "privacy_status" in data:
-        change_privacy(job, job.channel, data["privacy_status"])
+        requested_privacy = data.pop("privacy_status")
+        try:
+            actual_privacy = change_privacy(job, job.channel, requested_privacy)
+        except YouTubeError as exc:
+            raise HTTPException(502, f"No se pudo cambiar la privacidad en YouTube: {exc}") from exc
+        if actual_privacy != requested_privacy:
+            raise HTTPException(
+                502,
+                f"YouTube respondió con privacidad {actual_privacy or 'desconocida'} en vez de {requested_privacy}",
+            )
     for key, value in data.items():
         setattr(job, key, value)
     if job.status in {JobStatus.PREPARED.value, JobStatus.REVIEW_REQUIRED.value}:
