@@ -3,20 +3,39 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from fastapi import Body, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from engine import CDGLyricsExtractor
+from engine.dropbox_lab import DropboxLabClient, DropboxLabError
 from engine.lab import LabAnalyzer
+from engine.lab_queue import LabQueue
+from engine.lab_worker import LabWorker
 from engine.text_corrector import TextCorrector
 
 BASE_DIR = Path(__file__).resolve().parent
 MAX_CDG_BYTES = 20 * 1024 * 1024
 
+PACK_PATHS = {
+    7: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -7",
+    8: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top HIts PERU -8",
+    9: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -9",
+    10: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -10",
+    11: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -11",
+    12: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -12",
+    13: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -13",
+    14: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -14",
+    15: "/djgabo berrocal/1.- Pack Karaoke PRO MASTER/4.- Pack Karaoke TOP PERÚ (1)/Pack Top Hits PERU -15",
+}
+
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.7.0-lab",
+    version="0.8.0-lab",
 )
+
+lab_queue = LabQueue()
+lab_worker = LabWorker(lab_queue)
+lab_worker.start_thread()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -32,12 +51,16 @@ def lab_home() -> str:
 @app.get("/api/health")
 def health() -> dict:
     corrector = TextCorrector()
+    dropbox = DropboxLabClient()
     return {
         "ok": True,
         "engine": "CDG_LYRICS_ENGINE",
-        "version": "0.7.0-lab",
+        "version": "0.8.0-lab",
         "lexicon_words": len(corrector.freq),
         "lexicon_con": corrector.frequency("con"),
+        "dropbox_configured": dropbox.configured,
+        "dropbox_connected": dropbox.connected,
+        "lab_queue": lab_queue.counts(),
     }
 
 
@@ -66,6 +89,168 @@ def analyze_lab_batch(
             status_code=500,
             detail=f"No se pudo analizar el lote: {exc}",
         ) from exc
+
+
+@app.get("/api/lab/dropbox/status")
+def dropbox_lab_status() -> dict:
+    client = DropboxLabClient()
+    return {
+        "dropbox": client.status(),
+        "worker": lab_worker.status(),
+        "packs": [
+            {"number": number, "path": path}
+            for number, path in PACK_PATHS.items()
+        ],
+        "recent": lab_queue.recent(25),
+        "worst": lab_queue.worst_done(20),
+    }
+
+
+@app.post("/api/lab/dropbox/connect")
+def dropbox_lab_connect() -> dict:
+    client = DropboxLabClient()
+    try:
+        return {"authorization_url": client.authorization_url()}
+    except DropboxLabError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/lab/dropbox/callback")
+def dropbox_lab_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+):
+    client = DropboxLabClient()
+    try:
+        client.exchange_code(code, state)
+    except DropboxLabError as exc:
+        return HTMLResponse(
+            status_code=400,
+            content=(
+                "<h2>No se pudo conectar Dropbox</h2>"
+                f"<pre>{str(exc)}</pre>"
+                '<p><a href="/cdg-lyrics/lab">Volver al LAB</a></p>'
+            ),
+        )
+
+    return RedirectResponse(
+        url="/cdg-lyrics/lab?dropbox=connected",
+        status_code=302,
+    )
+
+
+@app.post("/api/lab/dropbox/index")
+def dropbox_lab_index(
+    payload: dict = Body(default={}),
+) -> dict:
+    client = DropboxLabClient()
+
+    if not client.connected:
+        raise HTTPException(
+            status_code=409,
+            detail="Dropbox todavía no está conectado",
+        )
+
+    requested = payload.get("packs") or list(PACK_PATHS)
+    try:
+        selected = sorted({int(value) for value in requested})
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Lista de packs inválida") from exc
+
+    unknown = [value for value in selected if value not in PACK_PATHS]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Packs no configurados: {unknown}",
+        )
+
+    reports = []
+    total_found = 0
+
+    for number in selected:
+        path = PACK_PATHS[number]
+        try:
+            entries = client.list_cdgs(path)
+        except DropboxLabError as exc:
+            reports.append(
+                {
+                    "pack": number,
+                    "path": path,
+                    "ok": False,
+                    "error": str(exc),
+                    "cdg_found": 0,
+                }
+            )
+            continue
+
+        total_found += len(entries)
+        queue_report = lab_queue.add_jobs(
+            entries,
+            pack=f"Pack Top Hits PERU -{number}",
+        )
+        reports.append(
+            {
+                "pack": number,
+                "path": path,
+                "ok": True,
+                "cdg_found": len(entries),
+                **queue_report,
+            }
+        )
+
+    return {
+        "ok": any(item["ok"] for item in reports),
+        "total_cdg_found": total_found,
+        "counts": lab_queue.counts(),
+        "packs": reports,
+    }
+
+
+@app.post("/api/lab/dropbox/worker/start")
+def dropbox_worker_start() -> dict:
+    client = DropboxLabClient()
+    if not client.connected:
+        raise HTTPException(
+            status_code=409,
+            detail="Conecta Dropbox antes de iniciar la cola",
+        )
+    lab_queue.set_worker_enabled(True)
+    lab_worker.start_thread()
+    return lab_worker.status()
+
+
+@app.post("/api/lab/dropbox/worker/pause")
+def dropbox_worker_pause() -> dict:
+    lab_queue.set_worker_enabled(False)
+    return lab_worker.status()
+
+
+@app.post("/api/lab/dropbox/retry-errors")
+def dropbox_retry_errors() -> dict:
+    count = lab_queue.retry_errors()
+    return {
+        "retried": count,
+        "counts": lab_queue.counts(),
+    }
+
+
+@app.get("/api/lab/dropbox/summary")
+def dropbox_lab_summary() -> dict:
+    results = lab_queue.load_done_results(500)
+    analyzer = LabAnalyzer()
+    summary = analyzer.summarize(results) if results else {
+        "lab_version": "1.0",
+        "files_analyzed": 0,
+        "average_lab_score": 0,
+        "quality_counts": {},
+        "flag_counts": {},
+        "strategy_counts": {},
+        "learned_corrections": [],
+        "worst_files": [],
+    }
+    summary["queue_counts"] = lab_queue.counts()
+    summary["worst_persistent"] = lab_queue.worst_done(50)
+    return summary
 
 
 @app.post("/api/extract")
