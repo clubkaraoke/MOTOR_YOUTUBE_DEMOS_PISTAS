@@ -1515,6 +1515,221 @@ class CDGLyricsExtractor:
         }
 
 
+    @staticmethod
+    def _max_event_gap(
+        result: dict,
+    ) -> float:
+        duration = float(
+            result.get("duration_seconds", 0.0)
+            or 0.0
+        )
+        events = sorted(
+            float(item.get("time", 0.0))
+            for item in result.get("page_events", [])
+            if isinstance(item, dict)
+        )
+
+        if not events:
+            return duration
+
+        gaps: list[float] = []
+        previous = 0.0
+
+        for value in events:
+            if value > previous:
+                gaps.append(value - previous)
+            previous = value
+
+        if duration > previous:
+            gaps.append(duration - previous)
+
+        return max(gaps) if gaps else 0.0
+
+    @classmethod
+    def _coverage_metrics(
+        cls,
+        result: dict,
+    ) -> dict:
+        duration = float(
+            result.get("duration_seconds", 0.0)
+            or 0.0
+        )
+        pages = int(
+            result.get("pages_detected", 0)
+            or 0
+        )
+        lines = int(
+            result.get("lines_detected", 0)
+            or 0
+        )
+        confidence = float(
+            result.get("average_confidence", 0.0)
+            or 0.0
+        )
+        minutes = duration / 60.0
+        pages_per_minute = (
+            pages / minutes
+            if minutes > 0
+            else 0.0
+        )
+        max_gap = cls._max_event_gap(result)
+
+        return {
+            "pages": pages,
+            "lines": lines,
+            "confidence": round(confidence, 2),
+            "pages_per_minute": round(
+                pages_per_minute,
+                2,
+            ),
+            "max_page_gap": round(max_gap, 2),
+        }
+
+    @classmethod
+    def _native_needs_hybrid(
+        cls,
+        result: dict,
+    ) -> bool:
+        metrics = cls._coverage_metrics(result)
+        duration = float(
+            result.get("duration_seconds", 0.0)
+            or 0.0
+        )
+
+        if duration < 90.0:
+            return False
+
+        return (
+            metrics["pages_per_minute"] < 3.0
+            or metrics["max_page_gap"] >= 30.0
+        )
+
+    @staticmethod
+    def _coverage_score(
+        metrics: dict,
+    ) -> float:
+        confidence = float(
+            metrics.get("confidence", 0.0)
+            or 0.0
+        )
+        lines = int(
+            metrics.get("lines", 0)
+            or 0
+        )
+        pages_per_minute = float(
+            metrics.get("pages_per_minute", 0.0)
+            or 0.0
+        )
+        max_gap = float(
+            metrics.get("max_page_gap", 0.0)
+            or 0.0
+        )
+
+        score = confidence
+        score += min(lines, 80) * 0.12
+        score += min(pages_per_minute, 8.0) * 1.5
+
+        if max_gap >= 45.0:
+            score -= 12.0
+        elif max_gap >= 30.0:
+            score -= 8.0
+        elif max_gap >= 20.0:
+            score -= 3.0
+
+        return round(score, 2)
+
+    @classmethod
+    def _select_hybrid_result(
+        cls,
+        native: dict,
+        fallback: dict,
+    ) -> dict:
+        native_metrics = cls._coverage_metrics(
+            native
+        )
+        fallback_metrics = cls._coverage_metrics(
+            fallback
+        )
+        native_score = cls._coverage_score(
+            native_metrics
+        )
+        fallback_score = cls._coverage_score(
+            fallback_metrics
+        )
+
+        native_lines = int(
+            native_metrics["lines"]
+        )
+        fallback_lines = int(
+            fallback_metrics["lines"]
+        )
+        native_conf = float(
+            native_metrics["confidence"]
+        )
+        fallback_conf = float(
+            fallback_metrics["confidence"]
+        )
+
+        fallback_has_coverage_gain = (
+            fallback_lines
+            >= max(
+                native_lines + 5,
+                int(native_lines * 1.15),
+            )
+            and fallback_conf
+            >= native_conf - 8.0
+        )
+
+        fallback_has_page_gain = (
+            fallback_metrics["pages"]
+            >= max(
+                native_metrics["pages"] + 3,
+                int(
+                    native_metrics["pages"]
+                    * 1.35
+                ),
+            )
+            and fallback_lines
+            >= int(native_lines * 0.95)
+            and fallback_conf
+            >= native_conf - 6.0
+        )
+
+        choose_fallback = (
+            fallback_score
+            >= native_score + 3.0
+            and (
+                fallback_has_coverage_gain
+                or fallback_has_page_gain
+            )
+        )
+
+        chosen = (
+            fallback
+            if choose_fallback
+            else native
+        )
+        chosen = dict(chosen)
+        chosen["strategy"] = (
+            "hybrid_fallback_selected"
+            if choose_fallback
+            else "hybrid_native_selected"
+        )
+        chosen["hybrid_trigger"] = (
+            "sparse_native_pages"
+        )
+        chosen["strategy_candidates"] = {
+            "native": {
+                **native_metrics,
+                "selection_score": native_score,
+            },
+            "fallback": {
+                **fallback_metrics,
+                "selection_score": fallback_score,
+            },
+        }
+        return chosen
+
     def extract(
         self,
         cdg_path: str | Path,
@@ -1533,11 +1748,45 @@ class CDGLyricsExtractor:
             data,
             duration,
         )
-        if native is not None:
+
+        if native is None:
+            fallback = self._extract_fallback(
+                path,
+                data,
+                duration,
+            )
+            fallback["engine_version"] = "0.9.0"
+            return fallback
+
+        if not self._native_needs_hybrid(
+            native
+        ):
+            native["engine_version"] = "0.9.0"
+            native["hybrid_trigger"] = None
+            native["strategy_candidates"] = {
+                "native": {
+                    **self._coverage_metrics(
+                        native
+                    ),
+                    "selection_score": (
+                        self._coverage_score(
+                            self._coverage_metrics(
+                                native
+                            )
+                        )
+                    ),
+                }
+            }
             return native
 
-        return self._extract_fallback(
+        fallback = self._extract_fallback(
             path,
             data,
             duration,
         )
+        selected = self._select_hybrid_result(
+            native,
+            fallback,
+        )
+        selected["engine_version"] = "0.9.0"
+        return selected
