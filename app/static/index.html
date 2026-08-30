@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DJGABO Engine — Panel de producción</title>
-  <link rel="stylesheet" href="./static/styles.css?v=12">
+  <link rel="stylesheet" href="./static/styles.css?v=13">
 </head>
 <body>
 <div id="app">
@@ -21,6 +21,7 @@
     <button class="link hidden" id="clearFilter">Quitar filtro</button>
     <button class="mini hidden" id="syncYoutube">↻ Revisar estado YouTube</button>
     <button class="mini bulk-public hidden" id="publicAll" disabled>Hacer públicos seleccionados (0)</button>
+    <span class="auto-public-note hidden" id="autoPublicNote">● Auto público activo · cuota protegida</span>
     <label class="search">⌕ <input id="search" placeholder="Buscar artista, título, canal o estado"></label>
   </nav>
   <main>
@@ -82,6 +83,6 @@
 </section>
 
 <div id="toasts"></div>
-<script src="./static/app.js?v=20"></script>
+<script src="./static/app.js?v=21"></script>
 </body>
 </html>
