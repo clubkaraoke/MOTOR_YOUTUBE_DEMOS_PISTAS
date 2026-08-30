@@ -26,6 +26,15 @@ class YouTubeError(RuntimeError):
     pass
 
 
+def is_quota_exceeded(message: str) -> bool:
+    lowered = message.lower()
+    return (
+        "quotaexceeded" in lowered
+        or "exceeded your quota" in lowered
+        or "dailylimitexceeded" in lowered
+    )
+
+
 YOUTUBE_HTTP_TIMEOUT_SECONDS = 90
 UploadProgressCallback = Callable[[int], None]
 
@@ -218,6 +227,11 @@ def change_privacy(job: Job, channel: Channel, privacy: str) -> str:
         actual_privacy = response.get("status", {}).get("privacyStatus", privacy)
     job.privacy_status = actual_privacy
     job.youtube_actual_privacy = actual_privacy
+    job.pending_privacy_status = None
+    job.privacy_pending_since = None
+    job.privacy_last_attempt_at = datetime.now(timezone.utc)
+    job.privacy_last_error = None
+    job.privacy_attempt_count = 0
     job.youtube_last_checked_at = datetime.now(timezone.utc)
     return actual_privacy
 
