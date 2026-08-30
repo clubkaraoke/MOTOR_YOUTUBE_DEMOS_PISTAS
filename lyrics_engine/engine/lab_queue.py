@@ -353,6 +353,49 @@ class LabQueue:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def recent_done(self, limit: int = 10) -> list[dict[str, Any]]:
+        limit = max(1, min(100, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, name, pack, status, finished_at,
+                       lab_score, ocr_confidence, quality,
+                       pages, lines, corrections, dropbox_path
+                FROM jobs
+                WHERE status='DONE'
+                ORDER BY finished_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_job_result(self, job_id: int) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, name, pack, result_path, lab_score,
+                       ocr_confidence, quality, pages, lines,
+                       corrections, finished_at
+                FROM jobs
+                WHERE id=? AND status='DONE' AND result_path IS NOT NULL
+                """,
+                (int(job_id),),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        try:
+            payload = json.loads(
+                Path(str(row["result_path"])).read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return None
+
+        payload["_job"] = dict(row)
+        return payload
+
     def worst_done(self, limit: int = 50) -> list[dict[str, Any]]:
         limit = max(1, min(200, int(limit)))
         with self._connect() as conn:
