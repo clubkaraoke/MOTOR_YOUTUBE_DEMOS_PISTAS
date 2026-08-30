@@ -1,12 +1,6 @@
 name: Deploy to OVH
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "lyrics_engine/**"
-      - "deploy/deploy_ovh.sh"
-      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +8,7 @@ permissions:
 
 concurrency:
   group: production-ovh
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
