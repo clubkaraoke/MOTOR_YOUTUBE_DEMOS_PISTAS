@@ -152,6 +152,74 @@ class LabWorker:
         result["dropbox_path"] = str(job["dropbox_path"])
         result["pack"] = str(job.get("pack") or "")
 
+        baseline = self.queue.baseline_for_job(
+            int(job["id"])
+        )
+        if baseline:
+            result["baseline"] = baseline
+            result["comparison"] = {
+                "lab_score_delta": round(
+                    score.score
+                    - float(
+                        baseline.get(
+                            "lab_score",
+                            0.0,
+                        )
+                        or 0.0
+                    ),
+                    2,
+                ),
+                "ocr_confidence_delta": round(
+                    float(
+                        result.get(
+                            "average_confidence",
+                            0.0,
+                        )
+                        or 0.0
+                    )
+                    - float(
+                        baseline.get(
+                            "ocr_confidence",
+                            0.0,
+                        )
+                        or 0.0
+                    ),
+                    2,
+                ),
+                "pages_delta": (
+                    int(
+                        result.get(
+                            "pages_detected",
+                            0,
+                        )
+                        or 0
+                    )
+                    - int(
+                        baseline.get(
+                            "pages",
+                            0,
+                        )
+                        or 0
+                    )
+                ),
+                "lines_delta": (
+                    int(
+                        result.get(
+                            "lines_detected",
+                            0,
+                        )
+                        or 0
+                    )
+                    - int(
+                        baseline.get(
+                            "lines",
+                            0,
+                        )
+                        or 0
+                    )
+                ),
+            }
+
         result_path = self.queue.save_result(
             job,
             result,
