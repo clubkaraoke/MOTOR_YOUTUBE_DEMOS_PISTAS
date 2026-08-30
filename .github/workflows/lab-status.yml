@@ -1,5 +1,5 @@
 name: CDG LAB Status
-# poll 2
+# poll 3
 
 on:
   push:
