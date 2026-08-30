@@ -183,7 +183,8 @@ extractBtn.addEventListener('click', async () => {
     document.getElementById('ocrFrames').textContent = body.frames_ocr ?? 0;
     document.getElementById('pagesCount').textContent = body.pages_detected ?? 0;
     document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
-    document.getElementById('quality').textContent = body.quality || '—';\n    document.getElementById('correctionsCount').textContent = body.corrections_count ?? 0;
+    document.getElementById('quality').textContent = body.quality || '—';
+    document.getElementById('correctionsCount').textContent = body.corrections_count ?? 0;
 
     resultCard.classList.remove('hidden');
 
