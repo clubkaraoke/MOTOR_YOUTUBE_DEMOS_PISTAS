@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CDG Lyrics LAB</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#080d18}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#17213d 0,#080d18 50%);padding:28px 18px}
+    .wrap{max-width:1180px;margin:auto}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{margin:0 0 20px;color:#95a3ba}
+    .card{background:rgba(16,23,39,.94);border:1px solid #26334a;border-radius:18px;padding:20px;margin-bottom:16px}
+    .drop{border:2px dashed #4d5e7a;border-radius:16px;padding:42px 22px;text-align:center;background:#0b1322;transition:.16s}
+    .drop.drag{border-color:#85a0ff;background:#111c31}
+    .drop.ready{border-color:#63d38d;background:#0d1c19}
+    .drop strong{display:block;font-size:21px;margin-bottom:8px}
+    .hint,.status,.muted{color:#8f9eb6}
+    .files{margin-top:12px;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#cad5f5;max-height:110px;overflow:auto}
+    button,.link{border:0;border-radius:11px;padding:12px 18px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block}
+    .primary{width:100%;margin-top:14px;background:#627fff;color:white}
+    .primary:disabled{opacity:.45;cursor:not-allowed}
+    .secondary,.link{background:#1d2940;color:#e8edff}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .status{min-height:22px;margin-top:12px}
+    .progress{height:12px;background:#0a111e;border:1px solid #253149;border-radius:999px;overflow:hidden;margin-top:12px}
+    .progress>div{height:100%;width:0;background:currentColor;transition:width .2s}
+    .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+    .metric{background:#0a111e;border:1px solid #202c42;border-radius:12px;padding:12px}
+    .metric strong{display:block;font-size:21px;margin-bottom:4px}
+    .metric span{font-size:11px;color:#8695ac}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #222d41;vertical-align:top}
+    th{color:#93a5c2;font-size:11px}
+    td:first-child{max-width:430px;word-break:break-word}
+    .pill{display:inline-block;background:#202c42;border-radius:999px;padding:3px 7px;margin:2px;font-size:11px}
+    .ok{color:#75df9a}.warn{color:#ffd479}.bad{color:#ff8d8d}
+    .hidden{display:none}
+    .section-title{font-size:15px;margin:0 0 10px}
+    @media(max-width:850px){.metrics{grid-template-columns:repeat(2,1fr)}table{display:block;overflow:auto}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CDG LYRICS LAB</h1>
+  <p class="sub">LAB V1 · procesa muchos CDG, compara resultados y encuentra patrones del lote.</p>
+
+  <section class="card">
+    <div class="drop" id="dropZone">
+      <strong id="dropTitle">ARRASTRA MUCHOS ARCHIVOS .CDG AQUÍ</strong>
+      <div class="hint">Puedes soltar decenas a la vez. Se procesan uno por uno para no saturar el servidor.</div>
+      <div class="files" id="filesList"></div>
+    </div>
+    <button id="runBtn" class="primary" disabled>INICIAR LAB</button>
+    <div class="progress"><div id="progressBar"></div></div>
+    <div id="status" class="status"></div>
+    <div class="actions">
+      <a class="link" href="./">VOLVER A PRUEBA INDIVIDUAL</a>
+    </div>
+  </section>
+
+  <section id="summaryCard" class="card hidden">
+    <div class="metrics">
+      <div class="metric"><strong id="filesDone">0</strong><span>CDG ANALIZADOS</span></div>
+      <div class="metric"><strong id="labScore">0</strong><span>SCORE LAB PROMEDIO</span></div>
+      <div class="metric"><strong id="goodCount">0</strong><span>BUENA</span></div>
+      <div class="metric"><strong id="reviewCount">0</strong><span>REVISAR</span></div>
+      <div class="metric"><strong id="badCount">0</strong><span>MALA</span></div>
+    </div>
+
+    <h3 class="section-title">PROBLEMAS DETECTADOS EN EL LOTE</h3>
+    <div id="flags"></div>
+  </section>
+
+  <section id="worstCard" class="card hidden">
+    <h3 class="section-title">ARCHIVOS QUE MÁS NOS CONVIENE ESTUDIAR</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ARCHIVO</th>
+          <th>LAB</th>
+          <th>OCR</th>
+          <th>PÁGINAS/MIN</th>
+          <th>GAP MÁX.</th>
+          <th>PROBLEMAS</th>
+        </tr>
+      </thead>
+      <tbody id="worstBody"></tbody>
+    </table>
+  </section>
+
+  <section id="learnedCard" class="card hidden">
+    <h3 class="section-title">DICCIONARIO DE ERRORES APRENDIDO DEL LOTE</h3>
+    <p class="muted">Estas reglas son evidencia. El LAB no las convierte automáticamente en verdad hasta que aparezcan repetidas en varios CDG.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>OCR</th>
+          <th>CANDIDATO</th>
+          <th>TIPO</th>
+          <th>VECES</th>
+          <th>CDG</th>
+          <th>CONF.</th>
+          <th>ESTADO</th>
+        </tr>
+      </thead>
+      <tbody id="learnedBody"></tbody>
+    </table>
+    <div class="actions">
+      <button class="secondary" id="jsonBtn">DESCARGAR RESULTADO LAB JSON</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const dropTitle = document.getElementById('dropTitle');
+const filesList = document.getElementById('filesList');
+const runBtn = document.getElementById('runBtn');
+const statusEl = document.getElementById('status');
+const progressBar = document.getElementById('progressBar');
+
+let selectedFiles = [];
+let extractedResults = [];
+let labSummary = null;
+let failures = [];
+
+function preventDefaults(event) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+['dragenter','dragover','dragleave','drop'].forEach(name => {
+  dropZone.addEventListener(name, preventDefaults);
+});
+
+['dragenter','dragover'].forEach(name => {
+  dropZone.addEventListener(name, () => dropZone.classList.add('drag'));
+});
+
+['dragleave','drop'].forEach(name => {
+  dropZone.addEventListener(name, () => dropZone.classList.remove('drag'));
+});
+
+dropZone.addEventListener('drop', event => {
+  const files = Array.from(event.dataTransfer?.files || [])
+    .filter(file => file.name.toLowerCase().endsWith('.cdg'));
+
+  selectedFiles = files;
+  extractedResults = [];
+  failures = [];
+  labSummary = null;
+  progressBar.style.width = '0%';
+
+  if (!files.length) {
+    dropZone.classList.remove('ready');
+    dropTitle.textContent = 'NO RECIBÍ ARCHIVOS .CDG';
+    filesList.textContent = '';
+    runBtn.disabled = true;
+    statusEl.textContent = 'Arrastra uno o muchos archivos .CDG.';
+    return;
+  }
+
+  dropZone.classList.add('ready');
+  dropTitle.textContent = files.length + ' CDG LISTOS ✓';
+  filesList.textContent = files
+    .slice(0, 80)
+    .map(file => file.name)
+    .join('\n');
+
+  if (files.length > 80) {
+    filesList.textContent += '\n… +' + (files.length - 80) + ' archivos';
+  }
+
+  runBtn.disabled = false;
+  runBtn.textContent = 'INICIAR LAB · ' + files.length + ' CDG';
+  statusEl.textContent = 'Listo para procesar el lote secuencialmente.';
+});
+
+async function extractOne(file) {
+  const form = new FormData();
+  form.append('file', file, file.name);
+
+  const response = await fetch('api/extract', {
+    method: 'POST',
+    body: form
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const raw = await response.text();
+    throw new Error(
+      'HTTP ' + response.status + ' ' +
+      raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
+    );
+  }
+
+  const body = await response.json();
+
+  if (!response.ok) {
+    throw new Error(body.detail || ('HTTP ' + response.status));
+  }
+
+  return body;
+}
+
+function compactForLab(result) {
+  return {
+    filename: result.filename,
+    strategy: result.strategy,
+    duration_seconds: result.duration_seconds,
+    pages_detected: result.pages_detected,
+    page_events: result.page_events,
+    average_confidence: result.average_confidence,
+    quality: result.quality,
+    lines_detected: result.lines_detected,
+    lines: result.lines,
+    corrections_count: result.corrections_count,
+    corrections: result.corrections,
+    ocr_fallback_pages: result.ocr_fallback_pages
+  };
+}
+
+async function analyzeResults(results) {
+  const response = await fetch('api/lab/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(results.map(compactForLab))
+  });
+
+  const body = await response.json();
+
+  if (!response.ok) {
+    throw new Error(body.detail || ('HTTP ' + response.status));
+  }
+
+  return body;
+}
+
+function pill(text) {
+  const span = document.createElement('span');
+  span.className = 'pill';
+  span.textContent = text;
+  return span;
+}
+
+function renderSummary(summary) {
+  document.getElementById('filesDone').textContent = summary.files_analyzed ?? 0;
+  document.getElementById('labScore').textContent = Math.round(summary.average_lab_score || 0);
+  document.getElementById('goodCount').textContent = summary.quality_counts?.BUENA ?? 0;
+  document.getElementById('reviewCount').textContent = summary.quality_counts?.REVISAR ?? 0;
+  document.getElementById('badCount').textContent = summary.quality_counts?.MALA ?? 0;
+
+  const flagsEl = document.getElementById('flags');
+  flagsEl.replaceChildren();
+  const flags = Object.entries(summary.flag_counts || {})
+    .sort((a,b) => b[1] - a[1]);
+
+  if (!flags.length) {
+    flagsEl.appendChild(pill('SIN ALERTAS DEL LOTE'));
+  } else {
+    flags.forEach(([name,count]) => {
+      flagsEl.appendChild(pill(name + ' · ' + count));
+    });
+  }
+
+  const worstBody = document.getElementById('worstBody');
+  worstBody.replaceChildren();
+
+  (summary.worst_files || []).slice(0, 40).forEach(item => {
+    const tr = document.createElement('tr');
+    const values = [
+      item.filename,
+      Math.round(item.lab_score || 0),
+      Math.round(item.ocr_confidence || 0) + '%',
+      item.pages_per_minute ?? 0,
+      (item.max_page_gap ?? 0) + 's'
+    ];
+
+    values.forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    const flagsTd = document.createElement('td');
+    (item.flags || []).forEach(flag => flagsTd.appendChild(pill(flag)));
+    tr.appendChild(flagsTd);
+    worstBody.appendChild(tr);
+  });
+
+  const learnedBody = document.getElementById('learnedBody');
+  learnedBody.replaceChildren();
+
+  (summary.learned_corrections || []).slice(0, 100).forEach(item => {
+    const tr = document.createElement('tr');
+    [
+      item.from,
+      item.to,
+      item.type,
+      item.count,
+      item.files,
+      Math.round(item.average_line_confidence || 0) + '%',
+      item.status
+    ].forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+    learnedBody.appendChild(tr);
+  });
+
+  document.getElementById('summaryCard').classList.remove('hidden');
+  document.getElementById('worstCard').classList.remove('hidden');
+  document.getElementById('learnedCard').classList.remove('hidden');
+}
+
+runBtn.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+
+  runBtn.disabled = true;
+  extractedResults = [];
+  failures = [];
+  labSummary = null;
+
+  for (let index = 0; index < selectedFiles.length; index++) {
+    const file = selectedFiles[index];
+    const number = index + 1;
+
+    statusEl.textContent =
+      'Procesando ' + number + '/' + selectedFiles.length + ' · ' + file.name;
+
+    try {
+      const result = await extractOne(file);
+      extractedResults.push(result);
+    } catch (error) {
+      failures.push({
+        filename: file.name,
+        error: String(error.message || error)
+      });
+    }
+
+    progressBar.style.width =
+      Math.round(number / selectedFiles.length * 100) + '%';
+  }
+
+  if (!extractedResults.length) {
+    statusEl.textContent = 'No se pudo extraer ningún CDG del lote.';
+    runBtn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent =
+    'OCR terminado. Analizando patrones de ' + extractedResults.length + ' resultados…';
+
+  try {
+    labSummary = await analyzeResults(extractedResults);
+    renderSummary(labSummary);
+
+    statusEl.textContent =
+      'LAB terminado: ' +
+      extractedResults.length +
+      ' analizados' +
+      (failures.length ? ' · ' + failures.length + ' con error' : '') +
+      '. Revisa primero los archivos con menor LAB score.';
+  } catch (error) {
+    statusEl.textContent = 'ERROR ANALIZANDO LOTE: ' + error.message;
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+document.getElementById('jsonBtn').addEventListener('click', () => {
+  if (!labSummary) return;
+
+  const payload = {
+    generated_at: new Date().toISOString(),
+    summary: labSummary,
+    failures,
+    results: extractedResults.map(compactForLab)
+  };
+
+  const blob = new Blob(
+    [JSON.stringify(payload, null, 2)],
+    {type: 'application/json'}
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'CDG_LYRICS_LAB_RESULT.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
