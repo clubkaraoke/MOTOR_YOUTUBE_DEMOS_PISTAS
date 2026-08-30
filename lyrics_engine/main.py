@@ -30,7 +30,7 @@ PACK_PATHS = {
 
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.9.0-lab",
+    version="0.9.1-lab",
 )
 
 lab_queue = LabQueue()
@@ -73,7 +73,7 @@ def health() -> dict:
     return {
         "ok": True,
         "engine": "CDG_LYRICS_ENGINE",
-        "version": "0.9.0-lab",
+        "version": "0.9.1-lab",
         "lexicon_words": len(corrector.freq),
         "lexicon_con": corrector.frequency("con"),
         "dropbox_configured": dropbox.configured,
