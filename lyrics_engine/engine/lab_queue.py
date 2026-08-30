@@ -353,6 +353,91 @@ class LabQueue:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def requeue_recent_done(self, limit: int = 5) -> dict[str, Any]:
+        limit = max(1, min(50, int(limit)))
+        now = utc_now()
+
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, name, lab_score, ocr_confidence, quality,
+                       pages, lines, corrections, result_path,
+                       finished_at
+                FROM jobs
+                WHERE status='DONE'
+                ORDER BY finished_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+            ids: list[int] = []
+
+            for row in rows:
+                job_id = int(row["id"])
+                baseline = {
+                    "job_id": job_id,
+                    "name": row["name"],
+                    "lab_score": row["lab_score"],
+                    "ocr_confidence": row["ocr_confidence"],
+                    "quality": row["quality"],
+                    "pages": row["pages"],
+                    "lines": row["lines"],
+                    "corrections": row["corrections"],
+                    "finished_at": row["finished_at"],
+                }
+
+                conn.execute(
+                    """
+                    INSERT INTO settings(key, value)
+                    VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                    """,
+                    (
+                        f"baseline_job_{job_id}",
+                        json.dumps(
+                            baseline,
+                            ensure_ascii=False,
+                        ),
+                    ),
+                )
+
+                conn.execute(
+                    """
+                    UPDATE jobs
+                    SET status='PENDING',
+                        started_at=NULL,
+                        finished_at=NULL,
+                        error=NULL,
+                        updated_at=?
+                    WHERE id=?
+                    """,
+                    (now, job_id),
+                )
+                ids.append(job_id)
+
+            conn.commit()
+
+        return {
+            "requeued": len(ids),
+            "job_ids": ids,
+        }
+
+    def baseline_for_job(self, job_id: int) -> dict[str, Any] | None:
+        raw = self.get_setting(
+            f"baseline_job_{int(job_id)}",
+            "",
+        )
+        if not raw:
+            return None
+
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+
+        return value if isinstance(value, dict) else None
+
     def recent_done(self, limit: int = 10) -> list[dict[str, Any]]:
         limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
