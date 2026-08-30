@@ -119,7 +119,7 @@ def test_frame_uses_new_fixed_cover_and_qr_contract(tmp_path: Path):
 def test_packaged_default_templates_are_exact_1280x720():
     root = Path("app/assets/default_templates")
     for channel in ("C1", "C2", "C3", "C4"):
-        path = root / f"{channel}.webp"
+        path = root / f"{channel}.png"
         assert path.is_file()
         with Image.open(path) as image:
             assert image.size == (1280, 720)
