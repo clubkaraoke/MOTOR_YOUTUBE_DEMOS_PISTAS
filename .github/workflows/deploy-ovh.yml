@@ -2,14 +2,9 @@ name: Deploy to OVH
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
-
-# Hotfix deployment: YouTube quota handling
 
 concurrency:
   group: production-ovh
