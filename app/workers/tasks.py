@@ -18,7 +18,6 @@ from app.services.cover_provider import cover_provider
 from app.services.frame_builder import create_frame
 from app.services.google_drive import DriveAudioStorage, GoogleStorageError
 from app.services.media import MediaError, create_demo_video, validate_demo_video
-from app.services.qr import whatsapp_url
 from app.services.scheduler import channel_slots, choose_channel
 from app.services.title_builder import build_youtube_title
 from app.services.youtube import YouTubeError, finalize_publication, upload_video
@@ -177,7 +176,7 @@ def _process_job(job_id: str) -> None:
         redirect = _ensure_qr(db, job)
         intro_frame_path = workdir / "frame_intro.png"
         frame_path = workdir / "frame_qr.png"
-        qr_url = whatsapp_url(settings.whatsapp_number, job.filename_original)
+        qr_url = f"{settings.public_base_url.rstrip('/')}/q/{redirect.token}"
         output = settings.ready_dir / f"{job.id}.mp4"
         job.youtube_title = build_youtube_title(job.filename_original, job.artist, job.title)
         try:
