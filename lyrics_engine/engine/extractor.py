@@ -43,6 +43,7 @@ class CDGLyricsExtractor:
         min_motion: float = 0.006,
         stable_threshold: float = 0.006,
         min_added_pixels: float = 0.012,
+        min_rewrite_pixels: float = 0.012,
         min_occupied: float = 0.010,
         ignore_first_seconds: float = 5.0,
         candidate_cooldown: float = 1.7,
@@ -53,6 +54,7 @@ class CDGLyricsExtractor:
         self.min_motion = min_motion
         self.stable_threshold = stable_threshold
         self.min_added_pixels = min_added_pixels
+        self.min_rewrite_pixels = min_rewrite_pixels
         self.min_occupied = min_occupied
         self.ignore_first_seconds = ignore_first_seconds
         self.candidate_cooldown = candidate_cooldown
@@ -150,6 +152,18 @@ class CDGLyricsExtractor:
             float(np.count_nonzero(a != b))
             / float(b.size)
         )
+
+    def _meaningful_stable_rewrite(
+        self,
+        added_ratio: float,
+        removed_ratio: float,
+    ) -> bool:
+        if added_ratio >= self.min_added_pixels:
+            return True
+
+        return (
+            added_ratio + removed_ratio
+        ) >= self.min_rewrite_pixels
 
     @staticmethod
     def _mask_text_score(mask: np.ndarray) -> float:
@@ -1237,10 +1251,16 @@ class CDGLyricsExtractor:
                     / float(mask.size)
                 )
 
+            rewrite_ratio = (
+                added_ratio + removed_ratio
+            )
+
             if (
                 accepted_mask is not None
-                and added_ratio
-                < self.min_added_pixels
+                and not self._meaningful_stable_rewrite(
+                    added_ratio,
+                    removed_ratio,
+                )
             ):
                 dirty = False
                 continue
@@ -1332,6 +1352,10 @@ class CDGLyricsExtractor:
                     ),
                     "removed_ratio": round(
                         removed_ratio,
+                        4,
+                    ),
+                    "rewrite_ratio": round(
+                        rewrite_ratio,
                         4,
                     ),
                     "selected_mask": (
@@ -1755,13 +1779,13 @@ class CDGLyricsExtractor:
                 data,
                 duration,
             )
-            fallback["engine_version"] = "0.9.0"
+            fallback["engine_version"] = "0.9.1"
             return fallback
 
         if not self._native_needs_hybrid(
             native
         ):
-            native["engine_version"] = "0.9.0"
+            native["engine_version"] = "0.9.1"
             native["hybrid_trigger"] = None
             native["strategy_candidates"] = {
                 "native": {
@@ -1788,5 +1812,5 @@ class CDGLyricsExtractor:
             native,
             fallback,
         )
-        selected["engine_version"] = "0.9.0"
+        selected["engine_version"] = "0.9.1"
         return selected
