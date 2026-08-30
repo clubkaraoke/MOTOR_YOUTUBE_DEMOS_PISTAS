@@ -247,6 +247,16 @@ def _process_job(job_id: str) -> None:
                 job.error_code = "YOUTUBE_ERROR"
                 job.error_message = message[-2000:]
             db.commit()
+        except Exception as exc:
+            # Never leave a failed RQ job pretending that it is still uploading.
+            # Google API/httplib2 can raise exceptions outside the explicit
+            # YouTubeError path (for example during channels/playlist preflight).
+            log.exception("youtube_upload_unexpected job_id=%s", job.id)
+            job.status = JobStatus.UPLOAD_ERROR.value
+            job.retry_count += 1
+            job.error_code = "YOUTUBE_UNEXPECTED_ERROR"
+            job.error_message = f"{type(exc).__name__}: {exc}"[-2000:]
+            db.commit()
 
 
 def process_job(job_id: str) -> None:
