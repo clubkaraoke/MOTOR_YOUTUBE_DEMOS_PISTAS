@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from google_auth_oauthlib.flow import Flow
 from PIL import Image, UnidentifiedImageError
 from redis import Redis
-from rq import Queue
+from rq import Queue, Worker
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -139,11 +139,29 @@ def recover_stalled() -> dict:
             Job.updated_at < cutoff,
         ).order_by(Job.updated_at)).all()
         storage = DriveAudioStorage()
+        active_job_ids: set[str] = set()
+        try:
+            for worker in Worker.all(connection=redis):
+                current = worker.get_current_job()
+                if current and current.args:
+                    active_job_ids.add(str(current.args[0]))
+        except Exception:
+            # If Redis/RQ worker inspection fails, do not risk duplicating a
+            # publication that may still be active.
+            log.exception("stalled_worker_inspection_failed")
+            return {"recovered": recovered, "failed": failed}
+
         for job in jobs:
             guard = f"djgabo:enqueued:{job.id}"
+            if job.id in active_job_ids:
+                log.info(
+                    "stalled_skip_active job_id=%s status=%s updated_at=%s",
+                    job.id, job.status, job.updated_at,
+                )
+                continue
             if redis.exists(guard):
                 log.warning(
-                    "stalled_guard_released job_id=%s status=%s updated_at=%s",
+                    "stalled_guard_released_no_active_worker job_id=%s status=%s updated_at=%s",
                     job.id, job.status, job.updated_at,
                 )
                 redis.delete(guard)
