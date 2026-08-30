@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import secrets
@@ -22,8 +23,8 @@ class DropboxLabError(RuntimeError):
 class DropboxLabClient:
     """Cliente Dropbox mínimo para el LAB.
 
-    Usa OAuth offline con refresh token y root namespace cuando Dropbox lo
-    devuelve. No modifica archivos: solo lista y descarga CDG.
+    Usa OAuth PKCE + refresh token, por lo que el servidor solo necesita
+    DROPBOX_APP_KEY. No modifica archivos: solo lista y descarga CDG.
     """
 
     def __init__(self, base_dir: Path | None = None) -> None:
@@ -35,7 +36,6 @@ class DropboxLabClient:
         self.state_path = self.base_dir / "dropbox_oauth_state.json"
 
         self.app_key = os.getenv("DROPBOX_APP_KEY", "").strip()
-        self.app_secret = os.getenv("DROPBOX_APP_SECRET", "").strip()
         self.redirect_uri = os.getenv(
             "DROPBOX_REDIRECT_URI",
             "https://panel.kitkaraoke.com/cdg-lyrics/api/lab/dropbox/callback",
@@ -43,7 +43,7 @@ class DropboxLabClient:
 
     @property
     def configured(self) -> bool:
-        return bool(self.app_key and self.app_secret and self.redirect_uri)
+        return bool(self.app_key and self.redirect_uri)
 
     def _read_auth(self) -> dict[str, Any]:
         try:
@@ -72,28 +72,37 @@ class DropboxLabClient:
     def authorization_url(self) -> str:
         if not self.configured:
             raise DropboxLabError(
-                "Faltan DROPBOX_APP_KEY y DROPBOX_APP_SECRET en el servidor"
+                "Falta DROPBOX_APP_KEY en el servidor"
             )
 
         state = secrets.token_urlsafe(32)
+        verifier = secrets.token_urlsafe(64)
+        challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(verifier.encode("ascii")).digest()
+        ).decode("ascii").rstrip("=")
+
         self.state_path.write_text(
-            json.dumps({"state": state}),
+            json.dumps(
+                {
+                    "state": state,
+                    "code_verifier": verifier,
+                }
+            ),
             encoding="utf-8",
         )
+
         params = {
             "client_id": self.app_key,
             "response_type": "code",
             "token_access_type": "offline",
             "redirect_uri": self.redirect_uri,
             "state": state,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
         }
         return "https://www.dropbox.com/oauth2/authorize?" + urllib.parse.urlencode(
             params
         )
-
-    def _basic_auth(self) -> str:
-        raw = f"{self.app_key}:{self.app_secret}".encode("utf-8")
-        return "Basic " + base64.b64encode(raw).decode("ascii")
 
     @staticmethod
     def _json_request(
@@ -122,13 +131,16 @@ class DropboxLabClient:
             raise DropboxLabError("Dropbox OAuth no está configurado")
 
         try:
-            expected = json.loads(
+            state_payload = json.loads(
                 self.state_path.read_text(encoding="utf-8")
-            ).get("state")
+            )
+            expected = state_payload.get("state")
+            verifier = state_payload.get("code_verifier")
         except (OSError, json.JSONDecodeError):
             expected = None
+            verifier = None
 
-        if not expected or state != expected:
+        if not expected or state != expected or not verifier:
             raise DropboxLabError("Estado OAuth inválido o vencido")
 
         form = urllib.parse.urlencode(
@@ -136,6 +148,8 @@ class DropboxLabClient:
                 "code": code,
                 "grant_type": "authorization_code",
                 "redirect_uri": self.redirect_uri,
+                "client_id": self.app_key,
+                "code_verifier": verifier,
             }
         ).encode("utf-8")
 
@@ -144,7 +158,6 @@ class DropboxLabClient:
             data=form,
             method="POST",
             headers={
-                "Authorization": self._basic_auth(),
                 "Content-Type": "application/x-www-form-urlencoded",
             },
         )
@@ -199,13 +212,14 @@ class DropboxLabClient:
         if refresh:
             if not self.configured:
                 raise DropboxLabError(
-                    "Hay refresh token, pero faltan APP_KEY/APP_SECRET"
+                    "Hay refresh token, pero falta DROPBOX_APP_KEY"
                 )
 
             form = urllib.parse.urlencode(
                 {
                     "refresh_token": refresh,
                     "grant_type": "refresh_token",
+                    "client_id": self.app_key,
                 }
             ).encode("utf-8")
             request = urllib.request.Request(
@@ -213,7 +227,6 @@ class DropboxLabClient:
                 data=form,
                 method="POST",
                 headers={
-                    "Authorization": self._basic_auth(),
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
             )
