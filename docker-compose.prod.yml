@@ -76,6 +76,7 @@ services:
     build:
       context: ./lyrics_engine
     container_name: djgabo-cdg-lyrics
+    mem_limit: 2g
     env_file: .env
     environment:
       CDG_LAB_DATA_DIR: /data/cdg_lab
