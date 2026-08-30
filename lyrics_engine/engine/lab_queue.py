@@ -102,6 +102,47 @@ class LabQueue:
     def worker_enabled(self) -> bool:
         return self.get_setting("worker_enabled", "0") == "1"
 
+    def set_run_limit(self, limit: int | None) -> None:
+        value = -1 if limit is None else max(0, int(limit))
+        self.set_setting("run_remaining", str(value))
+
+    def run_remaining(self) -> int:
+        try:
+            return int(self.get_setting("run_remaining", "-1"))
+        except ValueError:
+            return -1
+
+    def consume_run_slot(self) -> int:
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key='run_remaining'"
+            ).fetchone()
+            remaining = int(row["value"]) if row else -1
+
+            if remaining > 0:
+                remaining -= 1
+                conn.execute(
+                    """
+                    INSERT INTO settings(key, value)
+                    VALUES ('run_remaining', ?)
+                    ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                    """,
+                    (str(remaining),),
+                )
+
+            if remaining == 0:
+                conn.execute(
+                    """
+                    INSERT INTO settings(key, value)
+                    VALUES ('worker_enabled', '0')
+                    ON CONFLICT(key) DO UPDATE SET value='0'
+                    """
+                )
+
+            conn.commit()
+        return remaining
+
     def add_jobs(self, entries: list[dict[str, Any]], pack: str) -> dict[str, int]:
         inserted = 0
         existing = 0
