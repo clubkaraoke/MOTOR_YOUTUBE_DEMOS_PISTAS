@@ -92,19 +92,19 @@ def upload_video(
             progress_callback(100)
         return video_id, f"{settings.public_base_url.rstrip('/')}/api/jobs/{job.id}/video"
     service = _service(channel)
-    channels = service.channels().list(part="contentDetails", mine=True).execute().get("items", [])
+    channels = service.channels().list(part="contentDetails", mine=True).execute(num_retries=3).get("items", [])
     uploads_playlist = channels[0]["contentDetails"]["relatedPlaylists"]["uploads"] if channels else None
     candidate_ids: list[str] = []
     if uploads_playlist:
         recent = service.playlistItems().list(
             part="contentDetails", playlistId=uploads_playlist, maxResults=50
-        ).execute()
+        ).execute(num_retries=3)
         candidate_ids = [
             item["contentDetails"]["videoId"] for item in recent.get("items", [])
             if item.get("contentDetails", {}).get("videoId")
         ]
     if candidate_ids:
-        found = service.videos().list(part="snippet,status", id=",".join(candidate_ids)).execute()
+        found = service.videos().list(part="snippet,status", id=",".join(candidate_ids)).execute(num_retries=3)
         for item in found.get("items", []):
             if job.id in item.get("snippet", {}).get("tags", []):
                 video_id = item["id"]
