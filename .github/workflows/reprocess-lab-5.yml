@@ -1,0 +1,119 @@
+name: CDG LAB Reprocess 5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/reprocess-lab-5.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  reprocess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EJvmNCxljj7XEHw7ym3mdvmmbCf+XQxqpbc/XRKnz70"
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+          keyscan_file="$(mktemp)"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$keyscan_file"
+          actual_fingerprint="$(ssh-keygen -lf "$keyscan_file" -E sha256 | awk 'NR==1 {print $2}')"
+          test "$actual_fingerprint" = "$OVH_EXPECTED_FINGERPRINT"
+          cp "$keyscan_file" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Reprocess same five CDGs with V0.9
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          remote="ssh -p $OVH_PORT $OVH_USER@$OVH_HOST"
+          base="http://127.0.0.1:8090"
+
+          start="$($remote "curl -fsS -X POST -H 'Content-Type: application/json' --data '{\"limit\":5}' $base/api/lab/dropbox/reprocess-recent")"
+          echo "REPROCESS_START $start"
+
+          completed=0
+          for attempt in $(seq 1 300); do
+            status="$($remote "curl -fsS $base/api/lab/dropbox/status")"
+            printf '%s' "$status" > /tmp/lab-status.json
+
+            summary="$(python3 - <<'PY'
+import json
+d=json.load(open('/tmp/lab-status.json'))
+w=d.get('worker', {})
+c=w.get('counts', {})
+print(
+    f"enabled={w.get('enabled')} "
+    f"remaining={w.get('run_remaining')} "
+    f"pending={c.get('PENDING',0)} "
+    f"processing={c.get('PROCESSING',0)} "
+    f"done={c.get('DONE',0)} "
+    f"error={c.get('ERROR',0)} "
+    f"ram={w.get('memory_percent')}"
+)
+PY
+)"
+            echo "LAB_STATUS $summary"
+
+            finished="$(python3 - <<'PY'
+import json
+d=json.load(open('/tmp/lab-status.json'))
+w=d.get('worker', {})
+c=w.get('counts', {})
+print('1' if (w.get('run_remaining') == 0 and not w.get('current') and not w.get('enabled')) else '0')
+PY
+)"
+            if [ "$finished" = "1" ]; then
+              completed=1
+              break
+            fi
+            sleep 5
+          done
+
+          test "$completed" = "1"
+
+          final="$($remote "curl -fsS $base/api/lab/dropbox/status")"
+          printf '%s' "$final" > /tmp/lab-final.json
+
+          python3 - <<'PY' > /tmp/job-ids.txt
+import json
+d=json.load(open('/tmp/lab-final.json'))
+for item in d.get('recent_done', [])[:5]:
+    print(item['id'])
+PY
+
+          echo "=== V0.9 COMPARISONS ==="
+          while read -r job_id; do
+            test -n "$job_id" || continue
+            result="$($remote "curl -fsS $base/api/lab/dropbox/result/$job_id")"
+            RESULT="$result" python3 - <<'PY'
+import json, os
+d=json.loads(os.environ['RESULT'])
+print(json.dumps({
+    'filename': d.get('filename'),
+    'strategy': d.get('strategy'),
+    'quality': d.get('quality'),
+    'ocr': d.get('average_confidence'),
+    'lab': d.get('lab',{}).get('score'),
+    'pages': d.get('pages_detected'),
+    'lines': d.get('lines_detected'),
+    'baseline': d.get('baseline'),
+    'comparison': d.get('comparison'),
+    'strategy_candidates': d.get('strategy_candidates'),
+}, ensure_ascii=False))
+PY
+          done < /tmp/job-ids.txt
