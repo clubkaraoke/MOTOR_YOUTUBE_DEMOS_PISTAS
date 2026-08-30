@@ -60,3 +60,11 @@
 }
 
 .animation-video{display:block;width:100%;aspect-ratio:16/9;background:#05070a;border:1px solid var(--border);object-fit:contain}
+
+.layout-test-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.layout-test-scene{min-width:0}
+.layout-test-scene span{display:block;margin-bottom:5px;color:var(--dim);font-size:11px}
+.layout-test-scene img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#05070a;border:1px solid var(--border)}
+.layout-test-video{margin-top:14px;border-top:1px solid var(--soft);padding-top:10px}
+.layout-test-video summary{cursor:pointer;color:var(--dim);margin-bottom:8px}
+@media(max-width:760px){.layout-test-grid{grid-template-columns:1fr}}
