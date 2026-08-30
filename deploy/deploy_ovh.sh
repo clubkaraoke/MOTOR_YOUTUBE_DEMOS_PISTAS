@@ -100,7 +100,7 @@ import os
 health = json.loads(os.environ["LYRICS_HEALTH"])
 
 assert health.get("ok") is True, health
-assert health.get("version") == "0.7.0-lab", health
+assert health.get("version") == "0.8.0-lab", health
 assert int(health.get("lexicon_words", 0)) >= 45000, health
 assert int(health.get("lexicon_con", 0)) >= 100000, health
 
@@ -110,6 +110,9 @@ print(
         "version": health["version"],
         "lexicon_words": health["lexicon_words"],
         "lexicon_con": health["lexicon_con"],
+        "dropbox_configured": health.get("dropbox_configured"),
+        "dropbox_connected": health.get("dropbox_connected"),
+        "lab_queue": health.get("lab_queue", {}),
     },
 )
 PY
