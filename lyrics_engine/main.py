@@ -13,7 +13,7 @@ MAX_CDG_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 
@@ -24,7 +24,7 @@ def home() -> str:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "engine": "CDG_LYRICS_ENGINE", "version": "0.2.0"}
+    return {"ok": True, "engine": "CDG_LYRICS_ENGINE", "version": "0.3.0"}
 
 
 @app.post("/api/extract")
