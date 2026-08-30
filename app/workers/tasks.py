@@ -24,6 +24,29 @@ from app.services.youtube import YouTubeError, finalize_publication, upload_vide
 
 log = logging.getLogger("djgabo.worker")
 
+def _is_youtube_upload_limit(message: str) -> bool:
+    """Return True when YouTube rejects the channel for its upload-count limit."""
+    lowered = message.lower()
+    return (
+        "uploadlimitexceeded" in lowered
+        or "exceeded the number of videos they may upload" in lowered
+    )
+
+
+def _mark_youtube_upload_limit(db, job: Job, channel: Channel, message: str) -> None:
+    """Keep the job on its original channel and let the scheduler retry later."""
+    job.previous_status = JobStatus.UPLOADING_YOUTUBE.value
+    job.status = JobStatus.WAITING_SLOT.value
+    job.progress = 0
+    job.retry_count += 1
+    job.error_code = "YOUTUBE_UPLOAD_LIMIT"
+    job.error_message = (
+        f"{channel.display_name} alcanzó temporalmente el límite de subidas de YouTube. "
+        "La pista queda reservada para este mismo canal y el motor volverá a intentarlo automáticamente."
+    )
+    db.commit()
+
+
 def _setting(db, key: str) -> str | None:
     row = db.get(Setting, key)
     return row.value if row else None
@@ -94,14 +117,22 @@ def _process_job(job_id: str) -> None:
                 None,
             )
             if not recovery_slot or recovery_slot.used >= recovery_channel.max_uploads_24h:
+                youtube_limited = job.error_code == "YOUTUBE_UPLOAD_LIMIT"
                 job.status = JobStatus.WAITING_SLOT.value
                 job.progress = 0
-                job.error_code = "CHANNEL_24H_LIMIT"
-                job.error_message = (
-                    f"{recovery_channel.display_name} alcanzó su límite de 24 h "
-                    f"({recovery_slot.used if recovery_slot else 0}/"
-                    f"{recovery_channel.max_uploads_24h}). El reintento esperará cupo."
-                )
+                job.error_code = "YOUTUBE_UPLOAD_LIMIT" if youtube_limited else "CHANNEL_24H_LIMIT"
+                if youtube_limited:
+                    job.error_message = (
+                        f"{recovery_channel.display_name} sigue reservado para esta pista. "
+                        f"El contador interno aún está en {recovery_slot.used if recovery_slot else 0}/"
+                        f"{recovery_channel.max_uploads_24h}; el motor volverá a comprobarlo automáticamente."
+                    )
+                else:
+                    job.error_message = (
+                        f"{recovery_channel.display_name} alcanzó su límite de 24 h "
+                        f"({recovery_slot.used if recovery_slot else 0}/"
+                        f"{recovery_channel.max_uploads_24h}). El reintento esperará cupo."
+                    )
                 db.commit()
                 return
             channel = recovery_channel
@@ -236,10 +267,15 @@ def _process_job(job_id: str) -> None:
                 and "quotaExceeded" in previous_error
                 and "/youtube/v3/channels" in previous_error
             )
-            # On later retries after a real upload error, keep the duplicate
-            # recovery scan so a crash after YouTube accepted the video cannot
-            # create another copy.
-            check_existing = job.retry_count > 0 and not preflight_quota_only
+            upload_limit_retry = job.error_code == "YOUTUBE_UPLOAD_LIMIT"
+            # uploadLimitExceeded is rejected by YouTube before a successful
+            # publication, so retry it directly once the same channel has room.
+            # Other ambiguous upload retries keep the duplicate-recovery scan.
+            check_existing = (
+                job.retry_count > 0
+                and not preflight_quota_only
+                and not upload_limit_retry
+            )
 
             job.status = JobStatus.UPLOADING_YOUTUBE.value
             job.progress = 0
@@ -270,26 +306,33 @@ def _process_job(job_id: str) -> None:
                 db.commit()
         except (YouTubeError, RefreshError) as exc:
             message = str(exc)
-            job.status = JobStatus.UPLOAD_ERROR.value
-            job.retry_count += 1
-            if "invalid_grant" in message or "expired or revoked" in message:
-                job.error_code = "YOUTUBE_OAUTH_RECONNECT_REQUIRED"
-                job.error_message = "La autorización OAuth del canal venció o fue revocada. Reconecta el canal y pulsa Reintentar."
-                channel.oauth_status = "RECONNECT_REQUIRED"
+            if _is_youtube_upload_limit(message):
+                _mark_youtube_upload_limit(db, job, channel, message)
             else:
-                job.error_code = "YOUTUBE_ERROR"
-                job.error_message = message[-2000:]
-            db.commit()
+                job.status = JobStatus.UPLOAD_ERROR.value
+                job.retry_count += 1
+                if "invalid_grant" in message or "expired or revoked" in message:
+                    job.error_code = "YOUTUBE_OAUTH_RECONNECT_REQUIRED"
+                    job.error_message = "La autorización OAuth del canal venció o fue revocada. Reconecta el canal y pulsa Reintentar."
+                    channel.oauth_status = "RECONNECT_REQUIRED"
+                else:
+                    job.error_code = "YOUTUBE_ERROR"
+                    job.error_message = message[-2000:]
+                db.commit()
         except Exception as exc:
             # Never leave a failed RQ job pretending that it is still uploading.
             # Google API/httplib2 can raise exceptions outside the explicit
             # YouTubeError path (for example during channels/playlist preflight).
-            log.exception("youtube_upload_unexpected job_id=%s", job.id)
-            job.status = JobStatus.UPLOAD_ERROR.value
-            job.retry_count += 1
-            job.error_code = "YOUTUBE_UNEXPECTED_ERROR"
-            job.error_message = f"{type(exc).__name__}: {exc}"[-2000:]
-            db.commit()
+            message = f"{type(exc).__name__}: {exc}"
+            if _is_youtube_upload_limit(message):
+                _mark_youtube_upload_limit(db, job, channel, message)
+            else:
+                log.exception("youtube_upload_unexpected job_id=%s", job.id)
+                job.status = JobStatus.UPLOAD_ERROR.value
+                job.retry_count += 1
+                job.error_code = "YOUTUBE_UNEXPECTED_ERROR"
+                job.error_message = message[-2000:]
+                db.commit()
 
 
 def process_job(job_id: str) -> None:
