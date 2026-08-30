@@ -1117,14 +1117,30 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
 
     try:
         cover_provider.download(job.cover_url, cover_path)
-        qr_url = whatsapp_url(settings.whatsapp_number, job.filename_original)
+
+        # Use the same short, real redirect format as production. This keeps
+        # the QR compact and lets the user actually scan the panel preview.
+        redirect = db.scalar(select(QrRedirect).where(QrRedirect.job_id == job.id))
+        if not redirect:
+            token = uuid.uuid4().hex
+            redirect = QrRedirect(
+                token=token,
+                job_id=job.id,
+                artist=job.artist or "",
+                title=job.title or "",
+            )
+            job.qr_token = token
+            db.add(redirect)
+            db.commit()
+        qr_target = f"{settings.public_base_url.rstrip('/')}/q/{redirect.token}"
+
         create_frame(
             first_background, cover_path, job.artist or "", job.title or "",
-            qr_url, first_frame, settings.whatsapp_number, include_qr=False,
+            qr_target, first_frame, settings.whatsapp_number, include_qr=False,
         )
         create_frame(
             second_background, cover_path, job.artist or "", job.title or "",
-            qr_url, second_frame, settings.whatsapp_number, include_qr=True,
+            qr_target, second_frame, settings.whatsapp_number, include_qr=True,
         )
         _render_animation_preview(first_frame, second_frame, video_path, transition)
     except (ValueError, OSError, RuntimeError) as exc:
@@ -1140,6 +1156,9 @@ def channel_animation_preview(channel_id: int, db: Session = Depends(get_db)):
         "first_url": f"/api/channels/{channel_id}/animation-preview/first?v={stamp}",
         "qr_url": f"/api/channels/{channel_id}/animation-preview/qr?v={stamp}",
         "video_url": f"/api/channels/{channel_id}/animation-preview/video?v={stamp}",
+        "qr_target": qr_target,
+        "cover_box": {"x": 142, "y": 189, "width": 381, "height": 381},
+        "qr_box": {"x": 1066, "y": 419, "width": 138, "height": 138},
     }
 
 
