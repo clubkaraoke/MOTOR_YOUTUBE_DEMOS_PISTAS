@@ -35,7 +35,15 @@ from app.services.media import MediaError, probe_duration
 from app.services.oauth_client import YouTubeOAuthConfigError, google_client_config
 from app.services.qr import whatsapp_url
 from app.services.scheduler import channel_slots, global_next_slot
-from app.services.youtube import YouTubeError, change_privacy, delete_video, encrypt_token, sync_video_status, sync_video_statuses
+from app.services.youtube import (
+    YouTubeError,
+    change_privacy,
+    delete_video,
+    encrypt_token,
+    is_quota_exceeded,
+    sync_video_status,
+    sync_video_statuses,
+)
 
 log = logging.getLogger("djgabo.api")
 settings = get_settings()
@@ -415,6 +423,8 @@ async def lifespan(app: FastAPI):
                       id="covers", replace_existing=True, max_instances=1)
     scheduler.add_job(_sync_youtube_statuses, "interval", minutes=15,
                       id="youtube-status", replace_existing=True, max_instances=1)
+    scheduler.add_job(_process_pending_privacy_changes, "interval", minutes=30,
+                      id="youtube-privacy-queue", replace_existing=True, max_instances=1)
     scheduler.start()
     dispatch_waiting()
     yield
@@ -424,6 +434,72 @@ async def lifespan(app: FastAPI):
 def _cleanup() -> None:
     with SessionLocal() as db:
         cleanup_due(db)
+
+
+def _queue_privacy_change(job: Job, target: str, error: str | None = None) -> None:
+    now = datetime.now(timezone.utc)
+    job.pending_privacy_status = target
+    job.privacy_pending_since = job.privacy_pending_since or now
+    job.privacy_last_attempt_at = now
+    job.privacy_last_error = (error or "Esperando cuota disponible de YouTube")[-2000:]
+    job.privacy_attempt_count = (job.privacy_attempt_count or 0) + 1
+
+
+def _process_pending_privacy_changes() -> dict:
+    """Retry queued privacy changes without hammering an exhausted YouTube quota."""
+    changed: list[str] = []
+    errors: list[dict] = []
+    quota_blocked = False
+    with SessionLocal() as db:
+        jobs = db.scalars(
+            select(Job).where(
+                Job.pending_privacy_status.is_not(None),
+                Job.youtube_video_id.is_not(None),
+                Job.youtube_video_id.not_like("mock_%"),
+                Job.youtube_deleted_at.is_(None),
+            ).order_by(Job.privacy_pending_since, Job.published_at)
+        ).all()
+
+        for job in jobs:
+            target = job.pending_privacy_status
+            if not target:
+                continue
+            if (job.youtube_actual_privacy or job.privacy_status) == target:
+                job.pending_privacy_status = None
+                job.privacy_pending_since = None
+                job.privacy_last_error = None
+                job.privacy_attempt_count = 0
+                db.commit()
+                changed.append(job.id)
+                continue
+
+            job.privacy_last_attempt_at = datetime.now(timezone.utc)
+            job.privacy_attempt_count = (job.privacy_attempt_count or 0) + 1
+            try:
+                actual = change_privacy(job, job.channel, target)
+                if actual != target:
+                    job.privacy_last_error = (
+                        f"YouTube respondió con privacidad {actual or 'desconocida'} en vez de {target}"
+                    )
+                    errors.append({"id": job.id, "error": job.privacy_last_error})
+                else:
+                    changed.append(job.id)
+                db.commit()
+            except YouTubeError as exc:
+                message = str(exc)
+                job.privacy_last_error = message[-2000:]
+                db.commit()
+                if is_quota_exceeded(message):
+                    quota_blocked = True
+                    break
+                errors.append({"id": job.id, "error": message})
+
+    return {
+        "changed": len(changed),
+        "ids": changed,
+        "errors": errors,
+        "quota_blocked": quota_blocked,
+    }
 
 
 def _sync_youtube_statuses() -> dict:
@@ -790,6 +866,12 @@ def update_job(job_id: str, patch: JobUpdate, db: Session = Depends(get_db)):
         try:
             actual_privacy = change_privacy(job, job.channel, requested_privacy)
         except YouTubeError as exc:
+            message = str(exc)
+            if is_quota_exceeded(message):
+                _queue_privacy_change(job, requested_privacy, message)
+                db.commit()
+                db.refresh(job)
+                return job
             raise HTTPException(502, f"No se pudo cambiar la privacidad en YouTube: {exc}") from exc
         if actual_privacy != requested_privacy:
             raise HTTPException(
@@ -822,26 +904,45 @@ def bulk_youtube_privacy(body: BulkPrivacyUpdate, db: Session = Depends(get_db))
         stmt = stmt.where(Job.id.in_(body.ids))
     jobs = db.scalars(stmt).all()
     changed: list[str] = []
+    queued: list[str] = []
     failures: list[dict] = []
+    quota_blocked = False
     for job in jobs:
+        title = job.youtube_title or f"{job.artist} - {job.title}"
+        if quota_blocked:
+            _queue_privacy_change(job, body.privacy_status, "Esperando que se restablezca la cuota de YouTube")
+            queued.append(job.id)
+            continue
         try:
             actual_privacy = change_privacy(job, job.channel, body.privacy_status)
             if actual_privacy != body.privacy_status:
                 failures.append({
                     "id": job.id,
-                    "title": job.youtube_title or f"{job.artist} - {job.title}",
+                    "title": title,
                     "error": f"YouTube respondió con privacidad {actual_privacy or 'desconocida'}",
                 })
             else:
                 changed.append(job.id)
+        except YouTubeError as exc:
+            message = str(exc)
+            if is_quota_exceeded(message):
+                _queue_privacy_change(job, body.privacy_status, message)
+                queued.append(job.id)
+                quota_blocked = True
+            else:
+                failures.append({"id": job.id, "title": title, "error": message})
         except Exception as exc:
-            failures.append({
-                "id": job.id,
-                "title": job.youtube_title or f"{job.artist} - {job.title}",
-                "error": str(exc),
-            })
+            failures.append({"id": job.id, "title": title, "error": str(exc)})
     db.commit()
-    return {"requested": len(jobs), "changed": len(changed), "ids": changed, "failures": failures}
+    return {
+        "requested": len(jobs),
+        "changed": len(changed),
+        "ids": changed,
+        "queued": len(queued),
+        "queued_ids": queued,
+        "failures": failures,
+        "quota_blocked": quota_blocked,
+    }
 
 
 @app.post("/api/youtube/status/sync")
