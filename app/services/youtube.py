@@ -206,9 +206,15 @@ def change_privacy(job: Job, channel: Channel, privacy: str) -> str:
         raise YouTubeError("Privacidad inválida")
     actual_privacy = privacy
     if get_settings().youtube_mode == "real":
-        response = _service(channel).videos().update(
-            part="status", body={"id": job.youtube_video_id, "status": {"privacyStatus": privacy}}
-        ).execute()
+        try:
+            response = _execute(
+                _service(channel).videos().update(
+                    part="status",
+                    body={"id": job.youtube_video_id, "status": {"privacyStatus": privacy}},
+                )
+            )
+        except HttpError as exc:
+            raise YouTubeError(str(exc)) from exc
         actual_privacy = response.get("status", {}).get("privacyStatus", privacy)
     job.privacy_status = actual_privacy
     job.youtube_actual_privacy = actual_privacy
