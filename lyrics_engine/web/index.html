@@ -13,16 +13,19 @@
     h1{font-size:28px;margin:0 0 7px}
     .sub{color:#9aa7bd;margin:0}
     .card{background:rgba(17,24,39,.92);border:1px solid #26324a;border-radius:18px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25);margin-bottom:18px}
-    .drop{display:block;border:1px dashed #485873;border-radius:14px;padding:28px;text-align:center;cursor:pointer;background:#0c1323}
-    .drop:hover,.drop.drag{border-color:#7c9cff;background:#111b31}
-    input[type=file]{display:none}
+    .drop{border:2px dashed #485873;border-radius:16px;padding:42px 24px;text-align:center;background:#0c1323;transition:.18s ease;user-select:none}
+    .drop.drag{border-color:#7c9cff;background:#111b31;transform:scale(1.01)}
+    .drop.ready{border-color:#64d98b;background:#0d1d1a}
+    .drop strong{display:block;font-size:20px;margin-bottom:8px}
+    .drop .hint{color:#7f8da5}
+    .drop .filename{margin-top:12px;color:#cbd6ff;font:600 14px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}
     button{border:0;border-radius:11px;padding:12px 18px;font-weight:800;cursor:pointer}
     .primary{background:#5f7cff;color:white;margin-top:14px;width:100%}
-    .primary:disabled{opacity:.5;cursor:not-allowed}
+    .primary:disabled{opacity:.45;cursor:not-allowed}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
     .secondary{background:#1d2940;color:#e8edff}
     .status{margin-top:12px;color:#a7b3c8;min-height:22px}
-    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
     .metric{background:#0b1220;border:1px solid #202c42;border-radius:12px;padding:12px}
     .metric strong{display:block;font-size:20px;margin-bottom:4px}
     .metric span{font-size:12px;color:#8796ad}
@@ -35,15 +38,16 @@
 <div class="wrap">
   <div class="top">
     <h1>CDG → LETRA</h1>
-    <p class="sub">V0.3 · OCR por colores CDG + detección de páginas.</p>
+    <p class="sub">V0.3 · Arrastra un CDG y extrae su letra.</p>
   </div>
 
   <section class="card">
-    <label class="drop" for="cdgFile">
-      <strong id="fileLabel">Seleccionar un archivo .CDG</strong>
-      <div style="color:#7f8da5;margin-top:7px">Primera prueba: un CDG real</div>
-    </label>
-    <input id="cdgFile" type="file" accept=".cdg">
+    <div class="drop" id="dropZone">
+      <strong id="dropTitle">ARRASTRA AQUÍ TU ARCHIVO .CDG</strong>
+      <div class="hint">Sin abrir carpetas · sin buscar archivos · solo arrastra y suelta</div>
+      <div class="filename" id="fileName"></div>
+    </div>
+
     <button id="extractBtn" class="primary" disabled>EXTRAER LETRA</button>
     <div id="status" class="status"></div>
   </section>
@@ -54,7 +58,8 @@
       <div class="metric"><strong id="confidence">0%</strong><span>CONFIANZA OCR</span></div>
       <div class="metric"><strong id="ocrFrames">0</strong><span>PANTALLAS OCR</span></div>
       <div class="metric"><strong id="pagesCount">0</strong><span>PÁGINAS CDG</span></div>
-      <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>\n      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>
+      <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>
+      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>
     </div>
 
     <textarea id="lyrics" spellcheck="true"></textarea>
@@ -68,38 +73,57 @@
 </div>
 
 <script>
-const fileInput = document.getElementById('cdgFile');\nconst dropZone = document.querySelector('.drop');
-const fileLabel = document.getElementById('fileLabel');
+const dropZone = document.getElementById('dropZone');
+const dropTitle = document.getElementById('dropTitle');
+const fileNameEl = document.getElementById('fileName');
 const extractBtn = document.getElementById('extractBtn');
 const statusEl = document.getElementById('status');
 const resultCard = document.getElementById('resultCard');
 const lyricsEl = document.getElementById('lyrics');
+
+let selectedFile = null;
 let result = null;
 
-['dragenter','dragover'].forEach(name => dropZone.addEventListener(name, event => {
+function preventDefaults(event) {
   event.preventDefault();
-  dropZone.classList.add('drag');
-}));
-['dragleave','drop'].forEach(name => dropZone.addEventListener(name, event => {
-  event.preventDefault();
-  dropZone.classList.remove('drag');
-}));
-dropZone.addEventListener('drop', event => {
-  const files = [...event.dataTransfer.files].filter(file => file.name.toLowerCase().endsWith('.cdg'));
-  if (!files.length) {
-    statusEl.textContent = 'Arrastra un archivo .CDG.';
-    return;
-  }
-  const transfer = new DataTransfer();
-  transfer.items.add(files[0]);
-  fileInput.files = transfer.files;
-  fileInput.dispatchEvent(new Event('change'));
+  event.stopPropagation();
+}
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
+  dropZone.addEventListener(name, preventDefaults);
 });
 
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files[0];
-  fileLabel.textContent = file ? file.name : 'ARRASTRA AQUÍ UN ARCHIVO .CDG';
-  extractBtn.disabled = !file;
+['dragenter', 'dragover'].forEach(name => {
+  dropZone.addEventListener(name, () => dropZone.classList.add('drag'));
+});
+
+['dragleave', 'drop'].forEach(name => {
+  dropZone.addEventListener(name, () => dropZone.classList.remove('drag'));
+});
+
+dropZone.addEventListener('drop', event => {
+  const files = Array.from(event.dataTransfer?.files || []);
+  const cdg = files.find(file => file.name.toLowerCase().endsWith('.cdg'));
+
+  if (!cdg) {
+    selectedFile = null;
+    extractBtn.disabled = true;
+    dropZone.classList.remove('ready');
+    dropTitle.textContent = 'NO RECIBÍ UN ARCHIVO .CDG';
+    fileNameEl.textContent = '';
+    statusEl.textContent = 'Arrastra un archivo .CDG real desde tu PC o carpeta sincronizada.';
+    return;
+  }
+
+  selectedFile = cdg;
+  result = null;
+  resultCard.classList.add('hidden');
+
+  dropZone.classList.add('ready');
+  dropTitle.textContent = 'CDG CARGADO ✓';
+  fileNameEl.textContent = cdg.name;
+  extractBtn.disabled = false;
+  statusEl.textContent = 'Archivo listo. Pulsa EXTRAER LETRA.';
 });
 
 function fmtDuration(value) {
@@ -108,41 +132,53 @@ function fmtDuration(value) {
 }
 
 extractBtn.addEventListener('click', async () => {
-  const file = fileInput.files[0];
-  if (!file) return;
+  if (!selectedFile) {
+    statusEl.textContent = 'Primero arrastra un archivo .CDG.';
+    return;
+  }
 
   extractBtn.disabled = true;
   statusEl.textContent = 'Decodificando CDG y buscando pantallas de letra…';
   resultCard.classList.add('hidden');
 
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', selectedFile, selectedFile.name);
 
   try {
-    const response = await fetch('api/extract', { method: 'POST', body: form });
+    const response = await fetch('api/extract', {
+      method: 'POST',
+      body: form
+    });
+
     const body = await response.json();
-    if (!response.ok) throw new Error(body.detail || 'Error procesando el CDG');
+    if (!response.ok) {
+      throw new Error(body.detail || 'Error procesando el CDG');
+    }
 
     result = body;
     lyricsEl.value = body.lyrics || '';
+
     document.getElementById('lineCount').textContent = body.lines_detected ?? 0;
     document.getElementById('confidence').textContent =
       Math.round(body.average_confidence || 0) + '%';
     document.getElementById('ocrFrames').textContent = body.frames_ocr ?? 0;
     document.getElementById('pagesCount').textContent = body.pages_detected ?? 0;
-    document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);\n    document.getElementById('quality').textContent = body.quality || '—';
+    document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
+    document.getElementById('quality').textContent = body.quality || '—';
+
     resultCard.classList.remove('hidden');
+
     if (body.quality === 'BUENA') {
-      statusEl.textContent = 'Extracción buena. Revisa rápidamente el texto antes de descargar.';
+      statusEl.textContent = 'Extracción buena. Revisa rápidamente el texto.';
     } else if (body.quality === 'REVISAR') {
-      statusEl.textContent = 'Resultado intermedio: conviene revisar el texto antes de usarlo.';
+      statusEl.textContent = 'Resultado intermedio: conviene revisar la letra.';
     } else {
-      statusEl.textContent = 'RESULTADO MALO: no lo uses todavía. Este CDG necesita otro ajuste del motor.';
+      statusEl.textContent = 'RESULTADO MALO: no usar todavía; hay que seguir ajustando este tipo de CDG.';
     }
   } catch (error) {
     statusEl.textContent = 'ERROR: ' + error.message;
   } finally {
-    extractBtn.disabled = false;
+    extractBtn.disabled = !selectedFile;
   }
 });
 
@@ -166,18 +202,27 @@ function lrcTimestamp(seconds) {
   const value = Math.max(0, Number(seconds) || 0);
   const minutes = Math.floor(value / 60);
   const remainder = value - minutes * 60;
-  return String(minutes).padStart(2, '0') + ':' + remainder.toFixed(2).padStart(5, '0');
+  return String(minutes).padStart(2, '0') + ':' +
+    remainder.toFixed(2).padStart(5, '0');
 }
 
 document.getElementById('lrcBtn').addEventListener('click', () => {
   if (!result) return;
   const base = (result.filename || 'letra').replace(/\.cdg$/i, '');
-  const editedLines = lyricsEl.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+  const editedLines = lyricsEl.value
+    .split(/\r?\n/)
+    .map(value => value.trim())
+    .filter(Boolean);
   const detected = Array.isArray(result.lines) ? result.lines : [];
+
   const lrc = editedLines.map((text, index) => {
-    const time = detected[index]?.time ?? detected[detected.length - 1]?.time ?? 0;
+    const time =
+      detected[index]?.time ??
+      detected[detected.length - 1]?.time ??
+      0;
     return '[' + lrcTimestamp(time) + ']' + text;
   }).join('\n');
+
   download(base + '.lrc', lrc, 'text/plain;charset=utf-8');
 });
 
@@ -185,7 +230,11 @@ document.getElementById('jsonBtn').addEventListener('click', () => {
   if (!result) return;
   const base = (result.filename || 'letra').replace(/\.cdg$/i, '');
   const edited = { ...result, lyrics: lyricsEl.value };
-  download(base + '.json', JSON.stringify(edited, null, 2), 'application/json');
+  download(
+    base + '.json',
+    JSON.stringify(edited, null, 2),
+    'application/json'
+  );
 });
 </script>
 </body>
