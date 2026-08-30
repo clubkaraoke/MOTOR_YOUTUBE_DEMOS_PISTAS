@@ -1,6 +1,11 @@
 name: Deploy to OVH
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "lyrics_engine/**"
+      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
@@ -34,6 +39,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m compileall -q lyrics_engine
+          python3 lyrics_engine/tests/test_text_corrector.py
+          test -s lyrics_engine/data/es_50k.txt
           grep -q 'MOTOR 03' deploy/portal/index.html
           grep -q 'location /cdg-lyrics/' deploy/nginx-panel-integrado.conf
           grep -q '127.0.0.1:8090:8090' docker-compose.prod.yml
@@ -74,7 +81,8 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.env' \
-            --exclude='data' \
+            --exclude='./data' \
+            --exclude='./data/**' \
             --exclude='backup-*.tgz' \
             -czf "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" .
 
