@@ -37,6 +37,33 @@ sudo rsync -a --delete \
   --exclude='deploy/cdg-portal-auth.patch' \
   "$staging/" "$target/"
 
+# Actualiza el portal principal.
+sudo install -d -m 755 /opt/djgabo-portal
+sudo install -m 644 "$target/deploy/portal/index.html" /opt/djgabo-portal/index.html
+
+# Actualiza exactamente la configuración Nginx que ya sirve panel.kitkaraoke.com.
+nginx_match="$(sudo sh -c "grep -Rsl 'server_name panel\.kitkaraoke\.com' /etc/nginx/sites-enabled /etc/nginx/conf.d 2>/dev/null | head -n 1" || true)"
+if [ -z "$nginx_match" ] && sudo test -e /etc/nginx/sites-available/panel.kitkaraoke.com; then
+  nginx_match=/etc/nginx/sites-available/panel.kitkaraoke.com
+fi
+if [ -z "$nginx_match" ]; then
+  echo "No se encontró la configuración Nginx activa de panel.kitkaraoke.com" >&2
+  exit 1
+fi
+
+nginx_target="$(sudo readlink -f "$nginx_match")"
+nginx_backup="${nginx_target}.backup-${revision}"
+sudo cp -a "$nginx_target" "$nginx_backup"
+sudo install -m 644 "$target/deploy/nginx-panel-integrado.conf" "$nginx_target"
+
+if ! sudo nginx -t; then
+  echo "La nueva configuración Nginx no es válida; restaurando respaldo." >&2
+  sudo cp -a "$nginx_backup" "$nginx_target"
+  sudo nginx -t
+  exit 1
+fi
+sudo systemctl reload nginx
+
 cd "$target"
 sudo docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 sudo docker compose -f docker-compose.prod.yml ps
@@ -50,6 +77,21 @@ curl \
   --retry-delay 5 \
   --max-time 10 \
   http://127.0.0.1:8088/health
+
+printf '\n'
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  --retry 24 \
+  --retry-all-errors \
+  --retry-delay 5 \
+  --max-time 15 \
+  http://127.0.0.1:8090/api/health
+
+printf '\n'
+grep -q 'MOTOR 03' /opt/djgabo-portal/index.html
+sudo grep -q 'location /cdg-lyrics/' "$nginx_target"
 
 printf '\n'
 sudo docker compose -f docker-compose.prod.yml exec -T web python - <<'PY'
