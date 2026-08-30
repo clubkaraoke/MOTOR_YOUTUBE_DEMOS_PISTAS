@@ -228,6 +228,37 @@ class TextCorrectorTests(unittest.TestCase):
         )
         self.assertIsNone(kind)
 
+    def test_prefer_ahora_sola_over_fragmented_split(self) -> None:
+        corrected, kind = (
+            self.corrector.correct_token(
+                "AHORASOLA"
+            )
+        )
+        self.assertEqual(
+            corrected,
+            "AHORA SOLA",
+        )
+        self.assertEqual(
+            kind,
+            "split",
+        )
+
+    def test_enganaste_becomes_enganaste_with_enye(self) -> None:
+        self.corrector.freq["engañaste"] = 2079
+        corrected, kind = (
+            self.corrector.correct_token(
+                "ENGANASTE"
+            )
+        )
+        self.assertEqual(
+            corrected,
+            "ENGAÑASTE",
+        )
+        self.assertEqual(
+            kind,
+            "dictionary",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
