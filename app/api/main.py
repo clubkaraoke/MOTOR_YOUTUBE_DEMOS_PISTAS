@@ -240,10 +240,10 @@ def initialize() -> None:
         if not db.get(Setting, DEFAULT_TEMPLATE_MIGRATION_KEY):
             for index in range(1, 5):
                 channel = db.scalar(select(Channel).where(Channel.display_name == f"C{index}"))
-                source = DEFAULT_TEMPLATE_DIR / f"C{index}.webp"
+                source = DEFAULT_TEMPLATE_DIR / f"C{index}.png"
                 if not channel or not source.is_file():
                     raise RuntimeError(f"No se encontró la plantilla predeterminada C{index}: {source}")
-                target = settings.assets_dir / f"channel_{channel.id}_template.webp"
+                target = settings.assets_dir / f"channel_{channel.id}_template.png"
                 shutil.copy2(source, target)
                 channel.background_image_path = str(target)
                 # La segunda imagen del sistema anterior queda fuera de uso.
