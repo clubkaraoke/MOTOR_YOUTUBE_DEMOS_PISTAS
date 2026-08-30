@@ -17,6 +17,17 @@ from app.services.google_drive import DriveAudioStorage
 from app.services.media import YOUTUBE_AUDIO_BITRATE
 from app.services.qr import whatsapp_message, whatsapp_url
 from app.services.title_builder import build_youtube_title
+from app.workers.tasks import _is_youtube_upload_limit
+
+
+def test_youtube_upload_limit_detection_matches_real_error():
+    assert _is_youtube_upload_limit(
+        "reason: 'uploadLimitExceeded' The user has exceeded the number of videos they may upload"
+    )
+    assert _is_youtube_upload_limit(
+        "The user has exceeded the number of videos they may upload."
+    )
+    assert not _is_youtube_upload_limit("quotaExceeded on channels.list")
 
 
 def test_smart_youtube_title_handles_chorus_and_limit():
