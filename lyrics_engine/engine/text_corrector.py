@@ -465,6 +465,51 @@ class TextCorrector:
 
         return best_parts
 
+    def _function_prefix_split(
+        self,
+        token: str,
+    ) -> tuple[str, ...] | None:
+        token = self._normalize_digits(
+            token.upper()
+        )
+
+        # Solo separamos tokens que NO son ya una palabra frecuente.
+        if self.frequency(token) >= 300:
+            return None
+
+        prefixes = sorted(
+            FUNCTION_WORDS,
+            key=len,
+            reverse=True,
+        )
+
+        for prefix in prefixes:
+            if len(prefix) >= len(token) - 1:
+                continue
+            if not token.startswith(prefix):
+                continue
+
+            remainder = token[len(prefix):]
+
+            (
+                corrected_remainder,
+                remainder_frequency,
+                _,
+            ) = self._best_dictionary_word(
+                remainder,
+                segment_mode=True,
+            )
+
+            if remainder_frequency < 250:
+                continue
+
+            return (
+                prefix,
+                corrected_remainder.upper(),
+            )
+
+        return None
+
     def correct_token(
         self,
         token: str,
@@ -476,9 +521,7 @@ class TextCorrector:
             token
         )
 
-        # Primero intentamos corregir el token completo. Esto evita que una
-        # palabra pixelada como MUGHAGHITA se fragmente si MUCHACHITA existe
-        # claramente en el diccionario.
+        # 1) Corrección de la palabra completa.
         (
             corrected_word,
             _,
@@ -488,21 +531,46 @@ class TextCorrector:
             segment_mode=False,
         )
 
-        corrected_word = (
-            self._restore_case(
-                token,
-                corrected_word,
+        # Comparamos contra NORMALIZED. Si solo ocurrió 0->O,
+        # todavía debemos intentar separar prefijos como Y/TE/ME.
+        if (
+            corrected_word.casefold()
+            != normalized.casefold()
+        ):
+            corrected_word = (
+                self._restore_case(
+                    token,
+                    corrected_word,
+                )
             )
-        )
-
-        if corrected_word != token:
             return (
                 corrected_word,
                 "dictionary",
             )
 
-        # Si no existe una corrección completa clara, recién intentamos
-        # separar palabras pegadas: TEVEO -> TE VEO, YSIN -> Y SIN, etc.
+        # 2) Prefijo funcional seguro:
+        # TEVEO -> TE VEO, TESALUDO -> TE SALUDO,
+        # YHO -> Y NO, YG0M0 -> Y COMO.
+        function_split = (
+            self._function_prefix_split(
+                normalized
+            )
+        )
+
+        if function_split is not None:
+            corrected = " ".join(
+                function_split
+            )
+            corrected = self._restore_case(
+                token,
+                corrected,
+            )
+            return (
+                corrected,
+                "split",
+            )
+
+        # 3) Segmentación general conservadora.
         segmentation = self._segment(
             normalized.upper()
         )
@@ -520,6 +588,17 @@ class TextCorrector:
                     corrected,
                     "split",
                 )
+
+        # 4) Si lo único seguro fue un dígito confundido dentro de letras,
+        # aplicamos esa normalización al final.
+        if normalized != token:
+            return (
+                self._restore_case(
+                    token,
+                    normalized,
+                ),
+                "digit",
+            )
 
         return token, None
 
