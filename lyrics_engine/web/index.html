@@ -14,7 +14,7 @@
     .sub{color:#9aa7bd;margin:0}
     .card{background:rgba(17,24,39,.92);border:1px solid #26324a;border-radius:18px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25);margin-bottom:18px}
     .drop{display:block;border:1px dashed #485873;border-radius:14px;padding:28px;text-align:center;cursor:pointer;background:#0c1323}
-    .drop:hover{border-color:#7c9cff}
+    .drop:hover,.drop.drag{border-color:#7c9cff;background:#111b31}
     input[type=file]{display:none}
     button{border:0;border-radius:11px;padding:12px 18px;font-weight:800;cursor:pointer}
     .primary{background:#5f7cff;color:white;margin-top:14px;width:100%}
@@ -35,7 +35,7 @@
 <div class="wrap">
   <div class="top">
     <h1>CDG → LETRA</h1>
-    <p class="sub">V0.2 · Extrae texto directamente del gráfico CD+G.</p>
+    <p class="sub">V0.3 · OCR por colores CDG + detección de páginas.</p>
   </div>
 
   <section class="card">
@@ -54,7 +54,7 @@
       <div class="metric"><strong id="confidence">0%</strong><span>CONFIANZA OCR</span></div>
       <div class="metric"><strong id="ocrFrames">0</strong><span>PANTALLAS OCR</span></div>
       <div class="metric"><strong id="pagesCount">0</strong><span>PÁGINAS CDG</span></div>
-      <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>
+      <div class="metric"><strong id="duration">0:00</strong><span>DURACIÓN CDG</span></div>\n      <div class="metric"><strong id="quality">—</strong><span>CALIDAD</span></div>
     </div>
 
     <textarea id="lyrics" spellcheck="true"></textarea>
@@ -68,7 +68,7 @@
 </div>
 
 <script>
-const fileInput = document.getElementById('cdgFile');
+const fileInput = document.getElementById('cdgFile');\nconst dropZone = document.querySelector('.drop');
 const fileLabel = document.getElementById('fileLabel');
 const extractBtn = document.getElementById('extractBtn');
 const statusEl = document.getElementById('status');
@@ -76,9 +76,29 @@ const resultCard = document.getElementById('resultCard');
 const lyricsEl = document.getElementById('lyrics');
 let result = null;
 
+['dragenter','dragover'].forEach(name => dropZone.addEventListener(name, event => {
+  event.preventDefault();
+  dropZone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(name => dropZone.addEventListener(name, event => {
+  event.preventDefault();
+  dropZone.classList.remove('drag');
+}));
+dropZone.addEventListener('drop', event => {
+  const files = [...event.dataTransfer.files].filter(file => file.name.toLowerCase().endsWith('.cdg'));
+  if (!files.length) {
+    statusEl.textContent = 'Arrastra un archivo .CDG.';
+    return;
+  }
+  const transfer = new DataTransfer();
+  transfer.items.add(files[0]);
+  fileInput.files = transfer.files;
+  fileInput.dispatchEvent(new Event('change'));
+});
+
 fileInput.addEventListener('change', () => {
   const file = fileInput.files[0];
-  fileLabel.textContent = file ? file.name : 'Seleccionar un archivo .CDG';
+  fileLabel.textContent = file ? file.name : 'ARRASTRA AQUÍ UN ARCHIVO .CDG';
   extractBtn.disabled = !file;
 });
 
@@ -110,11 +130,15 @@ extractBtn.addEventListener('click', async () => {
       Math.round(body.average_confidence || 0) + '%';
     document.getElementById('ocrFrames').textContent = body.frames_ocr ?? 0;
     document.getElementById('pagesCount').textContent = body.pages_detected ?? 0;
-    document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);
+    document.getElementById('duration').textContent = fmtDuration(body.duration_seconds);\n    document.getElementById('quality').textContent = body.quality || '—';
     resultCard.classList.remove('hidden');
-    statusEl.textContent = body.lines_detected
-      ? 'Extracción terminada. Revisa el texto antes de descargar.'
-      : 'Terminó, pero no se detectaron líneas. Necesitamos ajustar esta marca de CDG.';
+    if (body.quality === 'BUENA') {
+      statusEl.textContent = 'Extracción buena. Revisa rápidamente el texto antes de descargar.';
+    } else if (body.quality === 'REVISAR') {
+      statusEl.textContent = 'Resultado intermedio: conviene revisar el texto antes de usarlo.';
+    } else {
+      statusEl.textContent = 'RESULTADO MALO: no lo uses todavía. Este CDG necesita otro ajuste del motor.';
+    }
   } catch (error) {
     statusEl.textContent = 'ERROR: ' + error.message;
   } finally {
