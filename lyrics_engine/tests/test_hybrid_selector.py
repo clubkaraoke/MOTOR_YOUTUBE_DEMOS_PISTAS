@@ -4,6 +4,24 @@ from engine.extractor import CDGLyricsExtractor
 
 
 class HybridCoverageTests(unittest.TestCase):
+    def test_removed_pixels_can_trigger_rewrite(self) -> None:
+        extractor = CDGLyricsExtractor(
+            min_added_pixels=0.012,
+            min_rewrite_pixels=0.012,
+        )
+        self.assertTrue(
+            extractor._meaningful_stable_rewrite(
+                added_ratio=0.004,
+                removed_ratio=0.010,
+            )
+        )
+        self.assertFalse(
+            extractor._meaningful_stable_rewrite(
+                added_ratio=0.003,
+                removed_ratio=0.004,
+            )
+        )
+
     def test_sparse_native_triggers_hybrid(self) -> None:
         native = {
             "duration_seconds": 240,
