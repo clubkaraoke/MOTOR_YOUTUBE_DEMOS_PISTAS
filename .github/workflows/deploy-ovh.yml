@@ -1,6 +1,11 @@
 name: Deploy to OVH
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "lyrics_engine/**"
+      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
