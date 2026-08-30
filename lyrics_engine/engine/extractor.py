@@ -28,12 +28,13 @@ class OCRLineCandidate:
 class CDGLyricsExtractor:
     """CDG -> páginas reales -> OCR -> letra.
 
-    V0.4 prioriza capturar la pantalla COMPLETA justo antes de cada
-    Memory Preset / Clear Screen. Así Tesseract recibe la página terminada
-    (blanco + amarillo) y no estados parciales del resaltado karaoke.
+    V0.6 mantiene la captura de página completa y añade OCR adaptativo:
+    una lectura rápida spa+eng/PSM6 y, solo en páginas débiles, una segunda
+    batería spa+eng/spa con PSM6/11. Después aplica diccionario y contexto
+    repetido de la propia canción, sin consultar letras externas.
 
     Si un CDG no trae suficientes Clear Screen, se conserva el detector
-    estable/por colores de V0.3 como fallback.
+    estable/por colores como fallback.
     """
 
     def __init__(
@@ -379,6 +380,8 @@ class CDGLyricsExtractor:
         self,
         mask: np.ndarray,
         scale: int = 6,
+        lang: str = "spa+eng",
+        psm: int = 6,
     ) -> list[tuple[str, float]]:
         prepared = self._prepare_for_ocr(mask, scale=scale)
 
@@ -391,7 +394,7 @@ class CDGLyricsExtractor:
             " ,.!?¿¡:-'"
         )
         config = (
-            '--oem 3 --psm 6 '
+            f'--oem 3 --psm {psm} '
             f'-c tessedit_char_whitelist="{whitelist}" '
             '-c preserve_interword_spaces=1'
         )
@@ -399,7 +402,7 @@ class CDGLyricsExtractor:
         try:
             data = pytesseract.image_to_data(
                 prepared,
-                lang="spa+eng",
+                lang=lang,
                 config=config,
                 output_type=pytesseract.Output.DICT,
             )
@@ -656,6 +659,8 @@ class CDGLyricsExtractor:
     ) -> tuple[
         list[tuple[str, float]],
         int,
+        str,
+        int,
     ]:
         mask = self._full_shape_mask(
             indices,
@@ -666,32 +671,100 @@ class CDGLyricsExtractor:
             / float(mask.size)
         )
         if occupied < self.min_occupied:
-            return [], 6
+            return [], 6, "empty", 0
 
-        primary = self._ocr(
-            mask,
+        candidates: list[
+            tuple[
+                float,
+                list[tuple[str, float]],
+                int,
+                str,
+            ]
+        ] = []
+
+        def add_candidate(
+            *,
+            scale: int,
+            lang: str,
+            psm: int,
+        ) -> None:
+            lines = self._ocr(
+                mask,
+                scale=scale,
+                lang=lang,
+                psm=psm,
+            )
+            avg = self._average_confidence(
+                lines
+            )
+
+            # La cantidad de líneas importa ligeramente: una página que
+            # recupera una línea extra con confianza similar suele ser mejor.
+            score = (
+                avg
+                + min(len(lines), 6) * 1.25
+            )
+            profile = (
+                f"{lang}/psm{psm}/x{scale}"
+            )
+            candidates.append(
+                (
+                    score,
+                    lines,
+                    scale,
+                    profile,
+                )
+            )
+
+        # Lectura principal: una sola llamada en la mayoría de páginas.
+        add_candidate(
             scale=6,
+            lang="spa+eng",
+            psm=6,
         )
+
+        primary_lines = candidates[0][1]
         primary_avg = self._average_confidence(
-            primary
+            primary_lines
         )
 
-        # Solo gastamos un segundo OCR si la lectura principal salió débil.
-        if primary_avg >= 72.0 or len(primary) >= 3:
-            return primary, 6
+        # Solo las páginas realmente dudosas pagan el coste de OCR adicional.
+        # En el CDG de prueba esto ayuda especialmente a páginas donde PSM11
+        # recupera líneas que PSM6 agrupa o pierde.
+        if primary_avg < 82.0:
+            add_candidate(
+                scale=6,
+                lang="spa+eng",
+                psm=11,
+            )
+            add_candidate(
+                scale=6,
+                lang="spa",
+                psm=6,
+            )
+            add_candidate(
+                scale=6,
+                lang="spa",
+                psm=11,
+            )
 
-        fallback = self._ocr(
-            mask,
-            scale=5,
+        candidates.sort(
+            key=lambda item: item[0],
+            reverse=True,
         )
-        fallback_avg = self._average_confidence(
-            fallback
+        (
+            _,
+            best_lines,
+            best_scale,
+            best_profile,
+        ) = candidates[0]
+
+        return (
+            best_lines,
+            best_scale,
+            best_profile,
+            len(candidates),
         )
-
-        if fallback_avg > primary_avg + 4.0:
-            return fallback, 5
-
-        return primary, 6
 
     def _native_page_snapshots(
         self,
@@ -796,6 +869,7 @@ class CDGLyricsExtractor:
         raw_screens: list[dict] = []
         accepted_pages = 0
         frames_ocr = 0
+        ocr_fallback_pages = 0
 
         for (
             page_index,
@@ -804,13 +878,18 @@ class CDGLyricsExtractor:
             pages,
             start=1,
         ):
-            lines, scale = (
-                self._ocr_native_page(
-                    page["indices"],
-                    page["background_index"],
-                )
+            (
+                lines,
+                scale,
+                ocr_profile,
+                ocr_calls,
+            ) = self._ocr_native_page(
+                page["indices"],
+                page["background_index"],
             )
-            frames_ocr += 1
+            frames_ocr += ocr_calls
+            if ocr_calls > 1:
+                ocr_fallback_pages += 1
 
             avg = self._average_confidence(
                 lines
@@ -848,6 +927,7 @@ class CDGLyricsExtractor:
                     ),
                     "page": page_index,
                     "ocr_scale": scale,
+                    "ocr_profile": ocr_profile,
                     "average_confidence": round(
                         avg,
                         2,
@@ -902,9 +982,9 @@ class CDGLyricsExtractor:
 
         return {
             "filename": path.name,
-            "engine_version": "0.5.0",
+            "engine_version": "0.6.0",
             "strategy": (
-                "native_page_final_frame"
+                "native_page_adaptive_ocr"
             ),
             "duration_seconds": round(
                 duration,
@@ -912,6 +992,7 @@ class CDGLyricsExtractor:
             ),
             "frames_sampled": len(pages),
             "frames_ocr": frames_ocr,
+            "ocr_fallback_pages": ocr_fallback_pages,
             "page_events": [
                 {
                     "time": round(
@@ -1384,7 +1465,7 @@ class CDGLyricsExtractor:
 
         return {
             "filename": path.name,
-            "engine_version": "0.5.0",
+            "engine_version": "0.6.0",
             "strategy": "stable_frame_fallback",
             "duration_seconds": round(
                 duration,
