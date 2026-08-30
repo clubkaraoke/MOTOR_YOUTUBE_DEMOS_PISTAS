@@ -38,6 +38,12 @@
     .ok{color:#75df9a}.warn{color:#ffd479}.bad{color:#ff8d8d}
     .hidden{display:none}
     .section-title{font-size:15px;margin:0 0 10px}
+    .mini-btn{border:0;border-radius:8px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;background:#243554;color:#eef2ff}
+    .modal{position:fixed;inset:0;background:rgba(3,7,18,.82);display:none;align-items:center;justify-content:center;padding:22px;z-index:999}
+    .modal.open{display:flex}
+    .modal-box{width:min(920px,96vw);max-height:88vh;overflow:auto;background:#101827;border:1px solid #34445f;border-radius:16px;padding:18px}
+    .modal-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+    .lyrics-preview{white-space:pre-wrap;background:#09101d;border:1px solid #27354d;border-radius:12px;padding:14px;line-height:1.5;max-height:52vh;overflow:auto}
     @media(max-width:850px){.metrics{grid-template-columns:repeat(2,1fr)}table{display:block;overflow:auto}}
   </style>
 </head>
@@ -72,6 +78,14 @@
     </div>
 
     <div id="workerState" class="status"></div>
+
+    <h3 class="section-title" style="margin-top:18px">ÚLTIMOS TERMINADOS</h3>
+    <div style="overflow:auto;max-height:300px;margin-bottom:18px">
+      <table>
+        <thead><tr><th>ARCHIVO</th><th>CALIDAD</th><th>LAB</th><th>OCR</th><th>PÁGINAS</th><th>LÍNEAS</th><th>CORR.</th><th></th></tr></thead>
+        <tbody id="doneBody"></tbody>
+      </table>
+    </div>
 
     <h3 class="section-title" style="margin-top:18px">ÚLTIMOS TRABAJOS</h3>
     <div style="overflow:auto;max-height:280px">
@@ -149,6 +163,19 @@
   </section>
 </div>
 
+<div class="modal" id="resultModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <h3 id="resultTitle" style="margin:0 0 6px">RESULTADO LAB</h3>
+        <div id="resultMeta" class="muted"></div>
+      </div>
+      <button class="secondary" id="closeResultBtn">CERRAR</button>
+    </div>
+    <div id="resultLyrics" class="lyrics-preview"></div>
+  </div>
+</div>
+
 <script>
 function setText(id, value) {
   const el = document.getElementById(id);
@@ -211,6 +238,35 @@ function renderDropboxStatus(body) {
     });
   }
 
+  const doneBody = document.getElementById('doneBody');
+  doneBody.replaceChildren();
+
+  (body.recent_done || []).forEach(item => {
+    const tr = document.createElement('tr');
+    [
+      item.name,
+      item.quality || '—',
+      item.lab_score == null ? '—' : Math.round(item.lab_score),
+      item.ocr_confidence == null ? '—' : Math.round(item.ocr_confidence) + '%',
+      item.pages == null ? '—' : item.pages,
+      item.lines == null ? '—' : item.lines,
+      item.corrections == null ? '—' : item.corrections
+    ].forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    const actionTd = document.createElement('td');
+    const button = document.createElement('button');
+    button.className = 'mini-btn';
+    button.textContent = 'VER RESULTADO';
+    button.addEventListener('click', () => openLabResult(item.id));
+    actionTd.appendChild(button);
+    tr.appendChild(actionTd);
+    doneBody.appendChild(tr);
+  });
+
   const queueBody = document.getElementById('queueBody');
   queueBody.replaceChildren();
 
@@ -230,6 +286,57 @@ function renderDropboxStatus(body) {
     queueBody.appendChild(tr);
   });
 }
+
+async function openLabResult(jobId) {
+  const modal = document.getElementById('resultModal');
+  const title = document.getElementById('resultTitle');
+  const meta = document.getElementById('resultMeta');
+  const lyrics = document.getElementById('resultLyrics');
+
+  title.textContent = 'Cargando resultado…';
+  meta.textContent = '';
+  lyrics.textContent = '';
+  modal.classList.add('open');
+
+  try {
+    const response = await fetch(
+      'api/lab/dropbox/result/' + encodeURIComponent(jobId),
+      {cache: 'no-store'}
+    );
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || ('HTTP ' + response.status));
+
+    title.textContent = body.filename || ('Resultado #' + jobId);
+    meta.textContent =
+      'Calidad ' + (body.quality || '—') +
+      ' · OCR ' + Math.round(Number(body.average_confidence || 0)) + '%' +
+      ' · LAB ' + Math.round(Number(body.lab?.score || body.job?.lab_score || 0)) +
+      ' · páginas ' + Number(body.pages_detected || 0) +
+      ' · líneas ' + Number(body.lines_detected || 0) +
+      ' · correcciones ' + Number(body.corrections_count || 0);
+
+    const lyricText = typeof body.lyrics === 'string'
+      ? body.lyrics
+      : (Array.isArray(body.lines)
+          ? body.lines.map(line => line.text || line.corrected_text || '').filter(Boolean).join('\n')
+          : '');
+
+    lyrics.textContent = lyricText || 'No hay texto de letra guardado para este resultado.';
+  } catch (error) {
+    title.textContent = 'No se pudo abrir el resultado';
+    lyrics.textContent = String(error.message || error);
+  }
+}
+
+document.getElementById('closeResultBtn').addEventListener('click', () => {
+  document.getElementById('resultModal').classList.remove('open');
+});
+
+document.getElementById('resultModal').addEventListener('click', event => {
+  if (event.target.id === 'resultModal') {
+    event.currentTarget.classList.remove('open');
+  }
+});
 
 async function refreshDropboxStatus() {
   try {
