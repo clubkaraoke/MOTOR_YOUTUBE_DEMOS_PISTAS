@@ -298,6 +298,23 @@ def initialize() -> None:
                 job.status = JobStatus.UPLOAD_ERROR.value
                 job.error_code = "DRIVE_UPLOAD_RECOVERY_ERROR"
                 job.error_message = str(exc)
+        quota_preflight_failures = db.scalars(select(Job).where(
+            Job.status == JobStatus.UPLOAD_ERROR.value,
+            Job.youtube_video_id.is_(None),
+            Job.retry_count == 1,
+            Job.error_message.contains("quotaExceeded"),
+            Job.error_message.contains("/youtube/v3/channels"),
+        )).all()
+        for job in quota_preflight_failures:
+            # channels.list failed before videos.insert was called, so this
+            # specific retry is safe to send directly to the upload endpoint.
+            job.status = JobStatus.QUEUED.value
+            job.error_code = "RECOVERED_YOUTUBE_PREFLIGHT_QUOTA"
+            try:
+                queue.connection.delete(f"djgabo:enqueued:{job.id}")
+            except Exception:
+                pass
+
         interrupted = db.scalars(select(Job).where(Job.status.in_([
             JobStatus.RENDERING.value, JobStatus.VALIDATING.value, JobStatus.MP4_READY.value,
             JobStatus.WAITING_SLOT.value, JobStatus.DOWNLOADING_AUDIO.value,
