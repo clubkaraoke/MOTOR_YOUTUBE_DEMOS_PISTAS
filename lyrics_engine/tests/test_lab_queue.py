@@ -92,6 +92,39 @@ class LabQueueTests(unittest.TestCase):
         second = LabQueue(Path(self.tmp.name))
         self.assertTrue(second.worker_enabled())
 
+    def test_requeue_recent_done_preserves_baseline(self) -> None:
+        self.queue.add_jobs(
+            [{
+                "name": "old.cdg",
+                "path_display": "/Pack/old.cdg",
+                "size": 100,
+            }],
+            pack="Pack -15",
+        )
+        job = self.queue.claim_next()
+        assert job is not None
+
+        result = {
+            "filename": "old.cdg",
+            "average_confidence": 88.0,
+            "quality": "REVISAR",
+            "pages_detected": 12,
+            "lines_detected": 58,
+            "corrections_count": 19,
+        }
+        result_path = self.queue.save_result(job, result)
+        self.queue.finish(job["id"], result_path, result, 68.0)
+
+        report = self.queue.requeue_recent_done(1)
+        self.assertEqual(report["requeued"], 1)
+        self.assertEqual(self.queue.counts()["PENDING"], 1)
+
+        baseline = self.queue.baseline_for_job(job["id"])
+        self.assertIsNotNone(baseline)
+        self.assertEqual(baseline["lab_score"], 68.0)
+        self.assertEqual(baseline["pages"], 12)
+        self.assertEqual(baseline["lines"], 58)
+
     def test_recent_done_and_result_lookup(self) -> None:
         self.queue.add_jobs(
             [{
