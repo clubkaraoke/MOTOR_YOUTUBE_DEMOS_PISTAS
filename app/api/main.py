@@ -41,6 +41,7 @@ from app.services.youtube import (
     delete_video,
     encrypt_token,
     is_quota_exceeded,
+    next_general_quota_reset_utc,
     sync_video_status,
     sync_video_statuses,
 )
@@ -426,6 +427,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_process_pending_privacy_changes, "interval", minutes=30,
                       id="youtube-privacy-queue", replace_existing=True, max_instances=1)
     scheduler.start()
+    _process_pending_privacy_changes()
     dispatch_waiting()
     yield
     scheduler.shutdown(wait=False)
@@ -445,26 +447,87 @@ def _queue_privacy_change(job: Job, target: str, error: str | None = None) -> No
     job.privacy_attempt_count = (job.privacy_attempt_count or 0) + 1
 
 
+def _quota_blocked_until(db: Session) -> datetime | None:
+    row = db.get(Setting, "youtube_general_quota_blocked_until")
+    if not row or not row.value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(row.value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _set_quota_blocked_until(db: Session, value: datetime) -> None:
+    db.merge(Setting(key="youtube_general_quota_blocked_until", value=value.isoformat()))
+    db.commit()
+
+
+def _ensure_auto_public_queue(db: Session) -> int:
+    """Keep every published engine video on the path to public."""
+    jobs = db.scalars(
+        select(Job).where(
+            Job.youtube_video_id.is_not(None),
+            Job.youtube_video_id.not_like("mock_%"),
+            Job.youtube_deleted_at.is_(None),
+        ).order_by(Job.published_at)
+    ).all()
+    queued = 0
+    now = datetime.now(timezone.utc)
+    for job in jobs:
+        actual = job.youtube_actual_privacy or job.privacy_status
+        if actual == "public" and not job.pending_privacy_status:
+            continue
+        if actual != "public" or job.pending_privacy_status != "public":
+            job.pending_privacy_status = "public"
+            job.privacy_pending_since = job.privacy_pending_since or job.published_at or now
+            if not job.privacy_last_error:
+                job.privacy_last_error = "Modo automático: pendiente de pasar a público"
+            queued += 1
+    if queued:
+        db.commit()
+    return queued
+
+
 def _process_pending_privacy_changes() -> dict:
-    """Retry queued privacy changes without hammering an exhausted YouTube quota."""
+    """Make every published video public while keeping a conservative quota budget."""
     changed: list[str] = []
     errors: list[dict] = []
     quota_blocked = False
+    now = datetime.now(timezone.utc)
+
     with SessionLocal() as db:
+        _ensure_auto_public_queue(db)
+
+        blocked_until = _quota_blocked_until(db)
+        if blocked_until and blocked_until > now:
+            pending = db.scalar(
+                select(func.count(Job.id)).where(Job.pending_privacy_status == "public")
+            ) or 0
+            return {
+                "changed": 0,
+                "ids": [],
+                "errors": [],
+                "quota_blocked": True,
+                "blocked_until": blocked_until.isoformat(),
+                "pending": pending,
+            }
+
+        # 3 updates every 30 minutes = at most 144 privacy updates/day.
+        # At 50 general-quota units each, that caps this automation near
+        # 7,200 units/day and leaves margin for status checks and admin actions.
         jobs = db.scalars(
             select(Job).where(
-                Job.pending_privacy_status.is_not(None),
+                Job.pending_privacy_status == "public",
                 Job.youtube_video_id.is_not(None),
                 Job.youtube_video_id.not_like("mock_%"),
                 Job.youtube_deleted_at.is_(None),
-            ).order_by(Job.privacy_pending_since, Job.published_at)
+            ).order_by(Job.privacy_pending_since, Job.published_at).limit(3)
         ).all()
 
         for job in jobs:
-            target = job.pending_privacy_status
-            if not target:
-                continue
-            if (job.youtube_actual_privacy or job.privacy_status) == target:
+            actual = job.youtube_actual_privacy or job.privacy_status
+            if actual == "public":
                 job.pending_privacy_status = None
                 job.privacy_pending_since = None
                 job.privacy_last_error = None
@@ -476,10 +539,10 @@ def _process_pending_privacy_changes() -> dict:
             job.privacy_last_attempt_at = datetime.now(timezone.utc)
             job.privacy_attempt_count = (job.privacy_attempt_count or 0) + 1
             try:
-                actual = change_privacy(job, job.channel, target)
-                if actual != target:
+                actual = change_privacy(job, job.channel, "public")
+                if actual != "public":
                     job.privacy_last_error = (
-                        f"YouTube respondió con privacidad {actual or 'desconocida'} en vez de {target}"
+                        f"YouTube respondió con privacidad {actual or 'desconocida'} en vez de public"
                     )
                     errors.append({"id": job.id, "error": job.privacy_last_error})
                 else:
@@ -487,18 +550,30 @@ def _process_pending_privacy_changes() -> dict:
                 db.commit()
             except YouTubeError as exc:
                 message = str(exc)
-                job.privacy_last_error = message[-2000:]
-                db.commit()
                 if is_quota_exceeded(message):
+                    reset_at = next_general_quota_reset_utc()
+                    job.privacy_last_error = (
+                        f"Cuota general de YouTube agotada. Reintento automático después de "
+                        f"{reset_at.isoformat()}."
+                    )
+                    db.commit()
+                    _set_quota_blocked_until(db, reset_at)
                     quota_blocked = True
                     break
+                job.privacy_last_error = message[-2000:]
+                db.commit()
                 errors.append({"id": job.id, "error": message})
+
+        pending = db.scalar(
+            select(func.count(Job.id)).where(Job.pending_privacy_status == "public")
+        ) or 0
 
     return {
         "changed": len(changed),
         "ids": changed,
         "errors": errors,
         "quota_blocked": quota_blocked,
+        "pending": pending,
     }
 
 
@@ -720,7 +795,7 @@ async def upload_jobs(files: list[UploadFile] = File(...), db: Session = Depends
             job = Job(id=job_id, filename_original=original_name, artist=artist, title=title, sha256=checksum,
                       source_md5=source_md5, source_size_bytes=size,
                       original_path=str(target), original_duration_seconds=duration,
-                      cut_seconds=default_cut_seconds, privacy_status=settings.youtube_default_privacy,
+                      cut_seconds=default_cut_seconds, privacy_status="public",
                       drive_folder_id=settings.drive_audio_folder_id,
                       status=JobStatus.UPLOADING_TO_DRIVE.value, progress=90)
             if not valid_cut:
