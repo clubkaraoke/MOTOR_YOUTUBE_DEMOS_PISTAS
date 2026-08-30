@@ -150,9 +150,28 @@ extractBtn.addEventListener('click', async () => {
       body: form
     });
 
-    const body = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    let body = null;
+
+    if (contentType.includes('application/json')) {
+      body = await response.json();
+    } else {
+      const raw = await response.text();
+
+      if (response.status === 413) {
+        throw new Error('El CDG supera el límite permitido de subida.');
+      }
+
+      throw new Error(
+        'Servidor respondió HTTP ' +
+        response.status +
+        '. ' +
+        raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
+      );
+    }
+
     if (!response.ok) {
-      throw new Error(body.detail || 'Error procesando el CDG');
+      throw new Error(body.detail || ('Error HTTP ' + response.status));
     }
 
     result = body;
