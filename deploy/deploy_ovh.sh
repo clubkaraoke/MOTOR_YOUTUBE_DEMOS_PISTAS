@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deployment trigger: privacy response fix.
 set -euo pipefail
 
 archive=${1:?Release archive is required}
