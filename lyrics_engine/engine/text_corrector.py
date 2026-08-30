@@ -28,7 +28,8 @@ CONFUSIONS = {
     "G": ("C",),
     "C": ("G",),
     "H": ("N",),
-    "N": ("H", "M"),
+    "N": ("H", "M", "Ñ"),
+    "Ñ": ("N",),
     "M": ("N",),
 }
 
@@ -372,9 +373,12 @@ class TextCorrector:
                 ) / len(freqs)
 
                 # Leve preferencia por menos fragmentos.
+                # V0.7 LAB: penaliza segmentaciones excesivas. Sin esto,
+                # AHORASOLA podía ganar como "A HORAS O LA" solo porque las
+                # palabras funcionales son extremadamente frecuentes.
                 score -= (
                     len(parts) - 1
-                ) * 0.18
+                ) * 0.65
 
                 candidates.append(
                     (
