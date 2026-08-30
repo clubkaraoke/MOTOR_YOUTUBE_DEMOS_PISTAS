@@ -35,7 +35,7 @@ from app.services.media import MediaError, probe_duration
 from app.services.oauth_client import YouTubeOAuthConfigError, google_client_config
 from app.services.qr import whatsapp_url
 from app.services.scheduler import channel_slots, global_next_slot
-from app.services.youtube import YouTubeError, change_privacy, delete_video, encrypt_token, sync_video_status
+from app.services.youtube import YouTubeError, change_privacy, delete_video, encrypt_token, sync_video_status, sync_video_statuses
 
 log = logging.getLogger("djgabo.api")
 settings = get_settings()
@@ -356,30 +356,48 @@ def _cleanup() -> None:
 
 
 def _sync_youtube_statuses() -> dict:
+    """Refresh published-video health in batches instead of one API call per video."""
     checked = 0
     errors: list[dict] = []
     with SessionLocal() as db:
-        job_ids = db.scalars(select(Job.id).where(
-            Job.youtube_video_id.is_not(None),
-            Job.youtube_video_id.not_like("mock_%"),
-            Job.youtube_deleted_at.is_(None),
-        ).order_by(Job.published_at.desc())).all()
-    for job_id in job_ids:
-        with SessionLocal() as db:
-            job = db.get(Job, job_id)
-            if not job:
-                continue
-            try:
-                channel = db.get(Channel, job.channel_id) if job.channel_id else None
-                if not channel:
-                    raise YouTubeError("El trabajo no tiene un canal válido")
-                sync_video_status(job, channel)
-                db.commit()
-                checked += 1
-            except Exception as exc:
-                db.rollback()
-                log.warning("youtube_status_failed job_id=%s error=%s", job.id, type(exc).__name__)
-                errors.append({"id": job.id, "error": str(exc)})
+        rows = db.execute(
+            select(Job.id, Job.channel_id).where(
+                Job.youtube_video_id.is_not(None),
+                Job.youtube_video_id.not_like("mock_%"),
+                Job.youtube_deleted_at.is_(None),
+            ).order_by(Job.published_at.desc())
+        ).all()
+
+    by_channel: dict[int, list[str]] = {}
+    for job_id, channel_id in rows:
+        if channel_id is None:
+            errors.append({"id": job_id, "error": "El trabajo no tiene un canal válido"})
+            continue
+        by_channel.setdefault(channel_id, []).append(job_id)
+
+    for channel_id, job_ids in by_channel.items():
+        for start in range(0, len(job_ids), 50):
+            chunk_ids = job_ids[start:start + 50]
+            with SessionLocal() as db:
+                jobs = [job for job_id in chunk_ids if (job := db.get(Job, job_id))]
+                try:
+                    channel = db.get(Channel, channel_id)
+                    if not channel:
+                        raise YouTubeError("El canal ya no existe")
+                    sync_video_statuses(jobs, channel)
+                    db.commit()
+                    checked += len(jobs)
+                except Exception as exc:
+                    db.rollback()
+                    log.warning(
+                        "youtube_status_batch_failed channel_id=%s count=%s error=%s",
+                        channel_id, len(chunk_ids), type(exc).__name__,
+                    )
+                    errors.append({
+                        "channel_id": channel_id,
+                        "count": len(chunk_ids),
+                        "error": str(exc),
+                    })
     return {"checked": checked, "errors": errors}
 
 
