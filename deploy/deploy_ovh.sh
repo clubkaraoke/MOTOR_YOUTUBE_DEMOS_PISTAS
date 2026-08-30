@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deployment trigger: pending privacy queue.
 # Deployment trigger: privacy response fix.
 set -euo pipefail
 
