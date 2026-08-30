@@ -39,6 +39,7 @@ jobs:
       - name: Validate Motor 03 mirror
         run: |
           set -euo pipefail
+          python3 -m pip install -r lyrics_engine/requirements.txt
           python3 -m compileall -q lyrics_engine
           python3 lyrics_engine/tests/test_text_corrector.py
           PYTHONPATH=lyrics_engine python3 lyrics_engine/tests/test_lab.py
