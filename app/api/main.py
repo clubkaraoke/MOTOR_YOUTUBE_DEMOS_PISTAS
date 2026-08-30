@@ -356,14 +356,21 @@ def initialize() -> None:
         # permanent failures. Preserve their assigned channel and move them to
         # the automatic waiting queue.
         upload_limit_failures = db.scalars(select(Job).where(
-            Job.status == JobStatus.UPLOAD_ERROR.value,
             Job.youtube_video_id.is_(None),
             or_(
+                Job.error_code == "YOUTUBE_UPLOAD_LIMIT",
                 Job.error_message.contains("uploadLimitExceeded"),
                 Job.error_message.contains("exceeded the number of videos they may upload"),
+                # Repair the five C3 jobs touched by the immediately previous
+                # restart path, which copied WAITING_SLOT into previous_status.
+                (Job.previous_status == JobStatus.WAITING_SLOT.value) & (Job.retry_count > 0),
             ),
         )).all()
+        c3 = db.scalar(select(Channel).where(Channel.display_name == "C3"))
         for job in upload_limit_failures:
+            if job.previous_status == JobStatus.WAITING_SLOT.value and c3:
+                # One-time repair for the known C3 upload-limit incident.
+                job.channel_id = c3.id
             job.previous_status = JobStatus.UPLOADING_YOUTUBE.value
             job.status = JobStatus.WAITING_SLOT.value
             job.progress = 0
@@ -381,7 +388,7 @@ def initialize() -> None:
 
         interrupted = db.scalars(select(Job).where(Job.status.in_([
             JobStatus.RENDERING.value, JobStatus.VALIDATING.value, JobStatus.MP4_READY.value,
-            JobStatus.WAITING_SLOT.value, JobStatus.DOWNLOADING_AUDIO.value,
+            JobStatus.DOWNLOADING_AUDIO.value,
             JobStatus.UPLOADING_YOUTUBE.value, JobStatus.VERIFYING.value,
         ]))).all()
         for job in interrupted:
