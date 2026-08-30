@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           python3 -m compileall -q lyrics_engine
           python3 lyrics_engine/tests/test_text_corrector.py
-          python3 -m unittest lyrics_engine.tests.test_lab -v
+          PYTHONPATH=lyrics_engine python3 lyrics_engine/tests/test_lab.py
           test -s lyrics_engine/data/es_50k.txt
           python3 - <<'PY'
           from pathlib import Path
