@@ -1,6 +1,13 @@
 name: Deploy to OVH
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "lyrics_engine/**"
+      - "docker-compose.prod.yml"
+      - "deploy/deploy_ovh.sh"
+      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,6 +43,8 @@ jobs:
           python3 -m compileall -q lyrics_engine
           python3 lyrics_engine/tests/test_text_corrector.py
           PYTHONPATH=lyrics_engine python3 lyrics_engine/tests/test_lab.py
+          PYTHONPATH=lyrics_engine python3 lyrics_engine/tests/test_lab_queue.py
+          PYTHONPATH=lyrics_engine python3 lyrics_engine/tests/test_dropbox_lab.py
           test -s lyrics_engine/data/es_50k.txt
           python3 - <<'PY'
           from pathlib import Path
