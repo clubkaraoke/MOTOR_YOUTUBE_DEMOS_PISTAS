@@ -104,6 +104,8 @@ jobs:
       - name: Package application
         run: |
           set -euo pipefail
+          archive="$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz"
+
           tar \
             --exclude='.git' \
             --exclude='.github' \
@@ -111,10 +113,14 @@ jobs:
             --exclude='./data' \
             --exclude='./data/**' \
             --exclude='backup-*.tgz' \
-            -czf "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" .
+            -czf "$archive" .
 
-          tar -tzf "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" \
-            | grep -q '^./lyrics_engine/data/es_50k.txt      - name: Upload release archive
+          if ! tar -tzf "$archive" | grep -Fqx './lyrics_engine/data/es_50k.txt'; then
+            echo "ERROR: lyrics_engine/data/es_50k.txt is missing from release archive" >&2
+            exit 1
+          fi
+
+      - name: Upload release archive
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
