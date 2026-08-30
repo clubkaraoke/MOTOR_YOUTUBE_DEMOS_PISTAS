@@ -234,6 +234,45 @@ def dropbox_worker_start() -> dict:
             status_code=409,
             detail="Conecta Dropbox antes de iniciar la cola",
         )
+    lab_queue.set_run_limit(None)
+    lab_queue.set_worker_enabled(True)
+    lab_worker.start_thread()
+    return lab_worker.status()
+
+
+@app.post("/api/lab/dropbox/worker/start-limited")
+def dropbox_worker_start_limited(
+    payload: dict = Body(default={}),
+) -> dict:
+    client = DropboxLabClient()
+    if not client.connected:
+        raise HTTPException(
+            status_code=409,
+            detail="Conecta Dropbox antes de iniciar la cola",
+        )
+
+    try:
+        max_jobs = int(payload.get("max_jobs", 5))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="max_jobs debe ser un número entero",
+        ) from exc
+
+    if not 1 <= max_jobs <= 50:
+        raise HTTPException(
+            status_code=400,
+            detail="max_jobs debe estar entre 1 y 50",
+        )
+
+    counts = lab_queue.counts()
+    if int(counts.get("PENDING", 0)) <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No hay CDG pendientes en la cola",
+        )
+
+    lab_queue.set_run_limit(max_jobs)
     lab_queue.set_worker_enabled(True)
     lab_worker.start_thread()
     return lab_worker.status()
