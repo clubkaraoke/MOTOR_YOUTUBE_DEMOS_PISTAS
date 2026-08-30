@@ -34,7 +34,7 @@ sudo mv -- "$backup_tmp" "$backup"
 
 sudo rsync -a --delete \
   --exclude='.env' \
-  --exclude='data/' \
+  --exclude='/data/' \
   --exclude='backup-*.tgz' \
   --exclude='deploy/cdg-portal-auth.patch' \
   "$staging/" "$target/"
@@ -81,7 +81,7 @@ curl \
   http://127.0.0.1:8088/health
 
 printf '\n'
-curl \
+lyrics_health="$(curl \
   --fail \
   --silent \
   --show-error \
@@ -89,7 +89,30 @@ curl \
   --retry-all-errors \
   --retry-delay 5 \
   --max-time 15 \
-  http://127.0.0.1:8090/api/health
+  http://127.0.0.1:8090/api/health)"
+
+printf '%s\n' "$lyrics_health"
+
+LYRICS_HEALTH="$lyrics_health" python3 - <<'PY'
+import json
+import os
+
+health = json.loads(os.environ["LYRICS_HEALTH"])
+
+assert health.get("ok") is True, health
+assert health.get("version") == "0.6.0", health
+assert int(health.get("lexicon_words", 0)) >= 45000, health
+assert int(health.get("lexicon_con", 0)) >= 100000, health
+
+print(
+    "CDG_LYRICS_HEALTH_OK",
+    {
+        "version": health["version"],
+        "lexicon_words": health["lexicon_words"],
+        "lexicon_con": health["lexicon_con"],
+    },
+)
+PY
 
 printf '\n'
 grep -q 'MOTOR 03' /opt/djgabo-portal/index.html
