@@ -65,6 +65,7 @@
     <div class="actions">
       <button class="secondary" id="connectDropboxBtn">CONECTAR DROPBOX</button>
       <button class="secondary" id="indexDropboxBtn">INDEXAR SELECCIONADOS</button>
+      <button class="secondary" id="testFiveBtn">PROBAR 5 CDG</button>
       <button class="secondary" id="startWorkerBtn">INICIAR COLA</button>
       <button class="secondary" id="pauseWorkerBtn">PAUSAR</button>
       <button class="secondary" id="retryErrorsBtn">REINTENTAR ERRORES</button>
@@ -187,7 +188,8 @@ function renderDropboxStatus(body) {
   document.getElementById('workerState').textContent =
     (worker.enabled ? 'COLA ACTIVA' : 'COLA PAUSADA') +
     ' · RAM ' + mem + '% / límite ' +
-    Number(worker.memory_limit_percent || 75).toFixed(0) + '%' +
+    Number(worker.memory_limit_percent || 60).toFixed(0) + '%' +
+    (worker.run_remaining >= 0 ? ' · prueba restante: ' + worker.run_remaining : '') +
     (current ? ' · Ahora: ' + current.name : '');
 
   const packChecks = document.getElementById('packChecks');
@@ -290,6 +292,21 @@ document.getElementById('indexDropboxBtn').addEventListener('click', async () =>
   } catch (error) {
     document.getElementById('dropboxState').textContent =
       'ERROR INDEXANDO: ' + error.message;
+  }
+});
+
+document.getElementById('testFiveBtn').addEventListener('click', async () => {
+  try {
+    await postJson(
+      'api/lab/dropbox/worker/start-limited',
+      {max_jobs: 5}
+    );
+    document.getElementById('workerState').textContent =
+      'PRUEBA DE 5 CDG INICIADA · se pausará automáticamente.';
+    await refreshDropboxStatus();
+  } catch (error) {
+    document.getElementById('workerState').textContent =
+      'No se pudo iniciar la prueba: ' + error.message;
   }
 });
 
