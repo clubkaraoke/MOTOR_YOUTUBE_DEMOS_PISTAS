@@ -108,18 +108,35 @@ def enqueue(job_id: str) -> bool:
 
 def dispatch_waiting() -> None:
     with SessionLocal() as db:
+        # Pull a wider candidate window so jobs cooling down after a YouTube
+        # uploadLimitExceeded do not block newer work behind them.
         jobs = db.scalars(select(Job).where(Job.status.in_([
             JobStatus.QUEUED.value, JobStatus.WAITING_SLOT.value, JobStatus.MP4_READY.value,
             JobStatus.RENDERING.value, JobStatus.VALIDATING.value,
-        ])).order_by(Job.created_at).limit(settings.ready_buffer)).all()
+        ])).order_by(Job.created_at).limit(max(50, settings.ready_buffer * 10))).all()
+        now = datetime.now(timezone.utc)
+        accepted = 0
         for job in jobs:
             updated = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
-            if job.status in {JobStatus.RENDERING.value, JobStatus.VALIDATING.value} and updated < datetime.now(timezone.utc) - timedelta(hours=1):
+
+            # YouTube's per-channel upload-count limit is not worth probing
+            # every 10 seconds. Recheck automatically every 15 minutes.
+            if (
+                job.status == JobStatus.WAITING_SLOT.value
+                and job.error_code == "YOUTUBE_UPLOAD_LIMIT"
+                and updated > now - timedelta(minutes=15)
+            ):
+                continue
+
+            if job.status in {JobStatus.RENDERING.value, JobStatus.VALIDATING.value} and updated < now - timedelta(hours=1):
                 try:
                     queue.connection.delete(f"djgabo:enqueued:{job.id}")
                 except Exception:
                     pass
-            enqueue(job.id)
+            if enqueue(job.id):
+                accepted += 1
+                if accepted >= settings.ready_buffer:
+                    break
 
 
 def recover_stalled() -> dict:
@@ -330,6 +347,33 @@ def initialize() -> None:
             # specific retry is safe to send directly to the upload endpoint.
             job.status = JobStatus.QUEUED.value
             job.error_code = "RECOVERED_YOUTUBE_PREFLIGHT_QUOTA"
+            try:
+                queue.connection.delete(f"djgabo:enqueued:{job.id}")
+            except Exception:
+                pass
+
+        # Existing jobs that YouTube rejected with uploadLimitExceeded are not
+        # permanent failures. Preserve their assigned channel and move them to
+        # the automatic waiting queue.
+        upload_limit_failures = db.scalars(select(Job).where(
+            Job.status == JobStatus.UPLOAD_ERROR.value,
+            Job.youtube_video_id.is_(None),
+            or_(
+                Job.error_message.contains("uploadLimitExceeded"),
+                Job.error_message.contains("exceeded the number of videos they may upload"),
+            ),
+        )).all()
+        for job in upload_limit_failures:
+            job.previous_status = JobStatus.UPLOADING_YOUTUBE.value
+            job.status = JobStatus.WAITING_SLOT.value
+            job.progress = 0
+            job.error_code = "YOUTUBE_UPLOAD_LIMIT"
+            channel = db.get(Channel, job.channel_id) if job.channel_id else None
+            channel_name = channel.display_name if channel else "El canal asignado"
+            job.error_message = (
+                f"{channel_name} alcanzó temporalmente el límite de subidas de YouTube. "
+                "La pista queda reservada para ese mismo canal y se reintentará automáticamente."
+            )
             try:
                 queue.connection.delete(f"djgabo:enqueued:{job.id}")
             except Exception:
