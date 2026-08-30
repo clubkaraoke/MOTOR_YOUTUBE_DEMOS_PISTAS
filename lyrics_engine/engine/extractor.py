@@ -14,6 +14,7 @@ from rapidfuzz import fuzz
 
 from .cdg_decoder import CDGDecoder, PACKETS_PER_SECOND
 from .formatters import format_lrc
+from .text_corrector import TextCorrector
 
 
 @dataclass
@@ -56,6 +57,75 @@ class CDGLyricsExtractor:
         self.candidate_cooldown = candidate_cooldown
         self.duplicate_window = duplicate_window
         self.min_line_confidence = min_line_confidence
+        self.text_corrector = TextCorrector()
+
+    def _finalize_lines(
+        self,
+        raw_lines: list[dict],
+    ) -> dict:
+        raw_lyrics = "\n".join(
+            item["text"]
+            for item in raw_lines
+        )
+
+        corrected_lines, corrections = (
+            self.text_corrector.correct_lines(
+                raw_lines
+            )
+        )
+
+        lyrics = "\n".join(
+            item["text"]
+            for item in corrected_lines
+        )
+
+        average_confidence = (
+            round(
+                sum(
+                    float(item["confidence"])
+                    for item in corrected_lines
+                )
+                / len(corrected_lines),
+                2,
+            )
+            if corrected_lines
+            else 0.0
+        )
+
+        # "BUENA" significa apta para una revisión rápida, no simplemente
+        # que Tesseract superó un umbral bajo. 84% debe seguir en REVISAR.
+        if (
+            average_confidence >= 92
+            and len(corrected_lines) >= 8
+        ):
+            quality = "BUENA"
+        elif (
+            average_confidence >= 80
+            and len(corrected_lines) >= 5
+        ):
+            quality = "REVISAR"
+        else:
+            quality = "MALA"
+
+        return {
+            "lines": corrected_lines,
+            "lines_detected": len(
+                corrected_lines
+            ),
+            "lyrics": lyrics,
+            "lyrics_raw": raw_lyrics,
+            "lrc": format_lrc(
+                corrected_lines
+            ),
+            "average_confidence": (
+                average_confidence
+            ),
+            "quality": quality,
+            "corrections": corrections,
+            "corrections_count": len(
+                corrections
+            ),
+        }
 
     @staticmethod
     def _full_shape_mask(
@@ -826,42 +896,13 @@ class CDGLyricsExtractor:
                     }
                 )
 
-        lyrics = "\n".join(
-            item["text"]
-            for item in final_lines
+        finalized = self._finalize_lines(
+            final_lines
         )
-
-        average_confidence = (
-            round(
-                sum(
-                    float(
-                        item["confidence"]
-                    )
-                    for item in final_lines
-                )
-                / len(final_lines),
-                2,
-            )
-            if final_lines
-            else 0.0
-        )
-
-        if (
-            average_confidence >= 82
-            and len(final_lines) >= 8
-        ):
-            quality = "BUENA"
-        elif (
-            average_confidence >= 68
-            and len(final_lines) >= 5
-        ):
-            quality = "REVISAR"
-        else:
-            quality = "MALA"
 
         return {
             "filename": path.name,
-            "engine_version": "0.4.0",
+            "engine_version": "0.5.0",
             "strategy": (
                 "native_page_final_frame"
             ),
@@ -894,18 +935,33 @@ class CDGLyricsExtractor:
             "pages_with_lyrics": (
                 accepted_pages
             ),
-            "lines_detected": len(
-                final_lines
-            ),
-            "average_confidence": (
-                average_confidence
-            ),
-            "quality": quality,
-            "lyrics": lyrics,
-            "lrc": format_lrc(
-                final_lines
-            ),
-            "lines": final_lines,
+            "lines_detected": finalized[
+                "lines_detected"
+            ],
+            "average_confidence": finalized[
+                "average_confidence"
+            ],
+            "quality": finalized[
+                "quality"
+            ],
+            "lyrics": finalized[
+                "lyrics"
+            ],
+            "lyrics_raw": finalized[
+                "lyrics_raw"
+            ],
+            "lrc": finalized[
+                "lrc"
+            ],
+            "lines": finalized[
+                "lines"
+            ],
+            "corrections_count": finalized[
+                "corrections_count"
+            ],
+            "corrections": finalized[
+                "corrections"
+            ],
             "raw_screens": raw_screens,
         }
 
@@ -1322,42 +1378,13 @@ class CDGLyricsExtractor:
                 )
             )
 
-        lyrics = "\n".join(
-            item["text"]
-            for item in final_lines
+        finalized = self._finalize_lines(
+            final_lines
         )
-
-        average_confidence = (
-            round(
-                sum(
-                    float(
-                        item["confidence"]
-                    )
-                    for item in final_lines
-                )
-                / len(final_lines),
-                2,
-            )
-            if final_lines
-            else 0.0
-        )
-
-        if (
-            average_confidence >= 75
-            and len(final_lines) >= 6
-        ):
-            quality = "BUENA"
-        elif (
-            average_confidence >= 60
-            and len(final_lines) >= 4
-        ):
-            quality = "REVISAR"
-        else:
-            quality = "MALA"
 
         return {
             "filename": path.name,
-            "engine_version": "0.4.0",
+            "engine_version": "0.5.0",
             "strategy": "stable_frame_fallback",
             "duration_seconds": round(
                 duration,
@@ -1376,18 +1403,33 @@ class CDGLyricsExtractor:
                     }
                 ),
             ),
-            "lines_detected": len(
-                final_lines
-            ),
-            "average_confidence": (
-                average_confidence
-            ),
-            "quality": quality,
-            "lyrics": lyrics,
-            "lrc": format_lrc(
-                final_lines
-            ),
-            "lines": final_lines,
+            "lines_detected": finalized[
+                "lines_detected"
+            ],
+            "average_confidence": finalized[
+                "average_confidence"
+            ],
+            "quality": finalized[
+                "quality"
+            ],
+            "lyrics": finalized[
+                "lyrics"
+            ],
+            "lyrics_raw": finalized[
+                "lyrics_raw"
+            ],
+            "lrc": finalized[
+                "lrc"
+            ],
+            "lines": finalized[
+                "lines"
+            ],
+            "corrections_count": finalized[
+                "corrections_count"
+            ],
+            "corrections": finalized[
+                "corrections"
+            ],
             "raw_screens": raw_screens,
         }
 
