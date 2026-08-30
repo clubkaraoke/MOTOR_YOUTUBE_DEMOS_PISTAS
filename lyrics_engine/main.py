@@ -30,7 +30,7 @@ PACK_PATHS = {
 
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.8.0-lab",
+    version="0.9.0-lab",
 )
 
 lab_queue = LabQueue()
@@ -73,7 +73,7 @@ def health() -> dict:
     return {
         "ok": True,
         "engine": "CDG_LYRICS_ENGINE",
-        "version": "0.8.0-lab",
+        "version": "0.9.0-lab",
         "lexicon_words": len(corrector.freq),
         "lexicon_con": corrector.frequency("con"),
         "dropbox_configured": dropbox.configured,
@@ -150,6 +150,10 @@ def dropbox_lab_result(job_id: int) -> dict:
         "lines": result.get("lines", []),
         "corrections": result.get("corrections", [])[:120],
         "lab": result.get("lab", {}),
+        "baseline": result.get("baseline", {}),
+        "comparison": result.get("comparison", {}),
+        "strategy_candidates": result.get("strategy_candidates", {}),
+        "hybrid_trigger": result.get("hybrid_trigger"),
     }
 
 
@@ -250,6 +254,49 @@ def dropbox_lab_index(
         "total_cdg_found": total_found,
         "counts": lab_queue.counts(),
         "packs": reports,
+    }
+
+
+@app.post("/api/lab/dropbox/reprocess-recent")
+def dropbox_reprocess_recent(
+    payload: dict = Body(default={}),
+) -> dict:
+    if lab_worker.status().get("current"):
+        raise HTTPException(
+            status_code=409,
+            detail="Hay un CDG procesándose; pausa y espera a que termine",
+        )
+
+    try:
+        limit = int(payload.get("limit", 5))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="limit debe ser un número entero",
+        ) from exc
+
+    if not 1 <= limit <= 20:
+        raise HTTPException(
+            status_code=400,
+            detail="limit debe estar entre 1 y 20",
+        )
+
+    lab_queue.set_worker_enabled(False)
+    report = lab_queue.requeue_recent_done(limit)
+
+    if report["requeued"] <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No hay resultados terminados para reprocesar",
+        )
+
+    lab_queue.set_run_limit(report["requeued"])
+    lab_queue.set_worker_enabled(True)
+    lab_worker.start_thread()
+
+    return {
+        **report,
+        "worker": lab_worker.status(),
     }
 
 
