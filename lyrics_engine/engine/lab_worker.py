@@ -22,7 +22,7 @@ class LabWorker:
         self,
         queue: LabQueue,
         *,
-        max_memory_percent: float = 75.0,
+        max_memory_percent: float = 60.0,
         poll_seconds: float = 3.0,
         max_cdg_bytes: int = 20 * 1024 * 1024,
     ) -> None:
