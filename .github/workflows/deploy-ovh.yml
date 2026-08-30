@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
 
+# Hotfix deployment: YouTube quota handling
+
 concurrency:
   group: production-ovh
   cancel-in-progress: false
