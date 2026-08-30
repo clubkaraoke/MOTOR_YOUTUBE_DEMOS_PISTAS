@@ -4,6 +4,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httplib2
 from cryptography.fernet import Fernet
@@ -33,6 +34,18 @@ def is_quota_exceeded(message: str) -> bool:
         or "exceeded your quota" in lowered
         or "dailylimitexceeded" in lowered
     )
+
+
+def next_general_quota_reset_utc(now: datetime | None = None) -> datetime:
+    """Return the next YouTube general-quota reset, with a 5-minute safety margin."""
+    now_utc = now or datetime.now(timezone.utc)
+    pacific_tz = ZoneInfo("America/Los_Angeles")
+    pacific_now = now_utc.astimezone(pacific_tz)
+    next_date = (pacific_now + timedelta(days=1)).date()
+    reset_local = datetime(
+        next_date.year, next_date.month, next_date.day, 0, 5, tzinfo=pacific_tz
+    )
+    return reset_local.astimezone(timezone.utc)
 
 
 YOUTUBE_HTTP_TIMEOUT_SECONDS = 90
