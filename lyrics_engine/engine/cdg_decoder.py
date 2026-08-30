@@ -163,3 +163,15 @@ class CDGDecoder:
 
     def background_rgb(self) -> tuple[int, int, int]:
         return self.palette[self.memory_color & 0x0F]
+
+    def visible_indices(self) -> list[list[int]]:
+        """Framebuffer visible como índices CLUT 0..15.
+
+        El extractor usa estos índices para separar texto por color sin
+        depender de luminancia RGB ni mezclar gráficos de otros colores.
+        """
+        left, top, right, bottom = VISIBLE_BOX
+        return [
+            row[left:right]
+            for row in self.pix[top:bottom]
+        ]
