@@ -14,7 +14,7 @@ MAX_CDG_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(
     title="CDG Lyrics Engine",
-    version="0.5.1",
+    version="0.6.0",
 )
 
 
@@ -29,7 +29,7 @@ def health() -> dict:
     return {
         "ok": True,
         "engine": "CDG_LYRICS_ENGINE",
-        "version": "0.5.1",
+        "version": "0.6.0",
         "lexicon_words": len(corrector.freq),
         "lexicon_con": corrector.frequency("con"),
     }
