@@ -114,7 +114,51 @@ jobs:
             -czf "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" .
 
           tar -tzf "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" \
-            | grep -q '^./lyrics_engine/data/es_50k.txt
+            | grep -q '^./lyrics_engine/data/es_50k.txt      - name: Upload release archive
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" \
+            "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" \
+            "$OVH_USER@$OVH_HOST:/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz"
+
+      - name: Deploy and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "bash -s -- '/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz' '${GITHUB_SHA}'" \
+            < deploy/deploy_ovh.sh
+
+
+      - name: Upload release archive
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" \
+            "$RUNNER_TEMP/djgabo-youtube-${GITHUB_SHA}.tar.gz" \
+            "$OVH_USER@$OVH_HOST:/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz"
+
+      - name: Deploy and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "bash -s -- '/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz' '${GITHUB_SHA}'" \
+            < deploy/deploy_ovh.sh
+
       - name: Upload release archive
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
