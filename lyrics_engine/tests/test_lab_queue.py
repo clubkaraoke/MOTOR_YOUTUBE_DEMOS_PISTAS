@@ -92,6 +92,21 @@ class LabQueueTests(unittest.TestCase):
         second = LabQueue(Path(self.tmp.name))
         self.assertTrue(second.worker_enabled())
 
+    def test_limited_run_auto_pauses(self) -> None:
+        self.queue.set_run_limit(2)
+        self.queue.set_worker_enabled(True)
+
+        self.assertEqual(self.queue.run_remaining(), 2)
+        self.assertEqual(self.queue.consume_run_slot(), 1)
+        self.assertTrue(self.queue.worker_enabled())
+
+        self.assertEqual(self.queue.consume_run_slot(), 0)
+        self.assertFalse(self.queue.worker_enabled())
+
+        second = LabQueue(Path(self.tmp.name))
+        self.assertEqual(second.run_remaining(), 0)
+        self.assertFalse(second.worker_enabled())
+
 
 if __name__ == "__main__":
     unittest.main()
