@@ -46,6 +46,11 @@ class JobOut(BaseModel):
     youtube_url: str | None
     youtube_deleted_at: datetime | None
     youtube_actual_privacy: str | None
+    pending_privacy_status: str | None
+    privacy_pending_since: datetime | None
+    privacy_last_attempt_at: datetime | None
+    privacy_last_error: str | None
+    privacy_attempt_count: int
     youtube_upload_status: str | None
     youtube_failure_reason: str | None
     youtube_rejection_reason: str | None
