@@ -9,6 +9,7 @@ from app.services.frame_builder import (
     COVER_SIZE,
     QR_CARD_POSITION,
     QR_CARD_SIZE,
+    _qr_image,
     create_frame,
 )
 from app.services.google_drive import DriveAudioStorage
@@ -68,6 +69,13 @@ def test_cover_download_ignores_broken_desktop_proxy(monkeypatch, tmp_path: Path
     target = provider.download("https://res.cloudinary.com/example/image.png", tmp_path / "cover.png")
     assert target.is_file()
     assert observed["session"].trust_env is False
+
+
+def test_qr_fills_almost_all_of_the_new_slot():
+    qr = _qr_image("https://panel.kitkaraoke.com/p-youtube/q/PRUEBA123")
+    assert qr.width == qr.height
+    assert 130 <= qr.width <= QR_CARD_SIZE[0]
+    assert QR_CARD_SIZE[0] - qr.width <= 8
 
 
 def test_frame_uses_new_fixed_cover_and_qr_contract(tmp_path: Path):
