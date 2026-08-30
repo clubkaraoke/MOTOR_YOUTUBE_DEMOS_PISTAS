@@ -1,6 +1,15 @@
 name: Deploy to OVH
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "lyrics_engine/**"
+      - "deploy/portal/index.html"
+      - "deploy/nginx-panel-integrado.conf"
+      - "deploy/deploy_ovh.sh"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/deploy-ovh.yml"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +38,14 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements.txt
           python3 -m pytest -q -p no:cacheprovider tests
+
+      - name: Validate Motor 03 mirror
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q lyrics_engine
+          grep -q 'MOTOR 03' deploy/portal/index.html
+          grep -q 'location /cdg-lyrics/' deploy/nginx-panel-integrado.conf
+          grep -q '127.0.0.1:8090:8090' docker-compose.prod.yml
 
       - name: Validate deployment secrets
         env:
