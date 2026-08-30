@@ -54,7 +54,9 @@ def _qr_image(value: str) -> Image.Image:
         # recovery. L keeps the matrix smaller so modules stay larger on TV.
         error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=1,
-        border=4,
+        # Quiet zone reducido a 2 módulos: el QR ocupa ~132×132 dentro
+        # del cuadro de 138×138, dejando apenas ~3 px visuales por lado.
+        border=2,
     )
     code.add_data(value)
     code.make(fit=True)
