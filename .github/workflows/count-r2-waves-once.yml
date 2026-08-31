@@ -1,0 +1,78 @@
+name: Count R2 waves once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/count-r2-waves-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Count objects in R2
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd "$HOME/djgabo-wave-peaks/tools/wave-peaks"
+          source .venv/bin/activate
+          source "$HOME/.config/djgabo-wave-peaks.env"
+          python - <<'PY'
+          import os
+          from collections import Counter
+          import boto3
+
+          s3 = boto3.client(
+              "s3",
+              endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+              aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+              aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+          )
+          bucket = os.getenv("R2_BUCKET", "djgabo-wave-peaks")
+
+          total = 0
+          prefixes = Counter()
+          suffixes = Counter()
+          samples = {}
+          for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+              for obj in page.get("Contents", []):
+                  total += 1
+                  key = obj["Key"]
+                  top = key.split("/", 1)[0] if "/" in key else "(root)"
+                  prefixes[top] += 1
+                  ext = "." + key.rsplit(".",1)[-1].lower() if "." in key else "(none)"
+                  suffixes[ext] += 1
+                  samples.setdefault(top, key)
+
+          print("TOTAL_OBJECTS", total)
+          print("PREFIX_COUNTS")
+          for k,v in prefixes.most_common():
+              print(k, v)
+          print("SUFFIX_COUNTS")
+          for k,v in suffixes.most_common(20):
+              print(k, v)
+          print("SAMPLES")
+          for k,v in samples.items():
+              print(k, "=>", v)
+          PY
+          REMOTE
