@@ -1,0 +1,49 @@
+name: Check INGLES migration status once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/check-ingles-migration-status-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Check migration state
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          APP=/opt/KITKARAOKE_DATA_SYNC
+          UNIT=kitkaraoke-ingles-migration-005-035
+
+          echo "=== SYSTEMD ==="
+          sudo systemctl is-active "$UNIT" || true
+          sudo systemctl is-failed "$UNIT" || true
+
+          echo "=== STATE ==="
+          sudo cat "$APP/data/migracion_ingles_estado.json" 2>/dev/null || echo "state_file_missing"
+
+          echo "=== LAST JOURNAL ==="
+          sudo journalctl -u "$UNIT" -n 80 --no-pager || true
+          REMOTE
