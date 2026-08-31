@@ -1,0 +1,61 @@
+name: Deploy universal INGLES catalog V2 once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/deploy-universal-ingles-catalog-v2-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout KIT sync
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: clubkaraoke/KITKARAOKE_DATA_SYNC
+          ref: bf6de93fe2ad3d2a5cc3ce9613b9c29b8420afe9
+          path: kit-source
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Package and upload
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          REV=bf6de93fe2ad3d2a5cc3ce9613b9c29b8420afe9
+          ARCHIVE="/tmp/kitkaraoke-data-sync-${REV}.tar.gz"
+          tar --exclude=.git -czf "$ARCHIVE" -C kit-source .
+          scp -P "$OVH_PORT" "$ARCHIVE" "$OVH_USER@$OVH_HOST:$ARCHIVE"
+
+      - name: Deploy and publish catalog
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'REV=bf6de93fe2ad3d2a5cc3ce9613b9c29b8420afe9; APP=/opt/KITKARAOKE_DATA_SYNC; sudo bash "$APP/deploy/deploy_ovh.sh" "/tmp/kitkaraoke-data-sync-${REV}.tar.gz" "$REV" && sudo bash "$APP/deploy/publish_universal_catalog.sh"'
+
+      - name: Verify public catalog
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error https://panel.kitkaraoke.com/catalogo/03_INGLES.json -o catalog.json
+          python3 -c 'import json; d=json.load(open("catalog.json",encoding="utf-8")); print("count=",d.get("count"),"blocks=",d.get("blocks")); assert d.get("count")==4534; assert d.get("blocks")==35; assert all(x.get("driveFileId") for x in d.get("items",[]))'
