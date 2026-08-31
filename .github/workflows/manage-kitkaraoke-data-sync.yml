@@ -13,6 +13,7 @@ on:
           - deploy
           - install_oauth
           - dry_run
+          - copy_block_001
       kit_ref:
         description: Branch, tag, or commit from clubkaraoke/KITKARAOKE_DATA_SYNC
         required: true
@@ -30,7 +31,7 @@ jobs:
   manage:
     name: ${{ inputs.operation }} KITKARAOKE DATA SYNC
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
 
     steps:
       - name: Check out deployment channel
@@ -169,3 +170,14 @@ jobs:
           set -euo pipefail
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
             'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/dry_run.sh'
+
+      - name: Execute controlled real copy of INGLES_001 only
+        if: inputs.operation == 'copy_block_001'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block_001.sh'
