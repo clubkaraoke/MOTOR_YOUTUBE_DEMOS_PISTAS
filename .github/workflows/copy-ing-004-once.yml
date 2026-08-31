@@ -1,0 +1,74 @@
+name: Copy INGLES_004 once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/copy-ing-004-once.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kitkaraoke-data-sync-ovh
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout KIT sync repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: clubkaraoke/KITKARAOKE_DATA_SYNC
+          ref: main
+          path: kit-source
+
+      - name: Validate SSH secrets
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$OVH_HOST"
+          test -n "$OVH_PORT"
+          test -n "$OVH_SSH_KEY"
+          test -n "$OVH_USER"
+
+      - name: Configure OVH SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          {
+            printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+            printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+          } > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Copy only INGLES_004
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block.sh 4'
+
+      - name: Show persisted status
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps kitkaraoke-data-sync python -m app.cli status'
