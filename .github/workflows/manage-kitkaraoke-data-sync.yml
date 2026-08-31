@@ -1,0 +1,135 @@
+name: Manage KITKARAOKE DATA SYNC on OVH
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Safe operation to run
+        required: true
+        type: choice
+        default: diagnose
+        options:
+          - diagnose
+          - deploy
+          - dry_run
+      kit_ref:
+        description: Branch, tag, or commit from clubkaraoke/KITKARAOKE_DATA_SYNC
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kitkaraoke-data-sync-ovh
+  cancel-in-progress: false
+
+jobs:
+  manage:
+    name: ${{ inputs.operation }} KITKARAOKE DATA SYNC
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out deployment channel
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out KITKARAOKE DATA SYNC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: clubkaraoke/KITKARAOKE_DATA_SYNC
+          ref: ${{ inputs.kit_ref }}
+          path: kit-source
+
+      - name: Validate deployment secrets
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$OVH_HOST"
+          test -n "$OVH_PORT"
+          test -n "$OVH_SSH_KEY"
+          test -n "$OVH_USER"
+
+      - name: Configure existing OVH SSH channel
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          {
+            printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+            printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+          } > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Resolve KIT revision
+        id: kit
+        working-directory: kit-source
+        run: printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Package KIT release
+        if: inputs.operation == 'deploy'
+        working-directory: kit-source
+        env:
+          KIT_SHA: ${{ steps.kit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          tar --exclude='.git' --exclude='.github' --exclude='.env' --exclude='data' \
+            --exclude='rclone.conf' --exclude='backup-*.tgz' \
+            -czf "$RUNNER_TEMP/kitkaraoke-data-sync-${KIT_SHA}.tar.gz" .
+
+      - name: Upload KIT release
+        if: inputs.operation == 'deploy'
+        env:
+          KIT_SHA: ${{ steps.kit.outputs.sha }}
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" "$RUNNER_TEMP/kitkaraoke-data-sync-${KIT_SHA}.tar.gz" \
+            "$OVH_USER@$OVH_HOST:/tmp/kitkaraoke-data-sync-${KIT_SHA}.tar.gz"
+
+      - name: Deploy KIT release with safety gates
+        if: inputs.operation == 'deploy'
+        env:
+          KIT_SHA: ${{ steps.kit.outputs.sha }}
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "bash -s -- '/tmp/kitkaraoke-data-sync-${KIT_SHA}.tar.gz' '${KIT_SHA}'" \
+            < kit-source/deploy/deploy_ovh.sh
+
+      - name: Diagnose OVH and isolated KIT service
+        if: inputs.operation == 'diagnose' || inputs.operation == 'deploy'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' \
+            < kit-source/deploy/diagnose_ovh.sh
+
+      - name: Execute read-only Drive dry run
+        if: inputs.operation == 'dry_run'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/dry_run.sh'
