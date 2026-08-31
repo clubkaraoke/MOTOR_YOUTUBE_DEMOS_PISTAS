@@ -11,6 +11,7 @@ on:
         options:
           - diagnose
           - deploy
+          - install_oauth
           - dry_run
       kit_ref:
         description: Branch, tag, or commit from clubkaraoke/KITKARAOKE_DATA_SYNC
@@ -99,6 +100,40 @@ jobs:
           scp -P "$OVH_PORT" "$RUNNER_TEMP/kitkaraoke-data-sync-${KIT_SHA}.tar.gz" \
             "$OVH_USER@$OVH_HOST:/tmp/kitkaraoke-data-sync-${KIT_SHA}.tar.gz"
 
+      - name: Validate temporary rclone secret
+        if: inputs.operation == 'install_oauth'
+        env:
+          KIT_RCLONE_CONFIG_B64: ${{ secrets.KIT_RCLONE_CONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KIT_RCLONE_CONFIG_B64"
+          printf '%s' "$KIT_RCLONE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/rclone.conf"
+          chmod 600 "$RUNNER_TEMP/rclone.conf"
+          grep -qx '\[gdrive\]' "$RUNNER_TEMP/rclone.conf"
+
+      - name: Upload protected rclone config
+        if: inputs.operation == 'install_oauth'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" "$RUNNER_TEMP/rclone.conf" \
+            "$OVH_USER@$OVH_HOST:/tmp/kitkaraoke-rclone-${GITHUB_RUN_ID}.conf"
+
+      - name: Install OAuth and start isolated dry-run service
+        if: inputs.operation == 'install_oauth'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "bash -s -- '/tmp/kitkaraoke-rclone-${GITHUB_RUN_ID}.conf'" \
+            < kit-source/deploy/install_rclone_ovh.sh
+
       - name: Deploy KIT release with safety gates
         if: inputs.operation == 'deploy'
         env:
@@ -113,7 +148,7 @@ jobs:
             < kit-source/deploy/deploy_ovh.sh
 
       - name: Diagnose OVH and isolated KIT service
-        if: inputs.operation == 'diagnose' || inputs.operation == 'deploy'
+        if: inputs.operation == 'diagnose' || inputs.operation == 'deploy' || inputs.operation == 'install_oauth'
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
