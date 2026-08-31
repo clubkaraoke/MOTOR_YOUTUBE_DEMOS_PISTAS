@@ -1,0 +1,43 @@
+name: Inspect wave log once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-wave-log-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Inspect recent waveform errors
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          cd "$HOME/djgabo-wave-peaks/tools/wave-peaks"
+          echo "=== PROCESS ==="
+          pgrep -af generate_peaks.py || true
+          echo "=== LAST 120 LINES ==="
+          tail -n 120 wave-peaks-optimized.log || true
+          echo "=== RECENT ERRORS ==="
+          tail -n 1200 wave-peaks-optimized.log | grep -Ei 'ERROR|quota|403|429|502|Drive|esperaba 206|expir' | tail -n 120 || true
+          REMOTE
