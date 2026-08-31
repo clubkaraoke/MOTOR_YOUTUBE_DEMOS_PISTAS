@@ -108,6 +108,7 @@ jobs:
           set -euo pipefail
           test -n "$KIT_RCLONE_CONFIG_B64"
           printf '%s' "$KIT_RCLONE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/rclone.conf"
+          sed -i 's/\r$//' "$RUNNER_TEMP/rclone.conf"
           chmod 600 "$RUNNER_TEMP/rclone.conf"
           grep -qx '\[gdrive\]' "$RUNNER_TEMP/rclone.conf"
 
