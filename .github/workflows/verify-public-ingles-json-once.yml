@@ -1,0 +1,33 @@
+name: Verify public INGLES JSON once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/verify-public-ingles-json-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public catalog
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2             https://panel.kitkaraoke.com/catalogo/03_INGLES.json -o catalog.json
+          python3 - <<'PY'
+          import json
+          with open("catalog.json", encoding="utf-8") as f:
+              d=json.load(f)
+          print("schema=", d.get("schema"))
+          print("count=", d.get("count"))
+          print("blocks=", d.get("blocks"))
+          print("bytes=", __import__("os").path.getsize("catalog.json"))
+          assert d.get("schema")=="kitkaraoke-universal-catalog-v1"
+          assert d.get("count")==4534
+          assert d.get("blocks")==35
+          assert len(d.get("items", []))==4534
+          assert all(x.get("driveFileId") for x in d["items"])
+          PY
