@@ -1,0 +1,53 @@
+name: Inspect OVH HTTP routes once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-ovh-http-routes-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Inspect web stack
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "=== LISTEN ==="
+          sudo ss -ltnp | sed -n '1,120p'
+          echo "=== NGINX ==="
+          if command -v nginx >/dev/null 2>&1; then
+            sudo nginx -T 2>/dev/null | grep -E 'server_name|listen |proxy_pass|location ' | sed -n '1,180p'
+          else
+            echo "nginx_not_installed"
+          fi
+          echo "=== CADDY ==="
+          if command -v caddy >/dev/null 2>&1; then
+            sudo caddy version || true
+          else
+            echo "caddy_not_installed"
+          fi
+          echo "=== UFW ==="
+          sudo ufw status 2>/dev/null || true
+          REMOTE
