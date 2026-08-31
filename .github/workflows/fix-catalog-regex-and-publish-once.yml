@@ -1,0 +1,60 @@
+name: Fix catalog regex and publish once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fix-catalog-regex-and-publish-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Upload fixed catalog builder
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          printf '%s' 'aW1wb3J0IGpzb24KaW1wb3J0IHJlCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lLCB0aW1lem9uZQpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKCmZyb20gLiBpbXBvcnQgcmNsb25lCmZyb20gLmNvbmZpZyBpbXBvcnQgc2V0dGluZ3MKZnJvbSAuZGIgaW1wb3J0IGNvbm5lY3QKCgpkZWYgX2F0b21pY19qc29uKHBhdGg6IFBhdGgsIGRhdGE6IGRpY3QpIC0+IE5vbmU6CiAgICB0bXAgPSBwYXRoLndpdGhfc3VmZml4KHBhdGguc3VmZml4ICsgIi50bXAiKQogICAgdG1wLndyaXRlX3RleHQoCiAgICAgICAganNvbi5kdW1wcyhkYXRhLCBlbnN1cmVfYXNjaWk9RmFsc2UsIHNlcGFyYXRvcnM9KCIsIiwgIjoiKSksCiAgICAgICAgZW5jb2Rpbmc9InV0Zi04IiwKICAgICkKICAgIHRtcC5yZXBsYWNlKHBhdGgpCgoKZGVmIGJ1aWxkX3VuaXZlcnNhbF9jYXRhbG9nKCkgLT4gZGljdDoKICAgICIiIkJ1aWxkIGEgcmVhZC1vbmx5IGNhdGFsb2cgZnJvbSB0aGUgREVTVElOQVRJT04gRHJpdmUgY29waWVzLgoKICAgIEltcG9ydGFudDogaXRlbVsiSUQiXSBpcyB0aGUgZGVzdGluYXRpb24gR29vZ2xlIERyaXZlIGZpbGUgSUQgcmV0dXJuZWQgYnkKICAgIHJjbG9uZSwgbm90IHRoZSBzb3VyY2UgSUQgc3RvcmVkIGluIHRoZSBtaWdyYXRpb24gaW52ZW50b3J5LgogICAgIiIiCiAgICBzZXR0aW5ncy52YWxpZGF0ZSgpCgogICAgaXRlbXMgPSByY2xvbmUubGlzdF9qc29uKAogICAgICAgIHNldHRpbmdzLmRlc3RfcGF0aCwKICAgICAgICByZWN1cnNpdmU9VHJ1ZSwKICAgICAgICBoYXNoZXM9RmFsc2UsCiAgICAgICAgZmFzdF9saXN0PVRydWUsCiAgICAgICAgdGltZW91dD1zZXR0aW5ncy5pbnZlbnRvcnlfc2Nhbl90aW1lb3V0X3NlY29uZHMsCiAgICApCgogICAgYmxvY2tfcGF0dGVybiA9IHJlLmNvbXBpbGUoCiAgICAgICAgIl4iICsgcmUuZXNjYXBlKHNldHRpbmdzLmJsb2NrX3ByZWZpeCkgKyByIihcZHszfSkkIiwKICAgICAgICByZS5JR05PUkVDQVNFLAogICAgKQoKICAgIHJvd3MgPSBbXQogICAgc2Vlbl9wYXRocyA9IHNldCgpCiAgICBzZWVuX2lkcyA9IHNldCgpCiAgICBibG9ja19jb3VudHMgPSB7fQoKICAgIGZvciBpdGVtIGluIGl0ZW1zOgogICAgICAgIHBhdGggPSBzdHIoaXRlbS5nZXQoIlBhdGgiKSBvciAiIikKICAgICAgICBuYW1lID0gc3RyKGl0ZW0uZ2V0KCJOYW1lIikgb3IgIiIpCiAgICAgICAgaWYgbm90IG5hbWUubG93ZXIoKS5lbmRzd2l0aCgiLm1wNCIpOgogICAgICAgICAgICBjb250aW51ZQoKICAgICAgICBwYXJ0cyA9IHBhdGguc3BsaXQoIi8iLCAxKQogICAgICAgIGlmIGxlbihwYXJ0cykgIT0gMjoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKGYiQ0FUQUxPR19TVFJVQ1RVUkU6IHJ1dGEgaW5lc3BlcmFkYToge3BhdGh9IikKCiAgICAgICAgYmxvY2ssIHJlbGF0aXZlX25hbWUgPSBwYXJ0cwogICAgICAgIG1hdGNoID0gYmxvY2tfcGF0dGVybi5mdWxsbWF0Y2goYmxvY2spCiAgICAgICAgaWYgbm90IG1hdGNoOgogICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoZiJDQVRBTE9HX1NUUlVDVFVSRTogYmxvcXVlIGluZXNwZXJhZG86IHtibG9ja30iKQoKICAgICAgICBpZiByZWxhdGl2ZV9uYW1lICE9IG5hbWU6CiAgICAgICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcihmIkNBVEFMT0dfU1RSVUNUVVJFOiBub21icmUvcnV0YSBubyBjb2luY2lkZW46IHtwYXRofSIpCgogICAgICAgIGZpbGVfaWQgPSBzdHIoaXRlbS5nZXQoIklEIikgb3IgIiIpLnN0cmlwKCkKICAgICAgICBpZiBub3QgZmlsZV9pZDoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKGYiQ0FUQUxPR19JRDogRHJpdmUgbm8gZGV2b2x2acOzIElEIHBhcmE6IHtwYXRofSIpCgogICAgICAgIHBhdGhfa2V5ID0gcGF0aC5jYXNlZm9sZCgpCiAgICAgICAgaWYgcGF0aF9rZXkgaW4gc2Vlbl9wYXRoczoKICAgICAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKGYiQ0FUQUxPR19EVVBMSUNBVEVfUEFUSDoge3BhdGh9IikKICAgICAgICBpZiBmaWxlX2lkIGluIHNlZW5faWRzOgogICAgICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoZiJDQVRBTE9HX0RVUExJQ0FURV9JRDoge2ZpbGVfaWR9IikKCiAgICAgICAgc2Vlbl9wYXRocy5hZGQocGF0aF9rZXkpCiAgICAgICAgc2Vlbl9pZHMuYWRkKGZpbGVfaWQpCiAgICAgICAgYmxvY2tfY291bnRzW2Jsb2NrXSA9IGJsb2NrX2NvdW50cy5nZXQoYmxvY2ssIDApICsgMQoKICAgICAgICByb3dzLmFwcGVuZCgKICAgICAgICAgICAgewogICAgICAgICAgICAgICAgIm5hbWUiOiBuYW1lLAogICAgICAgICAgICAgICAgImJsb2NrIjogYmxvY2ssCiAgICAgICAgICAgICAgICAicmVsYXRpdmVQYXRoIjogcGF0aCwKICAgICAgICAgICAgICAgICJkcml2ZUZpbGVJZCI6IGZpbGVfaWQsCiAgICAgICAgICAgICAgICAic2l6ZSI6IGludChpdGVtLmdldCgiU2l6ZSIpIG9yIDApLAogICAgICAgICAgICB9CiAgICAgICAgKQoKICAgIHJvd3Muc29ydCgKICAgICAgICBrZXk9bGFtYmRhIHJvdzogKAogICAgICAgICAgICBpbnQoYmxvY2tfcGF0dGVybi5mdWxsbWF0Y2gocm93WyJibG9jayJdKS5ncm91cCgxKSksCiAgICAgICAgICAgIHJvd1sibmFtZSJdLmNhc2Vmb2xkKCksCiAgICAgICAgKQogICAgKQoKICAgIGNvbm4gPSBjb25uZWN0KCkKICAgIHRyeToKICAgICAgICBkYXRhc2V0ID0gY29ubi5leGVjdXRlKAogICAgICAgICAgICAiU0VMRUNUIGludmVudG9yeV9jb3VudCBGUk9NIGRhdGFzZXRzIFdIRVJFIGRhdGFzZXRfa2V5PT8iLAogICAgICAgICAgICAoc2V0dGluZ3MuZGF0YXNldF9rZXksKSwKICAgICAgICApLmZldGNob25lKCkKICAgICAgICBleHBlY3RlZCA9IGludChkYXRhc2V0WyJpbnZlbnRvcnlfY291bnQiXSBvciAwKSBpZiBkYXRhc2V0IGVsc2UgMAogICAgICAgIHZlcmlmaWVkID0gaW50KAogICAgICAgICAgICBjb25uLmV4ZWN1dGUoCiAgICAgICAgICAgICAgICAiU0VMRUNUIENPVU5UKCopIG4gRlJPTSBpbnZlbnRvcnkgV0hFUkUgZGF0YXNldF9rZXk9PyBBTkQgc3RhdHVzPSdjb3BpZWQnIiwKICAgICAgICAgICAgICAgIChzZXR0aW5ncy5kYXRhc2V0X2tleSwpLAogICAgICAgICAgICApLmZldGNob25lKClbIm4iXQogICAgICAgICkKICAgIGZpbmFsbHk6CiAgICAgICAgY29ubi5jbG9zZSgpCgogICAgaWYgZXhwZWN0ZWQgYW5kIGxlbihyb3dzKSAhPSBleHBlY3RlZDoKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoCiAgICAgICAgICAgIGYiQ0FUQUxPR19DT1VOVDogZGVzdGlubz17bGVuKHJvd3MpfSBpbnZlbnRhcmlvPXtleHBlY3RlZH0iCiAgICAgICAgKQogICAgaWYgdmVyaWZpZWQgYW5kIGxlbihyb3dzKSAhPSB2ZXJpZmllZDoKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoCiAgICAgICAgICAgIGYiQ0FUQUxPR19WRVJJRklFRDogZGVzdGlubz17bGVuKHJvd3MpfSB2ZXJpZmljYWRvcz17dmVyaWZpZWR9IgogICAgICAgICkKCiAgICBvdmVyc2l6ZWQgPSB7CiAgICAgICAgYmxvY2s6IGNvdW50CiAgICAgICAgZm9yIGJsb2NrLCBjb3VudCBpbiBibG9ja19jb3VudHMuaXRlbXMoKQogICAgICAgIGlmIGNvdW50ID4gc2V0dGluZ3MuYmxvY2tfc2l6ZQogICAgfQogICAgaWYgb3ZlcnNpemVkOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcihmIkNBVEFMT0dfQkxPQ0tfU0laRToge292ZXJzaXplZH0iKQoKICAgIG91dHB1dCA9IHsKICAgICAgICAic2NoZW1hIjogImtpdGthcmFva2UtdW5pdmVyc2FsLWNhdGFsb2ctdjEiLAogICAgICAgICJnZW5lcmF0ZWRBdCI6IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLmlzb2Zvcm1hdCgpLAogICAgICAgICJkYXRhc2V0Ijogc2V0dGluZ3MuZGF0YXNldF9rZXksCiAgICAgICAgInJvb3QiOiBzZXR0aW5ncy5kZXN0X3BhdGguc3RyaXAoIi8iKS5zcGxpdCgiLyIpWy0xXSwKICAgICAgICAiY291bnQiOiBsZW4ocm93cyksCiAgICAgICAgImJsb2NrcyI6IGxlbihibG9ja19jb3VudHMpLAogICAgICAgICJibG9ja1NpemVNYXgiOiBzZXR0aW5ncy5ibG9ja19zaXplLAogICAgICAgICJpdGVtcyI6IHJvd3MsCiAgICB9CgogICAgcGF0aCA9IFBhdGgoc2V0dGluZ3MuZGF0YV9kaXIpIC8gImNhdGFsb2dvX3VuaXZlcnNhbF8wM19JTkdMRVMuanNvbiIKICAgIF9hdG9taWNfanNvbihwYXRoLCBvdXRwdXQpCgogICAgcmV0dXJuIHsKICAgICAgICAib2siOiBUcnVlLAogICAgICAgICJkYXRhc2V0Ijogc2V0dGluZ3MuZGF0YXNldF9rZXksCiAgICAgICAgImNvdW50IjogbGVuKHJvd3MpLAogICAgICAgICJibG9ja3MiOiBsZW4oYmxvY2tfY291bnRzKSwKICAgICAgICAib3V0cHV0Ijogc3RyKHBhdGgpLAogICAgICAgICJkZXN0aW5hdGlvbl9pZHMiOiBUcnVlLAogICAgfQo=' | base64 -d > /tmp/universal_catalog.py
+          scp -P "$OVH_PORT" /tmp/universal_catalog.py "$OVH_USER@$OVH_HOST:/tmp/kitkaraoke-universal_catalog.py"
+
+      - name: Rebuild and publish
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          APP=/opt/KITKARAOKE_DATA_SYNC
+          sudo install -m 0644 /tmp/kitkaraoke-universal_catalog.py "$APP/app/universal_catalog.py"
+          rm -f /tmp/kitkaraoke-universal_catalog.py
+          cd "$APP"
+          sudo docker compose up -d --build kitkaraoke-data-sync
+          curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 2 --max-time 5 http://127.0.0.1:8091/health
+          sudo bash "$APP/deploy/publish_universal_catalog.sh"
+          REMOTE
+
+      - name: Verify public JSON
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 2 https://panel.kitkaraoke.com/catalogo/03_INGLES.json -o catalog.json
+          python3 -c 'import json; d=json.load(open("catalog.json",encoding="utf-8")); print("count=",d.get("count"),"blocks=",d.get("blocks")); assert d.get("count")==4534; assert d.get("blocks")==35; assert all(x.get("driveFileId") for x in d.get("items",[]))'
