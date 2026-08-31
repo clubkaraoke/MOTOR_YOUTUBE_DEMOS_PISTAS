@@ -87,7 +87,7 @@ jobs:
 
           # Verificar que el bloque 004 quedó conciliado antes de continuar.
           cd "$APP"
-          sudo bash scripts/reconcile_block.sh 4
+          sudo bash scripts/reconcile_block.sh 4 </dev/null
 
           # Tarea durable en systemd: sigue aunque termine GitHub Actions o se cierre la PC.
           sudo systemd-run \
