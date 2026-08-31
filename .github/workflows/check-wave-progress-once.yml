@@ -1,0 +1,49 @@
+name: Check wave progress once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/check-wave-progress-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -H "$OVH_HOST" >> "$HOME/.ssh/known_hosts"
+
+      - name: Inspect wave generator
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd "$HOME/djgabo-wave-peaks/tools/wave-peaks"
+          echo "=== PROCESS ==="
+          pgrep -af generate_peaks.py || true
+          echo "=== FILES ==="
+          ls -la
+          echo "=== SCRIPT STORAGE HINTS ==="
+          grep -nEi 'r2|bucket|wave|s3|endpoint|boto|rclone|upload' generate_peaks.py | head -120 || true
+          echo "=== RECENT HISTORY HINTS ==="
+          grep -Ei 'rclone|wave|r2|s3|count' "$HOME/.bash_history" | tail -120 || true
+          echo "=== LOCAL COUNTS ==="
+          find . -type f \( -iname '*.json' -o -iname '*.json.gz' -o -iname '*.bin' -o -iname '*.dat' \) | wc -l
+          find . -maxdepth 3 -type f | sed 's#^./##' | head -120
+          REMOTE
