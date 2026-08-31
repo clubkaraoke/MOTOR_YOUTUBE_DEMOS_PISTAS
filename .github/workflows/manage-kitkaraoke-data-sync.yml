@@ -12,8 +12,15 @@ on:
           - diagnose
           - deploy
           - install_oauth
-          - dry_run
-          - copy_block_001
+          - inventory_refresh
+          - reconcile_block
+          - copy_block
+          - status
+      block_number:
+        description: Block number for reconcile_block/copy_block
+        required: true
+        default: "1"
+        type: string
       kit_ref:
         description: Branch, tag, or commit from clubkaraoke/KITKARAOKE_DATA_SYNC
         required: true
@@ -31,7 +38,7 @@ jobs:
   manage:
     name: ${{ inputs.operation }} KITKARAOKE DATA SYNC
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
 
     steps:
       - name: Check out deployment channel
@@ -56,6 +63,23 @@ jobs:
           test -n "$OVH_PORT"
           test -n "$OVH_SSH_KEY"
           test -n "$OVH_USER"
+
+      - name: Validate block input
+        if: inputs.operation == 'reconcile_block' || inputs.operation == 'copy_block'
+        env:
+          BLOCK_NUMBER: ${{ inputs.block_number }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BLOCK_NUMBER" =~ ^[0-9]{1,4}$ ]]; then
+            echo "BLOCK_NUMBER debe ser un entero de 1 a 9999." >&2
+            exit 2
+          fi
+          block_decimal=$((10#$BLOCK_NUMBER))
+          if (( block_decimal < 1 || block_decimal > 9999 )); then
+            echo "BLOCK_NUMBER fuera de rango." >&2
+            exit 2
+          fi
+          echo "Bloque validado: $block_decimal"
 
       - name: Configure existing OVH SSH channel
         env:
@@ -160,8 +184,8 @@ jobs:
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' \
             < kit-source/deploy/diagnose_ovh.sh
 
-      - name: Execute read-only Drive dry run
-        if: inputs.operation == 'dry_run'
+      - name: Refresh and persist source inventory
+        if: inputs.operation == 'inventory_refresh'
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
@@ -169,10 +193,34 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/dry_run.sh'
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/inventory_refresh.sh'
 
-      - name: Execute controlled real copy of INGLES_001 only
-        if: inputs.operation == 'copy_block_001'
+      - name: Reconcile one existing block only
+        if: inputs.operation == 'reconcile_block'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          BLOCK_NUMBER: ${{ inputs.block_number }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/reconcile_block.sh '$BLOCK_NUMBER'"
+
+      - name: Copy one controlled block only
+        if: inputs.operation == 'copy_block'
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          BLOCK_NUMBER: ${{ inputs.block_number }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block.sh '$BLOCK_NUMBER'"
+
+      - name: Show local persisted state
+        if: inputs.operation == 'inventory_refresh' || inputs.operation == 'reconcile_block' || inputs.operation == 'copy_block' || inputs.operation == 'status'
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
@@ -180,4 +228,4 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block_001.sh'
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps kitkaraoke-data-sync python -m app.cli status'
