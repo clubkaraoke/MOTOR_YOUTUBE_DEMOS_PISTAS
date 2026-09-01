@@ -1,0 +1,194 @@
+=== KITKARAOKE LIVE OVH STATE ===
+2026-09-01T23:27:00+00:00
+
+=== SAFE ENV ===
+
+=== MIGRATION STATE ===
+{"phase":"completed","current_block":35,"start_block":5,"end_block":35,"message":"migracion completa","updated_at":"2026-08-31T15:03:58Z"}
+
+=== CLI STATUS ===
+ Container kitkaraoke-data-sync-kitkaraoke-data-sync-run-33c7ba0a610f Creating 
+ Container kitkaraoke-data-sync-kitkaraoke-data-sync-run-33c7ba0a610f Created 
+{
+  "auto_sync": false,
+  "blocks": {
+    "INGLES_001": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_002": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_003": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_004": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_005": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_006": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_007": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_008": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_009": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_010": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_011": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_012": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_013": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_014": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_015": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_016": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_017": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_018": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_019": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_020": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_021": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_022": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_023": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_024": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_025": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_026": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_027": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_028": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_029": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_030": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_031": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_032": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_033": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_034": {
+      "copied": 130,
+      "planned": 130
+    },
+    "INGLES_035": {
+      "copied": 114,
+      "planned": 114
+    }
+  },
+  "copies": {
+    "copied": 4534
+  },
+  "dataset": {
+    "block_prefix": "INGLES_",
+    "block_size": 130,
+    "created_at": "2026-08-31 07:09:43",
+    "dataset_key": "03_INGLES",
+    "dest_path": "KITKARAOKE_APP_DATA/03_INGLES",
+    "inventory_count": 4534,
+    "inventory_generation": 1,
+    "inventory_refreshed_at": "2026-08-31T07:14:21.775800+00:00",
+    "source_path": "01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/03.- MEGA PACK KARAOKE - INGLES",
+    "updated_at": "2026-08-31T07:14:21.775800+00:00"
+  },
+  "dry_run": true,
+  "last_run": {
+    "block_name": "INGLES_035",
+    "copied": 114,
+    "dataset_key": "03_INGLES",
+    "details": "{\"ok\":true,\"dataset\":\"03_INGLES\",\"block\":\"INGLES_035\",\"planned\":114,\"final_block_mp4\":114,\"verified_copied\":114,\"pending\":0,\"conflicts\":[],\"unexpected\":[],\"duplicate_names\":[],\"source_scan_performed\":false,\"drive_modified\":true,\"copied_now\":114,\"existing\":0,\"failed_now\":0,\"failures\":[],\"elapsed_seconds\":586.89,\"inventory_generation\":1,\"verification_scope\":\"INGLES_035 only\"}",
+    "discovered": 0,
+    "dry_run": 0,
+    "failed": 0,
+    "finished_at": "2026-08-31T15:03:57.800404+00:00",
+    "id": 41,
+    "operation": "copy_block",
+    "skipped": 0,
+    "started_at": "2026-08-31 14:54:10"
+  },
+  "ok": true,
+  "performance_policy": {
+    "block_size_max": 130,
+    "copy_file_timeout_seconds": 300,
+    "copy_source_recursive_scan": false,
+    "copy_uses_persisted_inventory": true,
+    "post_copy_verification": "target block only"
+  }
+}
