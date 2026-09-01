@@ -53,12 +53,12 @@ jobs:
             sudo find "$cwd" -maxdepth 3 -type f \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" \) -printf '%p\n' | sort | head -n 160
             echo "=== UI STRING MATCHES HOST ==="
             sudo grep -RIl -E "LETRA LIBRE|Comenzar corrección|Siguiente trabajo recomendado|Pantalla|Ajustes" "$cwd" 2>/dev/null | head -n 50 || true
-            echo "=== EDITOR V1 STRUCTURE ==="
-            sudo grep -n -E "@media|max-width|viewport|layout|workspace|wave|lyric|lyrics|letra|pane|panel|tab|Pantalla|Ajustes|mobile" "$cwd/editor_v1/index.html" | head -n 360 || true
-            echo "=== EDITOR V1 CSS 1-520 ==="
-            sudo sed -n '1,520p' "$cwd/editor_v1/index.html"
-            echo "=== EDITOR V1 HTML 520-900 ==="
-            sudo sed -n '520,900p' "$cwd/editor_v1/index.html"
+            echo "=== EDITOR V1 CSS CORE 30-180 ==="
+            sudo nl -ba "$cwd/editor_v1/index.html" | sed -n '30,180p'
+            echo "=== EDITOR V1 CSS LATE 420-475 ==="
+            sudo nl -ba "$cwd/editor_v1/index.html" | sed -n '420,475p'
+            echo "=== EDITOR V1 HTML 476-650 ==="
+            sudo nl -ba "$cwd/editor_v1/index.html" | sed -n '476,650p'
           fi
 
           echo "=== DOCKER PORTS ==="
