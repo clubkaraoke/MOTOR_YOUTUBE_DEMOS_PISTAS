@@ -122,3 +122,5 @@ PY
           git add OVH_KITKARAOKE_LIVE_NOW.txt
           git commit -m "diag: save current KITKARAOKE OVH state" || exit 0
           git push origin main
+
+# trigger diagnostic run
