@@ -100,7 +100,7 @@ import os
 health = json.loads(os.environ["LYRICS_HEALTH"])
 
 assert health.get("ok") is True, health
-assert health.get("version") == "0.9.0-lab", health
+assert health.get("version") == "0.9.1-lab", health
 assert int(health.get("lexicon_words", 0)) >= 45000, health
 assert int(health.get("lexicon_con", 0)) >= 100000, health
 
