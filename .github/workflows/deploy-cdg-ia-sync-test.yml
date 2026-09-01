@@ -1,5 +1,5 @@
 name: Deploy CDG IA Sync Test
-# qwen comparison deploy
+# qwen async deploy
 
 on:
   push:
