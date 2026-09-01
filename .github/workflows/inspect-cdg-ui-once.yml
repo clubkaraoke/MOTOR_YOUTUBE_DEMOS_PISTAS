@@ -1,0 +1,60 @@
+name: Inspect CDG UI source once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-ui-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Prepare SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Inspect service on port 8765
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "=== LISTENER 8765 ==="
+          sudo ss -ltnp | grep ':8765' || true
+
+          echo "=== DOCKER PORTS ==="
+          sudo docker ps --format '{{.Names}}|{{.Image}}|{{.Ports}}' | grep -E '8765|cdg|consol|editor' || true
+
+          cid="$(sudo docker ps -q --filter publish=8765 | head -n1)"
+          if [ -n "$cid" ]; then
+            echo "=== CONTAINER ==="
+            sudo docker inspect "$cid" --format 'NAME={{.Name}} IMAGE={{.Config.Image}} WORKDIR={{.Config.WorkingDir}}'
+            echo "=== MOUNTS ==="
+            sudo docker inspect "$cid" --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
+            echo "=== ROOT CANDIDATES ==="
+            sudo docker exec "$cid" sh -lc 'pwd; find /app /srv /usr/share/nginx/html -maxdepth 3 -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.py" \) 2>/dev/null | head -n 120'
+            echo "=== UI STRING MATCHES ==="
+            sudo docker exec "$cid" sh -lc 'grep -RIl -E "LETRA LIBRE|Comenzar corrección|Siguiente trabajo recomendado|Pantalla.*Letra.*Ajustes" /app /srv /usr/share/nginx/html 2>/dev/null | head -n 40' || true
+          fi
+
+          echo "=== LOCAL HTML HEAD ==="
+          curl -fsS http://127.0.0.1:8765/ | head -n 80 || true
+          REMOTE
