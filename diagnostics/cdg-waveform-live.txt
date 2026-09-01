@@ -2322,6 +2322,122 @@ SHA256=2e37adf75dc29e7219ca22ba1ae984edfaa3dc420d24dc0acfcfc94131b7abbf
 665-      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
 666-      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Selecciona (clic/Shift/Ctrl+arrastre/L#) → pulsa el rol</span></div>
 
+=== EXACT .zq REFERENCES ===
+3510-  resize(); pvResize(); paintNow(); paintCounter(); paintLyrics(); draw();
+3511-  document.body.classList.remove("lyricEditMode");
+3512-  document.body.classList.add("phase2");
+3513-  setRate(1, true); // R26: sincronización SIEMPRE a velocidad real
+3514-  $("#phase1Step").classList.remove("on","action"); $("#phase1Step").classList.add("disabled");
+3515-  $("#phase2Step").classList.remove("action","disabled"); $("#phase2Step").classList.add("on");
+3516-  $("#phase3Step").classList.remove("disabled"); $("#phase3Step").classList.add("action");
+3517-  btn.textContent = "Continuar a sincronizar →";
+3518-};
+3519-function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+3520-
+3521-/* Flujo beta: CARGAR → SINCRONIZAR (editar + timings en el mismo panel) → CREAR CDG. */
+3522-$("#phase1Step").onclick=()=>{};
+3523-$("#phase1Step").onkeydown=()=>{};
+3524-$("#phase2Step").onclick=()=>{
+3525-  if(!document.body.classList.contains("phase2") && $("#phase2Step").classList.contains("action")) $("#btnStart").click();
+3526-};
+3527-$("#phase2Step").onkeydown=e=>{ if((e.key==="Enter"||e.key===" ") && $("#phase2Step").classList.contains("action")){ e.preventDefault(); $("#phase2Step").click(); } };
+3528-$("#phase3Step").onclick=()=>{ if(document.body.classList.contains("phase2") && !document.body.classList.contains("lyricEditMode") && $("#phase3Step").classList.contains("action")) { const b=$("#btnCdg"); b.dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false); } };
+3529-
+3530-/* botones */
+3531-$("#btnPlay").onclick = toggle;
+3532-$("#btnUndo").onclick = undoMark;
+3533-$("#btnBack").onclick = () => nudge(-2);
+3534-$("#btnFwd").onclick = () => nudge(2);
+3535-$("#btnSave").onclick = guardarProyecto;
+3536-$("#btnCdg").onclick = () => $("#btnCdg").dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false);
+3537-document.querySelectorAll(".rate").forEach(b => b.onclick = () => setRate(+b.dataset.rate));
+3538:document.querySelectorAll(".zq").forEach(b=>b.onclick=()=>{const t=S.audio.currentTime||0,d=+b.dataset.z;S.view.dur=d;S.view.t0=clamp(t-d*.4,-1,Math.max(0,S.duration-d*.4));draw();});
+3539-function syncPvControls(){
+3540-  const map={pvLines:S.cfg.linesPerPage,pvFont:S.cfg.fontFamily,pvFontSize:S.cfg.fontSize,pvStroke:S.cfg.strokeWidth,pvLyricY:S.cfg.lyricYOffset,pvOutro1:S.cfg.outroLine1,pvOutro2:S.cfg.outroLine2,pvOutroSize:S.cfg.outroSize,pvOutroTransition:S.cfg.outroTransition};
+3541-  Object.entries(map).forEach(([id,v])=>{const el=$("#"+id);if(el)el.value=v});
+3542-}
+3543-function pvChanged(){ PV.plan=null; S.dirty=true; scheduleSave(); pvDraw(); }
+3544-[["#pvLines","linesPerPage",v=>Math.max(2,Math.min(8,+v))],["#pvFont","fontFamily",v=>v],["#pvFontSize","fontSize",v=>Math.max(12,Math.min(24,+v))],["#pvStroke","strokeWidth",v=>Math.max(0,Math.min(3,+v))],["#pvLyricY","lyricYOffset",v=>Math.max(-5,Math.min(5,+v))],["#pvOutro1","outroLine1",v=>v],["#pvOutro2","outroLine2",v=>v],["#pvOutroSize","outroSize",v=>+v],["#pvOutroTransition","outroTransition",v=>v]].forEach(([id,key,fn])=>{const el=$(id);if(el)el.oninput=()=>{S.cfg[key]=fn(el.value);if(key==="linesPerPage"){PV.cfg.linesPerPage=S.cfg.linesPerPage;PV.cfg.row=Math.max(1,Math.floor((18-PV.cfg.linesPerPage*PV.cfg.lineTileHeight)/2));$("#setLines").value=S.cfg.linesPerPage;}pvChanged();};});
+3545-document.querySelectorAll(".pvTab").forEach(b=>b.onclick=()=>{PV.mode=b.dataset.pvmode;document.querySelectorAll(".pvTab").forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll(".pvCtlGroup").forEach(g=>g.classList.toggle("on",g.dataset.group===PV.mode));pvDraw();});
+3546-document.querySelectorAll("[data-nudge]").forEach(b=>b.onclick=()=>{const dx=+(b.dataset.dx||0),dy=+(b.dataset.dy||0);S.cfg.outroX+=dx;S.cfg.outroY+=dy;pvChanged();});
+3547-syncPvControls();
+3548-
+3549-if($("#btnRoleNone")) $("#btnRoleNone").onclick=()=>roleButtonPress("none");
+3550-if($("#btnMale")) $("#btnMale").onclick=()=>roleButtonPress("hombre");
+3551-if($("#btnFemale")) $("#btnFemale").onclick=()=>roleButtonPress("mujer");
+3552-if($("#btnDuet")) $("#btnDuet").onclick=()=>roleButtonPress("duo");
+3553-if($("#btnSpoken2")) $("#btnSpoken2").onclick=()=>roleButtonPress("hablado");
+3554-installRoleDelegation();
+3555-if($("#btnResync")) $("#btnResync").onclick = resyncSelected;
+3556-$("#btnLyrics").onclick = () => {
+3557-  const d = $("#lyricsDrawer"); d.classList.toggle("hidden");
+3558-  $("#btnLyrics").style.color = d.classList.contains("hidden") ? "" : "var(--text)";
+3559-  paintLyrics(); requestAnimationFrame(()=>{ resize(); draw(); });
+3560-};
+3561-$("#btnPreview").onclick = pvToggle;
+3562-
+3563-/* divisores arrastrables entre los tres paneles */
+3564-function makeSplit(el, pane, side){
+3565-  el.addEventListener("pointerdown", e => {
+3566-    e.preventDefault();
+3510-  resize(); pvResize(); paintNow(); paintCounter(); paintLyrics(); draw();
+3511-  document.body.classList.remove("lyricEditMode");
+3512-  document.body.classList.add("phase2");
+3513-  setRate(1, true); // R26: sincronización SIEMPRE a velocidad real
+3514-  $("#phase1Step").classList.remove("on","action"); $("#phase1Step").classList.add("disabled");
+3515-  $("#phase2Step").classList.remove("action","disabled"); $("#phase2Step").classList.add("on");
+3516-  $("#phase3Step").classList.remove("disabled"); $("#phase3Step").classList.add("action");
+3517-  btn.textContent = "Continuar a sincronizar →";
+3518-};
+3519-function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+3520-
+3521-/* Flujo beta: CARGAR → SINCRONIZAR (editar + timings en el mismo panel) → CREAR CDG. */
+3522-$("#phase1Step").onclick=()=>{};
+3523-$("#phase1Step").onkeydown=()=>{};
+3524-$("#phase2Step").onclick=()=>{
+3525-  if(!document.body.classList.contains("phase2") && $("#phase2Step").classList.contains("action")) $("#btnStart").click();
+3526-};
+3527-$("#phase2Step").onkeydown=e=>{ if((e.key==="Enter"||e.key===" ") && $("#phase2Step").classList.contains("action")){ e.preventDefault(); $("#phase2Step").click(); } };
+3528-$("#phase3Step").onclick=()=>{ if(document.body.classList.contains("phase2") && !document.body.classList.contains("lyricEditMode") && $("#phase3Step").classList.contains("action")) { const b=$("#btnCdg"); b.dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false); } };
+3529-
+3530-/* botones */
+3531-$("#btnPlay").onclick = toggle;
+3532-$("#btnUndo").onclick = undoMark;
+3533-$("#btnBack").onclick = () => nudge(-2);
+3534-$("#btnFwd").onclick = () => nudge(2);
+3535-$("#btnSave").onclick = guardarProyecto;
+3536-$("#btnCdg").onclick = () => $("#btnCdg").dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false);
+3537-document.querySelectorAll(".rate").forEach(b => b.onclick = () => setRate(+b.dataset.rate));
+3538:document.querySelectorAll(".zq").forEach(b=>b.onclick=()=>{const t=S.audio.currentTime||0,d=+b.dataset.z;S.view.dur=d;S.view.t0=clamp(t-d*.4,-1,Math.max(0,S.duration-d*.4));draw();});
+3539-function syncPvControls(){
+3540-  const map={pvLines:S.cfg.linesPerPage,pvFont:S.cfg.fontFamily,pvFontSize:S.cfg.fontSize,pvStroke:S.cfg.strokeWidth,pvLyricY:S.cfg.lyricYOffset,pvOutro1:S.cfg.outroLine1,pvOutro2:S.cfg.outroLine2,pvOutroSize:S.cfg.outroSize,pvOutroTransition:S.cfg.outroTransition};
+3541-  Object.entries(map).forEach(([id,v])=>{const el=$("#"+id);if(el)el.value=v});
+3542-}
+3543-function pvChanged(){ PV.plan=null; S.dirty=true; scheduleSave(); pvDraw(); }
+3544-[["#pvLines","linesPerPage",v=>Math.max(2,Math.min(8,+v))],["#pvFont","fontFamily",v=>v],["#pvFontSize","fontSize",v=>Math.max(12,Math.min(24,+v))],["#pvStroke","strokeWidth",v=>Math.max(0,Math.min(3,+v))],["#pvLyricY","lyricYOffset",v=>Math.max(-5,Math.min(5,+v))],["#pvOutro1","outroLine1",v=>v],["#pvOutro2","outroLine2",v=>v],["#pvOutroSize","outroSize",v=>+v],["#pvOutroTransition","outroTransition",v=>v]].forEach(([id,key,fn])=>{const el=$(id);if(el)el.oninput=()=>{S.cfg[key]=fn(el.value);if(key==="linesPerPage"){PV.cfg.linesPerPage=S.cfg.linesPerPage;PV.cfg.row=Math.max(1,Math.floor((18-PV.cfg.linesPerPage*PV.cfg.lineTileHeight)/2));$("#setLines").value=S.cfg.linesPerPage;}pvChanged();};});
+3545-document.querySelectorAll(".pvTab").forEach(b=>b.onclick=()=>{PV.mode=b.dataset.pvmode;document.querySelectorAll(".pvTab").forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll(".pvCtlGroup").forEach(g=>g.classList.toggle("on",g.dataset.group===PV.mode));pvDraw();});
+3546-document.querySelectorAll("[data-nudge]").forEach(b=>b.onclick=()=>{const dx=+(b.dataset.dx||0),dy=+(b.dataset.dy||0);S.cfg.outroX+=dx;S.cfg.outroY+=dy;pvChanged();});
+3547-syncPvControls();
+3548-
+3549-if($("#btnRoleNone")) $("#btnRoleNone").onclick=()=>roleButtonPress("none");
+3550-if($("#btnMale")) $("#btnMale").onclick=()=>roleButtonPress("hombre");
+3551-if($("#btnFemale")) $("#btnFemale").onclick=()=>roleButtonPress("mujer");
+3552-if($("#btnDuet")) $("#btnDuet").onclick=()=>roleButtonPress("duo");
+3553-if($("#btnSpoken2")) $("#btnSpoken2").onclick=()=>roleButtonPress("hablado");
+3554-installRoleDelegation();
+3555-if($("#btnResync")) $("#btnResync").onclick = resyncSelected;
+3556-$("#btnLyrics").onclick = () => {
+3557-  const d = $("#lyricsDrawer"); d.classList.toggle("hidden");
+3558-  $("#btnLyrics").style.color = d.classList.contains("hidden") ? "" : "var(--text)";
+3559-  paintLyrics(); requestAnimationFrame(()=>{ resize(); draw(); });
+3560-};
+3561-$("#btnPreview").onclick = pvToggle;
+3562-
+3563-/* divisores arrastrables entre los tres paneles */
+3564-function makeSplit(el, pane, side){
+3565-  el.addEventListener("pointerdown", e => {
+3566-    e.preventDefault();
+
 === VIEW STATE / TIME TRANSFORMS ===
 888-const clamp = (v,a,b) => v<a?a:v>b?b:v;
 889-
