@@ -1,0 +1,1853 @@
+LIVE_FILE=/opt/djgabo-cdg/editor_v1/index.html
+SIZE_BYTES=178643
+SHA256=2e37adf75dc29e7219ca22ba1ae984edfaa3dc420d24dc0acfcfc94131b7abbf
+
+=== ZOOM QUICK / PRESET MARKUP ===
+38-
+39-/* ---------- header ---------- */
+40-header{
+41-  height:46px;flex:0 0 46px;display:flex;align-items:center;gap:16px;
+42-  padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel);
+43-}
+44-#songName{font-family:var(--display);font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+45-#songName .art{color:var(--dim);font-weight:500}
+46-.spacer{flex:1}
+47-#counter{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+48-#counter b{color:var(--mark);font-weight:600}
+49-.hbtn{
+50-  font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;
+51-  padding:7px 12px;border:1px solid var(--line);border-radius:6px;color:var(--text);white-space:nowrap;
+52:  background:transparent;transition:background .15s,border-color .15s,color .15s;
+53-}
+54-.hbtn:hover{color:var(--text);border-color:var(--line);background:var(--panel2)}
+55-.hbtn.go{border-color:var(--mark);color:#fff;background:var(--mark)}
+56-.hbtn.go:hover{background:#A075F8;border-color:#A075F8}
+57-.hbtn.roleNone{color:#e8c34c;border-color:rgba(232,195,76,.42);background:rgba(232,195,76,.07)}
+58-.hbtn.roleNone.on{color:#111;border-color:#E8C34C;background:#E8C34C;font-weight:700;box-shadow:0 0 0 1px rgba(232,195,76,.30) inset}
+59-.hbtn .roleKey{opacity:.55;font:600 9px/1 var(--mono);margin-left:4px}
+60-.hbtn.spoken{color:#eaa29a;border-color:rgba(232,93,93,.42);background:rgba(232,93,93,.07)}
+61-.hbtn.spoken.on{color:#fff;border-color:#E85D5D;background:#7a2d24;font-weight:700;box-shadow:0 0 0 1px rgba(232,93,93,.35) inset}
+62-.hbtn.spoken.on::before{content:"● ";color:#ff6a5a}
+63-.hbtn.roleFemale{color:#e9a6c9;border-color:rgba(255,79,163,.38);background:rgba(255,79,163,.06)}
+64-.hbtn.roleMale{color:#9ccfe8;border-color:rgba(50,183,255,.38);background:rgba(50,183,255,.06)}
+65-.hbtn.roleDuet{color:#b7db9c;border-color:rgba(126,217,87,.38);background:rgba(126,217,87,.06)}
+66-.hbtn.roleFemale.on{color:#fff;border-color:#FF4FA3;background:#822a56;font-weight:700;box-shadow:0 0 0 1px rgba(255,79,163,.3) inset}
+--
+207-.roleLineBtn.role-hombre{border-color:rgba(50,183,255,.65);color:#32B7FF}
+208-.roleLineBtn.role-mujer{border-color:rgba(255,79,163,.65);color:#FF4FA3}
+209-.roleLineBtn.role-duo{border-color:rgba(126,217,87,.65);color:#7ED957}
+210-.roleLineBtn.role-hablado{border-color:rgba(232,93,93,.68);color:#E85D5D}
+211-.chip:hover{background:rgba(255,255,255,.09)}
+212-
+213-/* ---------- transport ---------- */
+214-#transport{
+215-  flex:0 0 68px;border-top:1px solid var(--line);background:var(--bg-surface);
+216-  display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px;
+217-}
+218-.tbtn{
+219-  display:flex;flex-direction:column;align-items:center;gap:3px;
+220-  min-width:78px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+221:  background:transparent;transition:background .15s,border-color .15s;
+222-}
+223-.tbtn:hover{border-color:var(--line);background:var(--bg-elevated)}
+224-.tbtn:active{background:var(--amber-dim)}
+225-.tbtn .lab{font-size:13px;font-weight:600}
+226-.tbtn .key{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--dimmer)}
+227-.tbtn.play{min-width:104px;border-color:var(--markEdge);background:var(--amber-dim);color:var(--text)}
+228-.rates{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+229-.rate{font-family:var(--mono);font-size:11px;padding:9px 11px;color:var(--dim)}
+230-.rate.on{background:var(--mark);color:#fff;font-weight:700}
+231-body.phase2 .rates{display:none}
+232-body.phase2 #transport .tsep.rateSep{display:none}
+233-.tsep{width:1px;height:34px;background:var(--line);margin:0 6px}
+234-#clock{font-family:var(--mono);font-size:13px;color:var(--dim);min-width:150px;text-align:right}
+235-#clock b{color:var(--text);font-weight:500}
+--
+296-textarea{font-family:var(--mono);font-size:12px;line-height:1.75;resize:vertical}
+297-input:focus,textarea:focus{border-color:var(--dimmer);outline:none}
+298-.drop{
+299-  border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;
+300-  color:var(--dim);font-size:13px;cursor:pointer;
+301-}
+302-.drop:hover,.drop.over{border-color:var(--mark);color:var(--text)}
+303-
+304-.driveLoad{padding:4px 2px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+305-.driveLoadTop{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+306-.driveLoadStage{color:#c9b8ff;text-align:left;font-weight:700}
+307-.driveLoadPct{font-family:var(--mono);font-size:12px;color:var(--text);min-width:44px;text-align:right}
+308-.driveLoadTrack{height:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+309-.driveLoadFill{height:100%;width:0%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd);transition:width .16s ease-out}
+310:.driveLoadFill.indeterminate{width:34%!important;animation:driveLoadSweep 1.05s ease-in-out infinite}
+311-@keyframes driveLoadSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
+312-.driveLoadBytes{font-family:var(--mono);font-size:10px;color:var(--dimmer);text-align:left}
+313-.onlineLoadOverlay{position:absolute;inset:0;z-index:18;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,10,14,.88);backdrop-filter:blur(2px)}
+314-.onlineLoadOverlay[hidden]{display:none!important}
+315-.onlineLoadCard{width:min(390px,calc(100% - 28px));padding:20px;border:1px solid #53457d;border-radius:12px;background:#171922;box-shadow:0 18px 55px rgba(0,0,0,.5)}
+316-.onlineLoadHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+317-.onlineLoadTitle{font:700 14px/1.35 var(--sans);color:#eee9ff}
+318-.onlineLoadPct{font:700 18px var(--mono);color:#c4b5fd;white-space:nowrap}
+319-.onlineLoadTrack{height:11px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+320:.onlineLoadFill{height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#c4b5fd);transition:width .22s ease-out}
+321-.onlineLoadDetail{margin-top:10px;font:11px/1.45 var(--mono);color:var(--dim)}
+322-.onlineLoadWarning{margin-top:13px;padding:9px 10px;border-radius:7px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);font:700 11px/1.4 var(--sans);color:#f6c86b}
+323-.onlineLoadRetry{margin-top:14px;border:1px solid #8b5cf6;border-radius:7px;padding:8px 13px;color:#eee9ff;background:#2c2050;font-weight:700;cursor:pointer}
+324-.rowbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center}
+325-.ghost{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);padding:9px 14px;border:1px solid var(--line);border-radius:6px}
+326-.ghost:hover{color:var(--text);background:var(--bg-elevated)}
+327-.primary{
+328-  font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none;
+329-  background:var(--mark);color:#fff;padding:10px 16px;border-radius:6px;border:1px solid var(--mark);
+330-}
+331-.primary:disabled{opacity:.35;cursor:not-allowed}
+332-.ruler{
+333-  font-family:var(--mono);font-size:10px;color:var(--dimmer);letter-spacing:.05em;
+334-  margin-top:6px;display:flex;justify-content:space-between;
+--
+565-    overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+566-  }
+567-  body.mobile-view-screen #centerPane{display:none!important}
+568-  body.mobile-view-screen #leftPane{
+569-    display:flex!important;width:100%!important;height:max(52vh,350px)!important;min-height:350px!important;
+570-    border-bottom:1px solid var(--line);
+571-  }
+572-  body.mobile-view-screen #preview{
+573-    display:flex!important;width:100%!important;height:auto!important;min-height:600px!important;
+574-    padding:10px 12px;border-top:0;overflow:visible!important;
+575-  }
+576-  body.mobile-view-screen #pvBox{min-height:220px}
+577-  body.mobile-view-screen #pvDesigner{min-height:260px;overflow:visible}
+578-
+579:  #zoomQuick{right:6px!important;top:6px!important;gap:3px!important}
+580:  #zoomQuick .hbtn{min-width:42px;padding:6px 7px;font-size:10.5px}
+581-
+582-  /* El transporte sigue disponible: scroll horizontal controlado, no corte. */
+583-  #transport{
+584-    max-width:100%;overflow-x:auto;overflow-y:hidden;gap:5px!important;
+585-    padding-left:8px!important;padding-right:8px!important;scrollbar-width:none;
+586-  }
+587-  #transport::-webkit-scrollbar{display:none}
+588-  #transport .tbtn{flex:0 0 auto;min-width:58px}
+589-  #transport .rates{flex:0 0 auto}
+590-  #clock{flex:0 0 auto;font-size:10px}
+591-
+592-  /* Fase CARGAR / letra libre */
+593-  .phase1Card{width:min(100%,100vw)!important;max-width:100%!important;border-radius:0!important}
+594-  .phase1Body{min-width:0}
+--
+628-
+629-<div id="workspace">
+630-  <div id="leftPane">
+631-    <div id="waveWrap">
+632-      <canvas id="wave"></canvas>
+633-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+634-        <div class="onlineLoadCard">
+635-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+636-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+637-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+638-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+639-          <button id="onlineLoadRetry" class="onlineLoadRetry" type="button" hidden>Reintentar carga</button>
+640-        </div>
+641-      </div>
+642:      <div id="zoomHud" title="Ctrl + rueda del mouse = zoom centrado en el cursor"></div><div id="zoomQuick" style="position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:5"><button class="hbtn zq" data-z="10">10s</button><button class="hbtn zq" data-z="5">5s</button><button class="hbtn zq" data-z="2">2s</button><button class="hbtn zq" data-z="1">1s</button></div>
+643-    </div>
+644-  </div>
+645-  <div class="split" id="splitLeft"></div>
+646-  <div id="centerPane">
+647-    <div id="phaseRailGlobal">
+648-      <div class="phaseStep on" id="phase1Step" role="button" tabindex="0"><b>CARGAR</b><span>Audio + letra</span></div>
+649-      <div class="phaseArrow">→</div>
+650-      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+651-      <div class="phaseArrow">→</div>
+652-      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+653-    </div>
+654-    <div id="now">
+655-      <div id="reticle"></div>
+656-      <div id="slots">
+
+=== WHEEL / CTRL / ZOOM HANDLERS ===
+1-<!DOCTYPE html>
+2-<html lang="es">
+3-<head>
+4-<meta charset="utf-8">
+5:<meta name="viewport" content="width=device-width, initial-scale=1">
+6-<title>Sincronizador de karaoke · DJGABO</title>
+7-<link rel="preconnect" href="https://fonts.googleapis.com">
+8-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+9-<style>
+10-:root{
+11-  /* Tema CONTROL_EDITOR_LETRAS_KARAOKE_DJGABO.
+12-     Se mantienen los alias originales para que el motor V1 siga intacto. */
+13-  --bg-base:#12141A; --bg-surface:#1B1E26; --bg-elevated:#232733;
+14-  --border:#2E3340;
+15-  --amber:#8B5CF6; --amber-dim:rgba(139,92,246,.16);
+16-  --teal:#4FD1C5; --teal-dim:rgba(79,209,197,.14);
+17-  --danger:#E85D5D; --danger-dim:rgba(232,93,93,.14);
+18-  --orange:#F0A860; --yellow:#E8C34C; --blue:#5C9DE8; --green:#5BC98C;
+19-  --text-1:#F1EFEA; --text-2:#9AA0AC; --text-3:#5C6270;
+20-
+21-  --ink:var(--bg-base); --panel:var(--bg-surface); --panel2:var(--bg-elevated); --line:var(--border);
+22-  --text:var(--text-1); --dim:var(--text-2); --dimmer:var(--text-3);
+23-  --mark:var(--amber); --markSoft:var(--amber-dim); --markEdge:rgba(139,92,246,.55);
+--
+94-  margin-top:-17px;border-radius:2px;background:var(--dimmer);
+95-}
+96-.split:hover::after,.split.on::after{background:var(--mark)}
+97-
+98-.pvHead{
+99-  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+100-  color:var(--dimmer);align-self:flex-start;flex:0 0 auto;
+101-}
+102-#pvBox{flex:1 1 auto;width:100%;display:flex;align-items:center;justify-content:center;min-height:0}
+103-#pv{background:#000;border:1px solid var(--line);image-rendering:auto;max-width:100%;max-height:100%}
+104-#pvInfo{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+105-  letter-spacing:.03em;text-align:center}
+106-#pvInfo b{color:var(--mark);font-weight:600}
+107-#pvInfo .warn{color:var(--danger)}
+108-
+109-/* ---------- onda (vertical: el tiempo baja) ---------- */
+110-#waveWrap{flex:1 1 auto;position:relative;min-height:0;background:var(--bg-base)}
+111-#wave{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+112:#zoomHud{
+113-  position:absolute;right:10px;top:8px;font-family:var(--mono);font-size:10px;
+114-  color:var(--dimmer);letter-spacing:.06em;pointer-events:none
+115-}
+116-
+117-/* ---------- now strip ---------- */
+118-#now{
+119-  flex:0 0 auto;padding:14px 0 28px;background:var(--bg-surface);
+120-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+121-  gap:6px;position:relative;overflow:hidden;
+122-}
+123-#reticle{position:absolute;top:0;bottom:34px;left:50%;width:1px;background:var(--line)}
+124-#slots{
+125-  display:flex;align-items:baseline;justify-content:center;gap:26px;
+126-  width:100%;transition:transform .09s cubic-bezier(.2,.7,.3,1);
+127-}
+128-.slot{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+129-.slot.prev,.slot.next{font-size:19px;color:var(--dimmer);font-weight:600}
+130-.slot.cur{
+--
+561-
+562-  /* PANTALLA: onda y preview, ambos a ancho completo y apilados.
+563-     Se desplaza verticalmente dentro del área de trabajo si hace falta. */
+564-  body.mobile-view-screen #workspace{
+565-    overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+566-  }
+567-  body.mobile-view-screen #centerPane{display:none!important}
+568-  body.mobile-view-screen #leftPane{
+569-    display:flex!important;width:100%!important;height:max(52vh,350px)!important;min-height:350px!important;
+570-    border-bottom:1px solid var(--line);
+571-  }
+572-  body.mobile-view-screen #preview{
+573-    display:flex!important;width:100%!important;height:auto!important;min-height:600px!important;
+574-    padding:10px 12px;border-top:0;overflow:visible!important;
+575-  }
+576-  body.mobile-view-screen #pvBox{min-height:220px}
+577-  body.mobile-view-screen #pvDesigner{min-height:260px;overflow:visible}
+578-
+579:  #zoomQuick{right:6px!important;top:6px!important;gap:3px!important}
+580:  #zoomQuick .hbtn{min-width:42px;padding:6px 7px;font-size:10.5px}
+581-
+582-  /* El transporte sigue disponible: scroll horizontal controlado, no corte. */
+583-  #transport{
+584-    max-width:100%;overflow-x:auto;overflow-y:hidden;gap:5px!important;
+585-    padding-left:8px!important;padding-right:8px!important;scrollbar-width:none;
+586-  }
+587-  #transport::-webkit-scrollbar{display:none}
+588-  #transport .tbtn{flex:0 0 auto;min-width:58px}
+589-  #transport .rates{flex:0 0 auto}
+590-  #clock{flex:0 0 auto;font-size:10px}
+591-
+592-  /* Fase CARGAR / letra libre */
+593-  .phase1Card{width:min(100%,100vw)!important;max-width:100%!important;border-radius:0!important}
+594-  .phase1Body{min-width:0}
+595-  .lyricsFree{
+596-    width:100%;max-width:100%;min-height:46vh;height:calc(100dvh - 330px);
+597-    font-size:16px;line-height:1.6;padding:14px;
+598-  }
+--
+624-  <button class="hbtn" id="btnSettings">Ajustes</button>
+625-  <button class="hbtn" id="btnSave">Guardar proyecto</button>
+626-  <button class="hbtn go" id="btnCdg">Crear CDG</button>
+627-</header>
+628-
+629-<div id="workspace">
+630-  <div id="leftPane">
+631-    <div id="waveWrap">
+632-      <canvas id="wave"></canvas>
+633-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+634-        <div class="onlineLoadCard">
+635-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+636-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+637-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+638-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+639-          <button id="onlineLoadRetry" class="onlineLoadRetry" type="button" hidden>Reintentar carga</button>
+640-        </div>
+641-      </div>
+642:      <div id="zoomHud" title="Ctrl + rueda del mouse = zoom centrado en el cursor"></div><div id="zoomQuick" style="position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:5"><button class="hbtn zq" data-z="10">10s</button><button class="hbtn zq" data-z="5">5s</button><button class="hbtn zq" data-z="2">2s</button><button class="hbtn zq" data-z="1">1s</button></div>
+643-    </div>
+644-  </div>
+645-  <div class="split" id="splitLeft"></div>
+646-  <div id="centerPane">
+647-    <div id="phaseRailGlobal">
+648-      <div class="phaseStep on" id="phase1Step" role="button" tabindex="0"><b>CARGAR</b><span>Audio + letra</span></div>
+649-      <div class="phaseArrow">→</div>
+650-      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+651-      <div class="phaseArrow">→</div>
+652-      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+653-    </div>
+654-    <div id="now">
+655-      <div id="reticle"></div>
+656-      <div id="slots">
+657-        <span class="slot prev"></span>
+658-        <span class="slot cur">—</span>
+659-        <span class="slot next"></span>
+660-      </div>
+--
+1037-  S.audioFile = file;
+1038-  const buf = await file.arrayBuffer();
+1039-
+1040-  try{
+1041-    const h = await crypto.subtle.digest("SHA-1", buf.slice(0));
+1042-    S.sha1 = [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("");
+1043-  }catch(e){ S.sha1 = ""; }
+1044-
+1045-  S.audio.src = URL.createObjectURL(file);
+1046-  await new Promise(r => S.audio.addEventListener("loadedmetadata", r, {once:true}));
+1047-  S.duration = S.audio.duration;
+1048-
+1049-  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+1050-  const decoded = await ctx.decodeAudioData(buf);
+1051-  buildPeaks(decoded);
+1052-  ctx.close();
+1053-}
+1054-
+1055:/* min/max por cubo de 1 ms — permite hacer zoom hasta ~1000 px/s sin volver a leer */
+1056-function buildPeaks(ab){
+1057-  const rate = 1000;
+1058-  const n = Math.ceil(ab.duration * rate);
+1059-  const mn = new Float32Array(n), mx = new Float32Array(n);
+1060-  const chans = [];
+1061-  for(let c=0;c<ab.numberOfChannels;c++) chans.push(ab.getChannelData(c));
+1062-  const step = ab.sampleRate / rate;
+1063-  for(let i=0;i<n;i++){
+1064-    const a = Math.floor(i*step), b = Math.min(chans[0].length, Math.floor((i+1)*step));
+1065-    let lo = 0, hi = 0;
+1066-    for(const ch of chans){
+1067-      for(let j=a;j<b;j++){ const v = ch[j]; if(v<lo) lo=v; if(v>hi) hi=v; }
+1068-    }
+1069-    mn[i]=lo; mx[i]=hi;
+1070-  }
+1071-  S.peaks = {min:mn, max:mx, rate};
+1072-}
+1073-
+--
+1344-  if(lpr){
+1345-    const {bx,by,bw,bh}=lpr;
+1346-    cx.fillStyle="rgba(11,13,12,.94)"; cx.fillRect(bx,by,bw,bh);
+1347-    cx.strokeStyle="#F2B705"; cx.lineWidth=1; cx.strokeRect(bx+.5,by+.5,bw-1,bh-1);
+1348-    cx.font="700 10px "+mono; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillStyle="#D6DED8";
+1349-    cx.fillText(S.loopingRange?"■ STOP":"▶ LOOP",bx+bw/2,by+bh/2);
+1350-    cx.textAlign="left";
+1351-  }
+1352-
+1353-  /* cabeza de reproducción */
+1354-  const py = t2y(S.audio.currentTime);
+1355-  if(py >= -1 && py <= CH+1){
+1356-    cx.strokeStyle = "#FFFFFF"; cx.lineWidth = 1;
+1357-    cx.beginPath(); cx.moveTo(0, py+.5); cx.lineTo(CW, py+.5); cx.stroke();
+1358-    cx.fillStyle = "#FFFFFF";
+1359-    cx.beginPath(); cx.moveTo(CW,py-4); cx.lineTo(CW,py+4); cx.lineTo(CW-6,py); cx.closePath(); cx.fill();
+1360-  }
+1361-
+1362:  $("#zoomHud").textContent = S.view.dur.toFixed(1) + " s";
+1363-}
+1364-
+1365-/* ==========================================================================
+1366-   VISTA DE PANTALLA
+1367-   Reproduce lo que hará el CD+G, con las mismas reglas que el renderer:
+1368-     · misma fuente y mismas anchuras (tabla de avances extraída del TTF)
+1369-     · mismo corte de línea
+1370-     · mismo planificador de dibujado y borrado, portado de cdgmaker
+1371-   Si esto miente, no sirve de nada. Cualquier cambio en style.json debe
+1372-   reflejarse también en PV.cfg.
+1373-   ========================================================================== */
+1374-const PV_FONT = "Impact";
+1375-let pvMeasureCanvas=document.createElement("canvas"), pvMeasureCtx=pvMeasureCanvas.getContext("2d");
+1376-function pvFontCss(size=S.cfg.fontSize){ const fam=S.cfg.fontFamily==="arial"?"Arial":S.cfg.fontFamily==="arialbd"?"Arial Black":"Impact"; return `${size}px ${fam}, Arial, sans-serif`; }
+1377-function advWidth(s){ pvMeasureCtx.font=pvFontCss(); let w=0; for(const c of s) w+=pvMeasureCtx.measureText(c).width; return w; }
+1378-
+1379-const PV = {
+1380-  cfg: {
+--
+1556-  const last = syl[syl.length-1];
+1557-  erase[last.li] = last.e + 600;
+1558-
+1559-  return {lines, geom, syl, draw, erase, lpp};
+1560-}
+1561-
+1562-let pvT;
+1563-function pvInvalidate(){
+1564-  PV.plan = null;
+1565-  if(!PV.on) return;
+1566-  clearTimeout(pvT);
+1567-  pvT = setTimeout(()=>{ try{ PV.plan = pvPlan(); }catch(e){ PV.plan = null; } }, 220);
+1568-}
+1569-
+1570-/* --- 3. dibujado --- */
+1571-const pvc = $("#pv"), pvx = pvc.getContext("2d");
+1572-function pvResize(){
+1573-  const box = $("#pvBox").getBoundingClientRect();
+1574:  const scale = Math.max(1, Math.min(3, Math.floor(Math.min(box.width / PV.VW, box.height / PV.VH) * 2) / 2));
+1575:  pvc.style.width = (PV.VW * scale) + "px";
+1576:  pvc.style.height = (PV.VH * scale) + "px";
+1577-  const dpr = window.devicePixelRatio || 1;
+1578-  pvc.width = PV.VW * dpr; pvc.height = PV.VH * dpr;
+1579-  pvx.setTransform(dpr, 0, 0, dpr, 0, 0);
+1580-}
+1581-
+1582-function pvMergedSpokenIntervals(){
+1583-  const join=PV.cfg.instrumental.spokenJoin ?? .75;
+1584-  const arr=S.words
+1585-    .filter(w=>w.spoken && w.start_time!==null)
+1586-    .map(w=>[w.start_time, w.end_time??(w.start_time+.05)])
+1587-    .sort((a,b)=>a[0]-b[0]);
+1588-  const out=[];
+1589-  for(const it of arr){
+1590-    if(!out.length || it[0]-out[out.length-1][1] > join) out.push(it.slice());
+1591-    else out[out.length-1][1]=Math.max(out[out.length-1][1],it[1]);
+1592-  }
+1593-  return out;
+1594-}
+--
+1834-      const lb=document.createElement("button");
+1835-      lb.type="button"; lb.className="roleLineBtn"; lb.textContent="L"+lyricLineNo;
+1836-      lb.dataset.roleLine="1"; lb.dataset.start=lineStart;
+1837-      row.appendChild(lb);
+1838-    }
+1839-    for(const w of seg.words){
+1840-      const c = document.createElement("span");
+1841-      const idx = gi;
+1842-      const inMulti = S.selStart>=0 && idx>=Math.min(S.selStart,S.selEnd) && idx<=Math.max(S.selStart,S.selEnd);
+1843-      c.className = "chip" + (w.start_time!==null?" timed":"") + (w.locked?" locked":"") + (w.spoken?" spoken":"") + (w.vocal_role==="female"?" roleFemale":w.vocal_role==="male"?" roleMale":w.vocal_role==="duet"?" roleDuet":"") + (w.provisional?" provisional":"")
+1844-                  + (S.words[S.cursor]===w?" cursor":"") + (inMulti || S.sel===idx?" sel":"")
+1845-                  + (S.rolePick?.has(idx)?" rolePick":"");
+1846-      c.textContent = w.text; c.dataset.gi=idx;
+1847-      c.title = w.spoken ? "HABLADO: esta palabra no se exportará al CDG" : "Clic selecciona · doble clic edita";
+1848-      // Selección Motor V1 intacta (clic/Shift+clic/Ctrl). Si hay un rol ARMADO,
+1849-      // la selección resultante se pinta sola justo después, sin lag.
+1850-      c.onclick = ev => {
+1851-        if(ev.target.closest("input")) return;
+1852:        ev.preventDefault(); ev.stopPropagation();
+1853-        // El clic/Shift+clic normal siempre reemplaza cualquier selección libre (Ctrl) previa.
+1854-        if(S.rolePick?.size) clearRolePick(false);
+1855:        selectWord(idx,false,{shiftKey:ev.shiftKey,ctrlKey:ev.ctrlKey,metaKey:ev.metaKey});
+1856-        applyArmedRoleToCurrentSelection();
+1857-      };
+1858-      c.ondblclick = ev => {
+1859:        ev.preventDefault(); ev.stopPropagation();
+1860-        startDirectLyricsEdit(idx);
+1861-      };
+1862-      row.appendChild(c); gi++;
+1863-    }
+1864-    if(seg.kind!=="break"){
+1865-      const lb=row.querySelector(".roleLineBtn");
+1866-      if(lb){ lb.dataset.end=gi-1; paintRoleLineLabel(lb,lineStart,gi-1); }
+1867-    }
+1868-    box.appendChild(row);
+1869-  }
+1870-  refreshSelectionVisual();
+1871-  refreshRolePickVisual();
+1872-  // El DOM se reconstruyó: el brillo de reproducción debe reaplicarse al
+1873-  // nuevo chip aunque la palabra activa no haya cambiado.
+1874-  S.playHiIndex=-2; S.playHiEl=null;
+1875-  // Nunca saltar al cursor de sincronización por un simple repintado.
+1876-  drawer.scrollTop=oldScroll;
+1877-}
+--
+1962-      }else if(result.pending){
+1963-        toast(`${result.pending} palabra${result.pending===1?" pendiente":"s pendientes"} para sincronizar`,2600);
+1964-      }else{
+1965-        toast("Letra guardada · volvimos a sincronización",1800);
+1966-      }
+1967-    }else{
+1968-      paintLyrics();
+1969-      toast("Edición cancelada",1200);
+1970-    }
+1971-    requestAnimationFrame(()=>{ drawer.scrollTop=Math.min(st.oldScroll,Math.max(0,drawer.scrollHeight-drawer.clientHeight)); });
+1972-  };
+1973-  state.finish=finish;
+1974-
+1975-  // Un solo clic dentro del texto sigue siendo edición normal (posicionar
+1976-  // el cursor, seleccionar): no se usa blur para salir. DOBLE clic dentro del
+1977-  // texto guarda y sale — simétrico con el doble clic que abrió la edición.
+1978-  // ESC cancela sin guardar.
+1979-  ed.addEventListener("keydown",ev=>{
+1980:    if(ev.key==="Escape"){ ev.preventDefault(); ev.stopPropagation(); finish(false); }
+1981-    // Enter queda libre: crea una línea nueva como en un editor normal.
+1982-  });
+1983-  ed.addEventListener("pointerdown",ev=>ev.stopPropagation());
+1984-  ed.addEventListener("click",ev=>ev.stopPropagation());
+1985-  // Doble clic dentro del texto = guarda y regresa a sincronizar. Simétrico con
+1986-  // el doble clic que abrió la edición: fácil de recordar, no depende de acertar
+1987-  // un botón. Si el doble clic cae sobre una palabra, se ignora la selección
+1988-  // nativa del navegador (no aporta nada aquí, ya estamos saliendo).
+1989:  ed.addEventListener("dblclick",ev=>{ ev.preventDefault(); ev.stopPropagation(); finish(true); });
+1990-
+1991-  ed.focus({preventScroll:true});
+1992-  requestAnimationFrame(()=>{ setPlainCaret(ed,caret); drawer.scrollTop=oldScroll; });
+1993-}
+1994-
+1995-/* edición en el sitio antigua, conservada como fallback interno */
+1996-function inlineEdit(chip, gi){
+1997-  const w = S.words[gi], prev = w.text;
+1998-  chip.textContent = "";
+1999-  const inp = document.createElement("input");
+2000-  inp.className = "inlineWordInput";
+2001-  inp.value = prev;
+2002-  inp.size = Math.max(12, Math.min(36, prev.length + 6));
+2003-  inp.style.width = Math.max(180, Math.min(420, prev.length * 13 + 70)) + "px";
+2004-  chip.appendChild(inp);
+2005-  inp.onpointerdown = ev => ev.stopPropagation();
+2006-  inp.onclick = ev => ev.stopPropagation();
+2007-  inp.ondblclick = ev => ev.stopPropagation();
+2008-  inp.focus();
+2009-  requestAnimationFrame(()=>{ const n=inp.value.length; try{ inp.setSelectionRange(n,n); }catch(e){} });
+2010-  let cerrado = false;
+2011-  const fin = commit => {
+2012-    if(cerrado) return; cerrado = true;
+2013-    if(commit) editWordText(gi, inp.value); else paintLyrics();
+2014-  };
+2015-  inp.onkeydown = ev => {
+2016-    ev.stopPropagation();
+2017:    if(ev.key === "Enter"){ ev.preventDefault(); fin(true); }
+2018:    else if(ev.key === "Escape"){ ev.preventDefault(); fin(false); }
+2019-  };
+2020-  inp.onblur = () => setTimeout(()=>fin(true),0);
+2021-}
+2022-
+2023-/* ---------------- ROLES V07 · "selecciona, luego pulsa el botón" ----------------
+2024-   Flujo para Valeria, sin modos que cambien el clic normal:
+2025-   1) Selecciona con el Motor V1 de siempre (clic, Shift+clic para rango, o
+2026-      Ctrl+clic/arrastrar para selección libre). Nada de esto se toca ni se
+2027-      intercepta: sigue navegando/reproduciendo exactamente igual que antes.
+2028-   2) Pulsa HOMBRE/MUJER/DUO/HABLADO: la selección actual se pinta al instante
+2029-      (0ms, sin animación) y el botón queda ARMADO (iluminado).
+2030-   3) Mientras el botón siga armado, CUALQUIER selección nueva que haga se
+2031-      pinta sola con ese rol — si esa selección YA tenía el mismo rol, se
+2032-      quita (vuelve a SIN ROL); si no, se aplica. Así corrige de más sin
+2033-      tocar lo que ya estaba bien.
+2034-   4) Pulsar el mismo botón armado lo apaga; no toca nada de lo ya pintado.
+2035-      Pulsar otro botón de rol cambia el armado al nuevo.
+2036-   No toca start_time/end_time/audio en ningún punto. */
+--
+2126-function selectLineForRole(a,b){
+2127-  if(a<0||b<a) return;
+2128-  clearRolePick(false);
+2129-  S.sel=b; S.selStart=a; S.selEnd=b;
+2130-  refreshSelectionVisual(); draw();
+2131-}
+2132-function paintRoleLineLabel(lb,a,b){
+2133-  if(!lb||b<a) return;
+2134-  const first=wordRole(S.words[a]), uniform=S.words.slice(a,b+1).every(w=>wordRole(w)===first);
+2135-  lb.className="roleLineBtn"+(uniform?` role-${first}`:"");
+2136-}
+2137-function installRoleDelegation(){
+2138-  const box=$("#lyricsInner"); if(!box || box.dataset.rolesV07==="1") return;
+2139-  box.dataset.rolesV07="1";
+2140-
+2141-  // Ctrl+clic / Ctrl+arrastrar = selección libre (funciona siempre, sea o no
+2142-  // sea un rol armado; sólo decide QUÉ queda seleccionado).
+2143-  box.addEventListener("pointerdown",ev=>{
+2144:    if(!(ev.ctrlKey||ev.metaKey)) return;
+2145-    const c=ev.target.closest(".chip[data-gi]"); if(!c) return;
+2146:    ev.preventDefault(); ev.stopImmediatePropagation();
+2147-    const gi=+c.dataset.gi, adding=!S.rolePick.has(gi);
+2148-    S.rolePickDrag={pointerId:ev.pointerId,adding}; S.roleSuppressClick=true;
+2149-    setRolePickIndex(gi,adding);
+2150-    try{box.setPointerCapture(ev.pointerId)}catch(_){ }
+2151-  },true);
+2152-  box.addEventListener("pointermove",ev=>{
+2153-    const d=S.rolePickDrag; if(!d||d.pointerId!==ev.pointerId) return;
+2154-    const hit=document.elementFromPoint(ev.clientX,ev.clientY); const c=hit?.closest?.(".chip[data-gi]");
+2155-    if(c) setRolePickIndex(+c.dataset.gi,d.adding);
+2156-  },true);
+2157-  const finishPick=ev=>{
+2158-    const d=S.rolePickDrag; if(!d||d.pointerId!==ev.pointerId) return;
+2159-    S.rolePickDrag=null; try{box.releasePointerCapture(ev.pointerId)}catch(_){ }
+2160-    if(S.armedRole){ applyArmedRoleToCurrentSelection(); }
+2161-    else toast(`${S.rolePick.size} palabra${S.rolePick.size===1?"":"s"} seleccionada${S.rolePick.size===1?"":"s"} · elige un rol`,1200);
+2162-  };
+2163-  box.addEventListener("pointerup",finishPick,true); box.addEventListener("pointercancel",finishPick,true);
+2164-
+2165-  // L# de línea: selecciona toda la línea (como un clic normal, pero de una).
+2166-  // Si hay un rol armado, se pinta de inmediato, igual que cualquier otra selección.
+2167-  box.addEventListener("click",ev=>{
+2168:    if(S.roleSuppressClick){ S.roleSuppressClick=false; ev.preventDefault(); ev.stopImmediatePropagation(); return; }
+2169-    const lb=ev.target.closest(".roleLineBtn");
+
+=== POINTER / TOUCH / MOUSE HANDLERS ===
+896-  doc: null,            // {song, segments[]}
+897-  words: [],            // lista plana, referencias a los objetos de doc
+898-  cursor: 0,            // índice de la siguiente palabra a marcar
+899-  sel: -1,              // palabra principal seleccionada
+900-  selStart: -1,         // selección múltiple inclusiva
+901-  selEnd: -1,
+902-  view: {t0:0, dur:30},
+903-  playing: false,
+904-  lastMarkT: -1,
+905-  capturePrevIndex: null, // palabra anterior marcada en la captura ACTUAL; nunca toca timings viejos al insertar letra
+906-  undo: [], redo: [],
+907-  cfg: {cal:0, minGap:60, maxWord:2.5, stall:4, introMode:"auto", introDuration:6, introShort:3, linesPerPage:6,
+908-        fontFamily:"impact", fontSize:18, strokeWidth:1, lyricYOffset:0,
+909-        introTitleSize:28, introArtistSize:20, introTitleX:0, introTitleY:0, introArtistX:0, introArtistY:0,
+910-        introTransition:"centertexttoplogobottomtext", outroLine1:"Ediciones Personalizadas.", outroLine2:"Whatsapp +51921675846",
+911-        outroSize:18, outroX:0, outroY:0, outroTransition:"centertexttoplogobottomtext"},
+912:  drag: null,
+913-  range: null,          // rango derivado únicamente de la selección sincronizada
+914-  rangeSource: null,    // sólo "word"
+915-  loopingRange: false,
+916-  dirty: false,
+917-  editing: true,
+918-  resyncSession: null,  // {ids,pos}: SPACE queda limitado a esta selección
+919-  clickResync: false,   // clic normal = punto exacto de resincronización secuencial
+920-  armedRole: null,       // null | none | hombre | mujer | duo | hablado — rol ARMADO (botón iluminado)
+921-  playHiIndex: -1,       // índice de la palabra que brilla ahora mismo siguiendo el audio
+922-  playHiEl: null,
+923-  rolePick: new Set(),   // selección libre Ctrl+clic / Ctrl+arrastrar
+924-  rolePickDrag: null,
+925-  roleSuppressClick: false,
+926-  audioFile: null,
+927-};
+928-S.audio.preservesPitch = true;
+--
+1967-    }else{
+1968-      paintLyrics();
+1969-      toast("Edición cancelada",1200);
+1970-    }
+1971-    requestAnimationFrame(()=>{ drawer.scrollTop=Math.min(st.oldScroll,Math.max(0,drawer.scrollHeight-drawer.clientHeight)); });
+1972-  };
+1973-  state.finish=finish;
+1974-
+1975-  // Un solo clic dentro del texto sigue siendo edición normal (posicionar
+1976-  // el cursor, seleccionar): no se usa blur para salir. DOBLE clic dentro del
+1977-  // texto guarda y sale — simétrico con el doble clic que abrió la edición.
+1978-  // ESC cancela sin guardar.
+1979-  ed.addEventListener("keydown",ev=>{
+1980-    if(ev.key==="Escape"){ ev.preventDefault(); ev.stopPropagation(); finish(false); }
+1981-    // Enter queda libre: crea una línea nueva como en un editor normal.
+1982-  });
+1983:  ed.addEventListener("pointerdown",ev=>ev.stopPropagation());
+1984-  ed.addEventListener("click",ev=>ev.stopPropagation());
+1985-  // Doble clic dentro del texto = guarda y regresa a sincronizar. Simétrico con
+1986-  // el doble clic que abrió la edición: fácil de recordar, no depende de acertar
+1987-  // un botón. Si el doble clic cae sobre una palabra, se ignora la selección
+1988-  // nativa del navegador (no aporta nada aquí, ya estamos saliendo).
+1989-  ed.addEventListener("dblclick",ev=>{ ev.preventDefault(); ev.stopPropagation(); finish(true); });
+1990-
+1991-  ed.focus({preventScroll:true});
+1992-  requestAnimationFrame(()=>{ setPlainCaret(ed,caret); drawer.scrollTop=oldScroll; });
+1993-}
+1994-
+1995-/* edición en el sitio antigua, conservada como fallback interno */
+1996-function inlineEdit(chip, gi){
+1997-  const w = S.words[gi], prev = w.text;
+1998-  chip.textContent = "";
+1999-  const inp = document.createElement("input");
+2000-  inp.className = "inlineWordInput";
+2001-  inp.value = prev;
+2002-  inp.size = Math.max(12, Math.min(36, prev.length + 6));
+2003-  inp.style.width = Math.max(180, Math.min(420, prev.length * 13 + 70)) + "px";
+2004-  chip.appendChild(inp);
+2005:  inp.onpointerdown = ev => ev.stopPropagation();
+2006-  inp.onclick = ev => ev.stopPropagation();
+2007-  inp.ondblclick = ev => ev.stopPropagation();
+2008-  inp.focus();
+2009-  requestAnimationFrame(()=>{ const n=inp.value.length; try{ inp.setSelectionRange(n,n); }catch(e){} });
+2010-  let cerrado = false;
+2011-  const fin = commit => {
+2012-    if(cerrado) return; cerrado = true;
+2013-    if(commit) editWordText(gi, inp.value); else paintLyrics();
+2014-  };
+2015-  inp.onkeydown = ev => {
+2016-    ev.stopPropagation();
+2017-    if(ev.key === "Enter"){ ev.preventDefault(); fin(true); }
+2018-    else if(ev.key === "Escape"){ ev.preventDefault(); fin(false); }
+2019-  };
+2020-  inp.onblur = () => setTimeout(()=>fin(true),0);
+2021-}
+--
+2127-  if(a<0||b<a) return;
+2128-  clearRolePick(false);
+2129-  S.sel=b; S.selStart=a; S.selEnd=b;
+2130-  refreshSelectionVisual(); draw();
+2131-}
+2132-function paintRoleLineLabel(lb,a,b){
+2133-  if(!lb||b<a) return;
+2134-  const first=wordRole(S.words[a]), uniform=S.words.slice(a,b+1).every(w=>wordRole(w)===first);
+2135-  lb.className="roleLineBtn"+(uniform?` role-${first}`:"");
+2136-}
+2137-function installRoleDelegation(){
+2138-  const box=$("#lyricsInner"); if(!box || box.dataset.rolesV07==="1") return;
+2139-  box.dataset.rolesV07="1";
+2140-
+2141-  // Ctrl+clic / Ctrl+arrastrar = selección libre (funciona siempre, sea o no
+2142-  // sea un rol armado; sólo decide QUÉ queda seleccionado).
+2143:  box.addEventListener("pointerdown",ev=>{
+2144-    if(!(ev.ctrlKey||ev.metaKey)) return;
+2145-    const c=ev.target.closest(".chip[data-gi]"); if(!c) return;
+2146-    ev.preventDefault(); ev.stopImmediatePropagation();
+2147-    const gi=+c.dataset.gi, adding=!S.rolePick.has(gi);
+2148-    S.rolePickDrag={pointerId:ev.pointerId,adding}; S.roleSuppressClick=true;
+2149-    setRolePickIndex(gi,adding);
+2150-    try{box.setPointerCapture(ev.pointerId)}catch(_){ }
+2151-  },true);
+2152:  box.addEventListener("pointermove",ev=>{
+2153-    const d=S.rolePickDrag; if(!d||d.pointerId!==ev.pointerId) return;
+2154-    const hit=document.elementFromPoint(ev.clientX,ev.clientY); const c=hit?.closest?.(".chip[data-gi]");
+2155-    if(c) setRolePickIndex(+c.dataset.gi,d.adding);
+2156-  },true);
+2157-  const finishPick=ev=>{
+2158-    const d=S.rolePickDrag; if(!d||d.pointerId!==ev.pointerId) return;
+2159-    S.rolePickDrag=null; try{box.releasePointerCapture(ev.pointerId)}catch(_){ }
+2160-    if(S.armedRole){ applyArmedRoleToCurrentSelection(); }
+2161-    else toast(`${S.rolePick.size} palabra${S.rolePick.size===1?"":"s"} seleccionada${S.rolePick.size===1?"":"s"} · elige un rol`,1200);
+2162-  };
+2163:  box.addEventListener("pointerup",finishPick,true); box.addEventListener("pointercancel",finishPick,true);
+2164-
+2165-  // L# de línea: selecciona toda la línea (como un clic normal, pero de una).
+2166-  // Si hay un rol armado, se pinta de inmediato, igual que cualquier otra selección.
+2167-  box.addEventListener("click",ev=>{
+2168-    if(S.roleSuppressClick){ S.roleSuppressClick=false; ev.preventDefault(); ev.stopImmediatePropagation(); return; }
+2169-    const lb=ev.target.closest(".roleLineBtn");
+2170-    if(lb){
+2171-      ev.preventDefault(); ev.stopImmediatePropagation();
+2172-      selectLineForRole(+lb.dataset.start,+lb.dataset.end);
+2173-      applyArmedRoleToCurrentSelection();
+2174-    }
+2175-  },true);
+2176-}
+2177-
+2178-function flashHint(msg){
+2179-  const h = $("#hint"); const old = h.textContent;
+--
+2319-  try{ if(PV.on) pvDraw(); }catch(e){ console.warn("Preview frame error",e); }
+2320-  updatePlayHighlight();
+2321-  const h = $("#hint");
+2322-  if(h){
+2323-    if(stalled && !h.classList.contains("warn")) h.textContent = "¿Perdiste el hilo? Retroceso deshace y rebobina";
+2324-    else if(!stalled && !h.classList.contains("warn")){
+2325-      const pendingAtCursor = S.cursor < S.words.length && S.words[S.cursor]?.start_time === null;
+2326-      h.textContent = (S.playing && pendingAtCursor) ? "Espacio = siguiente palabra · Ctrl+rueda = zoom · P = pantalla" : (rangeBounds() ? "Espacio = PLAY/STOP del LOOP · Ctrl+rueda = zoom · Esc = detener" : "Espacio = siguiente palabra · Ctrl+rueda = zoom · P = pantalla");
+2327-    }
+2328-  }
+2329-  if(S.peaks) draw();
+2330-  requestAnimationFrame(loop);
+2331-}
+2332-
+2333-/* ---------------- interacción con el canvas ---------------- */
+2334-/* RONDA28 — controlador ÚNICO de timings.
+2335:   No hay parches encadenados: pointerdown decide UNA sola acción
+2336:   (START / MOVE / END / SEEK) y esa acción queda capturada hasta pointerup. */
+2337-const TIMING_EDGE_SELECTED = 18;   // agarre cómodo del bloque seleccionado
+2338-const TIMING_EDGE_OTHER = 10;      // agarre de cualquier bloque sincronizado
+2339-
+2340-// END virtual sólo para detectar/mostrar palabras antiguas cuyo END quedó nulo.
+2341-// No modifica datos hasta que el usuario arrastra realmente el timing.
+2342-// Brillo en vivo: la palabra que corresponde al tiempo actual del audio se
+2343-// ilumina en el panel de letras (no solo en la vista previa), y se apaga en
+2344-// cuanto termina su tiempo, siguiendo exactamente lo que se escucha.
+2345-function isSongCompleteForReview(){
+2346-  return S.words.length>0
+2347-    && S.words.every(w=>w.start_time!==null)
+2348-    && !S.resyncSession
+2349-    && !S.clickResync;
+2350-}
+2351-function clearPlayHighlight(){
+2352-  if(S.playHiEl) S.playHiEl.classList.remove("playHi");
+--
+2458-  S.sel=i; S.selStart=i; S.selEnd=i;
+2459-  const en=effectiveTimingEnd(i);
+2460-  if(!w.spoken && en!==null && en>w.start_time){
+2461-    S.range={start:w.start_time,end:en}; S.rangeSource="word";
+2462-  }else{
+2463-    S.range=null; S.rangeSource=null;
+2464-  }
+2465-  refreshSelectionVisual();
+2466-}
+2467-
+2468-function beginTimingDrag(hit,e,y){
+2469-  if(S.playing) pause();
+2470-  const i=hit.i, w=S.words[i], en=effectiveTimingEnd(i);
+2471-  if(!w || w.start_time===null || en===null) return;
+2472-  const snap=snapshot(i); // conserva END=null en Undo si venía de un proyecto antiguo
+2473-  selectTimingWord(i);
+2474:  S.drag={
+2475-    kind:"timing", mode:hit.mode, i, pointerId:e.pointerId,
+2476-    y0:y, start0:w.start_time, end0:en,
+2477-    duration0:en-w.start_time,
+2478-    snap, moved:false, materialized:(w.end_time===null)
+2479-  };
+2480-  cv.style.cursor = hit.mode==="move" ? "grabbing" : "ns-resize";
+2481-  draw();
+2482-}
+2483-
+2484-function beginMultiMove(e,y){
+2485-  if(S.playing) pause();
+2486-  const ids=selectedTimedIndices();
+2487-  const items=ids.map(i=>({i,start:S.words[i].start_time,end:S.words[i].end_time,locked:S.words[i].locked}));
+2488-  const minStart=Math.min(...items.map(it=>it.start)), maxEnd=Math.max(...items.map(it=>it.end));
+2489:  S.drag={kind:"multi-move",pointerId:e.pointerId,y0:y,moved:false,snap:docSnapshot(),items,minStart,maxEnd};
+2490-  cv.style.cursor="grabbing";
+2491-}
+2492-
+2493-function releaseCanvasPointer(pointerId){
+2494-  try{ if(cv.hasPointerCapture(pointerId)) cv.releasePointerCapture(pointerId); }catch(_){ }
+2495-}
+2496-
+2497:cv.addEventListener("pointerdown", e => {
+2498-  if(!S.peaks) return;
+2499-  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+2500-  e.preventDefault();
+2501-
+2502-  if(rangePlayHit(x,y)){ toggleRangeLoop(); return; }
+2503-
+2504-  const hit=hitTimingAction(x,y);
+2505-  if(hit){
+2506-    cv.setPointerCapture(e.pointerId);
+2507-    if(hit.mode==="multi-move") beginMultiMove(e,y);
+2508-    else beginTimingDrag(hit,e,y);
+2509-    return;
+2510-  }
+2511-
+2512-  // Espacio libre = SEEK. Nunca reproduce ni modifica timings.
+2513-  cv.setPointerCapture(e.pointerId);
+2514-  const target=clamp(y2t(y),0,S.duration);
+2515-  S.audio.currentTime=target;
+2516-  S.sel=-1; S.selStart=-1; S.selEnd=-1; S.range=null; S.rangeSource=null;
+2517-  S.capturePrevIndex=null; S.lastMarkT=-1; S.clickResync=false; clearPlayHighlight();
+2518-  paintLyrics(); draw();
+2519:  S.drag={kind:"seek",pointerId:e.pointerId,y0:y,tStart:target,moved:false};
+2520-});
+2521-
+2522:cv.addEventListener("pointermove", e => {
+2523-  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+2524-
+2525:  if(!S.drag){
+2526-    if(rangePlayHit(x,y)) cv.style.cursor="pointer";
+2527-    else {
+2528-      const h=hitTimingAction(x,y);
+2529-      if(h?.mode==="start" || h?.mode==="end") cv.style.cursor="ns-resize";
+2530-      else if(h?.mode==="move" || h?.mode==="multi-move") cv.style.cursor="grab";
+2531-      else cv.style.cursor="crosshair";
+2532-    }
+2533-    return;
+2534-  }
+2535-
+2536:  const d=S.drag;
+2537-  if(d.pointerId!==undefined && e.pointerId!==d.pointerId) return;
+2538-  e.preventDefault();
+2539-  const dy=y-(d.y0??y); if(Math.abs(dy)>2) d.moved=true;
+2540-  if(d.kind==="seek") return;
+2541-
+2542-  if(d.kind==="multi-move"){
+2543-    cv.style.cursor="grabbing";
+2544-    let dt=y2t(y)-y2t(d.y0);
+2545-    dt=clamp(dt,-d.minStart,S.duration-d.maxEnd);
+2546-    for(const it of d.items){
+2547-      const w=S.words[it.i];
+2548-      w.start_time=it.start+dt; w.end_time=it.end+dt;
+2549-      w.locked=true; w.provisional=false;
+2550-    }
+2551-    draw();
+2552-    return;
+--
+2569-    cv.style.cursor="ns-resize";
+2570-    // END libre hacia abajo/arriba: START permanece fijo y cambia duración.
+2571-    w.start_time=d.start0;
+2572-    w.end_time=clamp(t,d.start0+.03,S.duration);
+2573-  }else if(d.mode==="move"){
+2574-    cv.style.cursor="grabbing";
+2575-    const ns=clamp(d.start0+(y2t(y)-y2t(d.y0)),0,Math.max(0,S.duration-d.duration0));
+2576-    w.start_time=ns; w.end_time=ns+d.duration0; // duración EXACTA
+2577-  }
+2578-
+2579-  w.locked=true; w.provisional=false;
+2580-  if(!w.spoken && w.end_time>w.start_time){ S.range={start:w.start_time,end:w.end_time}; S.rangeSource="word"; }
+2581-  draw(); // feedback visual continuo
+2582-});
+2583-
+2584-function finishCanvasDrag(e){
+2585:  const d=S.drag; S.drag=null;
+2586-  releaseCanvasPointer(e.pointerId);
+2587-  cv.style.cursor="crosshair";
+2588-  if(!d) return;
+2589-
+2590-  if(d.kind==="seek"){
+2591-    const r=cv.getBoundingClientRect(), y=e.clientY-r.top;
+2592-    S.audio.currentTime=clamp(y2t(y),0,S.duration);
+2593-    draw(); return;
+2594-  }
+2595-
+2596-  if(!d.moved){ draw(); return; }
+2597-  if(d.kind==="multi-move") push(d.snap);
+2598-  else if(d.kind==="timing") push(d.snap);
+2599-  else return;
+2600-
+2601-  S.dirty=true; pvInvalidate();
+2602-  paintLyrics(); draw(); scheduleSave();
+2603-}
+2604-
+2605:cv.addEventListener("pointerup", finishCanvasDrag);
+2606-cv.addEventListener("pointercancel", finishCanvasDrag);
+2607-
+2608-cv.addEventListener("wheel", e => {
+2609-  if(!S.peaks) return;
+2610-  e.preventDefault();
+2611-  const r = cv.getBoundingClientRect(), y = e.clientY - r.top;
+2612-  if(e.ctrlKey || e.metaKey){
+2613-    const anchor = y2t(y);
+2614-    const factor = Math.exp(e.deltaY * 0.0016);
+2615-    const newDur = clamp(S.view.dur * factor, 0.4, Math.max(4, S.duration || 60));
+2616-    S.view.dur = newDur;
+2617-    S.view.t0 = clamp(anchor - (y / CH) * newDur, -1, Math.max(0, S.duration-newDur));
+2618-  }else{
+2619-    // Rueda normal: desplazamiento temporal, sin zoom accidental.
+2620-    S.view.t0 = clamp(S.view.t0 + (e.deltaY/CH)*S.view.dur*0.8, -1, Math.max(0,S.duration-S.view.dur));
+2621-  }
+2622-  draw();
+2623-}, {passive:false});
+2624-
+2625-/* pellizco en táctil */
+2626-let pinch = null;
+2627:cv.addEventListener("touchstart", e => {
+2628-  if(e.touches.length === 2){
+2629-    const [a,b] = e.touches;
+2630-    pinch = {d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), dur: S.view.dur};
+2631-  }
+2632-}, {passive:true});
+2633:cv.addEventListener("touchmove", e => {
+2634-  if(pinch && e.touches.length === 2){
+2635-    const [a,b] = e.touches;
+2636-    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+2637-    S.view.dur = clamp(pinch.dur * pinch.d / Math.max(1,d), 0.4, S.duration||60);
+2638-  }
+2639-}, {passive:true});
+2640:cv.addEventListener("touchend", ()=>{ pinch = null; }, {passive:true});
+2641-
+2642-/* ---------------- teclado ---------------- */
+2643-document.addEventListener("keydown", e => {
+2644-  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) || !!e.target.isContentEditable;
+2645-  if(typing) return;
+2646-  if(!$("#setup").hidden || !$("#settings").hidden){
+2647-    if(e.code === "Escape" && $("#setup").hidden) closeSettings();
+2648-    if(calibrating && e.code === "Space"){ e.preventDefault(); calTap(); return; }
+2649-    if(!$("#setup").hidden){
+2650-      if(e.code==="Enter"){ e.preventDefault(); toggle(); }
+2651-      else if(e.code==="ArrowLeft"){ e.preventDefault(); nudge(-2); }
+2652-      else if(e.code==="ArrowRight"){ e.preventDefault(); nudge(2); }
+2653-    }
+
+=== PLAYHEAD / CURSOR / SEEK / DRAW ===
+8-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+9-<style>
+10-:root{
+11-  /* Tema CONTROL_EDITOR_LETRAS_KARAOKE_DJGABO.
+12-     Se mantienen los alias originales para que el motor V1 siga intacto. */
+13-  --bg-base:#12141A; --bg-surface:#1B1E26; --bg-elevated:#232733;
+14-  --border:#2E3340;
+15-  --amber:#8B5CF6; --amber-dim:rgba(139,92,246,.16);
+16-  --teal:#4FD1C5; --teal-dim:rgba(79,209,197,.14);
+17-  --danger:#E85D5D; --danger-dim:rgba(232,93,93,.14);
+18-  --orange:#F0A860; --yellow:#E8C34C; --blue:#5C9DE8; --green:#5BC98C;
+19-  --text-1:#F1EFEA; --text-2:#9AA0AC; --text-3:#5C6270;
+20-
+21-  --ink:var(--bg-base); --panel:var(--bg-surface); --panel2:var(--bg-elevated); --line:var(--border);
+22-  --text:var(--text-1); --dim:var(--text-2); --dimmer:var(--text-3);
+23-  --mark:var(--amber); --markSoft:var(--amber-dim); --markEdge:rgba(139,92,246,.55);
+24:  --wave:var(--teal); --waveHi:#7BE1D8; --good:var(--green);
+25-  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+26-  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+27-  --display:"Space Grotesk",var(--sans);
+28-}
+29-*{box-sizing:border-box;margin:0;padding:0}
+30-html,body{height:100%;overflow:hidden}
+31-body{
+32-  background:var(--ink);color:var(--text);font-family:var(--sans);
+33-  font-size:14px;-webkit-font-smoothing:antialiased;
+34-  display:flex;flex-direction:column;
+35-}
+36:button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+37-:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+38-
+39-/* ---------- header ---------- */
+40-header{
+41-  height:46px;flex:0 0 46px;display:flex;align-items:center;gap:16px;
+42-  padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel);
+43-}
+44-#songName{font-family:var(--display);font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+45-#songName .art{color:var(--dim);font-weight:500}
+46-.spacer{flex:1}
+47-#counter{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+48-#counter b{color:var(--mark);font-weight:600}
+49-.hbtn{
+50-  font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;
+51-  padding:7px 12px;border:1px solid var(--line);border-radius:6px;color:var(--text);white-space:nowrap;
+52-  background:transparent;transition:background .15s,border-color .15s,color .15s;
+--
+73-.chip.roleMale{--roleColor:#32B7FF}
+74-.chip.roleDuet{--roleColor:#7ED957}
+75-.chip.spoken{--roleColor:#E85D5D}
+76-
+77-/* ---------- espacio de trabajo: tres paneles ---------- */
+78-#workspace{flex:1 1 auto;min-height:0;display:flex;overflow:hidden;background:var(--ink)}
+79-
+80-#leftPane{flex:0 0 34%;min-width:200px;display:flex;flex-direction:column;overflow:hidden}
+81-#centerPane{flex:1 1 auto;min-width:280px;display:flex;flex-direction:column;
+82-  background:var(--panel);overflow:hidden}
+83-#preview{flex:0 0 27%;min-width:190px;background:var(--bg-base);
+84-  display:flex;flex-direction:column;align-items:center;
+85-  gap:8px;padding:10px 12px;overflow:hidden}
+86-#preview[hidden]{display:none}
+87-
+88-.split{
+89:  flex:0 0 5px;cursor:col-resize;background:var(--line);position:relative;
+90-}
+91-.split:hover,.split.on{background:var(--dimmer)}
+92-.split::after{
+93-  content:"";position:absolute;top:50%;left:1px;width:3px;height:34px;
+94-  margin-top:-17px;border-radius:2px;background:var(--dimmer);
+95-}
+96-.split:hover::after,.split.on::after{background:var(--mark)}
+97-
+98-.pvHead{
+99-  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+100-  color:var(--dimmer);align-self:flex-start;flex:0 0 auto;
+101-}
+102-#pvBox{flex:1 1 auto;width:100%;display:flex;align-items:center;justify-content:center;min-height:0}
+103-#pv{background:#000;border:1px solid var(--line);image-rendering:auto;max-width:100%;max-height:100%}
+104-#pvInfo{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+105-  letter-spacing:.03em;text-align:center}
+106-#pvInfo b{color:var(--mark);font-weight:600}
+107-#pvInfo .warn{color:var(--danger)}
+108-
+109-/* ---------- onda (vertical: el tiempo baja) ---------- */
+110:#waveWrap{flex:1 1 auto;position:relative;min-height:0;background:var(--bg-base)}
+111:#wave{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+112-#zoomHud{
+113-  position:absolute;right:10px;top:8px;font-family:var(--mono);font-size:10px;
+114-  color:var(--dimmer);letter-spacing:.06em;pointer-events:none
+115-}
+116-
+117-/* ---------- now strip ---------- */
+118-#now{
+119-  flex:0 0 auto;padding:14px 0 28px;background:var(--bg-surface);
+120-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+121-  gap:6px;position:relative;overflow:hidden;
+122-}
+123-#reticle{position:absolute;top:0;bottom:34px;left:50%;width:1px;background:var(--line)}
+124-#slots{
+125-  display:flex;align-items:baseline;justify-content:center;gap:26px;
+126-  width:100%;transition:transform .09s cubic-bezier(.2,.7,.3,1);
+127-}
+128-.slot{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+129-.slot.prev,.slot.next{font-size:19px;color:var(--dimmer);font-weight:600}
+130-.slot.cur{
+131-  font-size:40px;color:var(--mark);line-height:1;
+132-  text-shadow:0 0 28px rgba(139,92,246,.22);
+133-}
+134-#now.stalled .slot.cur{color:var(--danger);text-shadow:none}
+135:#now.done .slot.cur{color:var(--wave)}
+136-#lineEcho{
+137-  font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.02em;
+138-  white-space:nowrap;overflow:hidden;max-width:96%;text-align:center;
+139-}
+140-#lineEcho .on{color:var(--text);border-bottom:1px solid var(--mark);padding-bottom:1px}
+141-#hint{
+142-  position:absolute;bottom:6px;font-family:var(--mono);font-size:10px;
+143-  letter-spacing:.1em;text-transform:uppercase;color:var(--dimmer);
+144-}
+145-#hint.warn{color:var(--danger)}
+146-
+147-/* ---------- lyrics drawer ---------- */
+148-#lyricsDrawer{
+149-  flex:1 1 auto;min-height:0;overflow-y:auto;border-top:1px solid var(--line);
+150-  background:var(--bg-elevated);
+151-}
+152-#lyricsDrawer.hidden{display:none}
+153-#lyricsInner{padding:10px 14px;font-family:var(--mono);font-size:12px;line-height:1.9}
+154-.liveLyricsEditShell{
+155-  display:block;width:100%;min-height:100%;box-sizing:border-box;max-width:640px;
+156-}
+157-.liveLyricsEditor{
+158-  display:block;width:100%;min-height:100%;box-sizing:border-box;white-space:pre-wrap;
+159-  color:var(--text);background:transparent;outline:none;border:0;font:inherit;line-height:1.9;
+160-  caret-color:var(--mark);padding:0;margin:0;overflow-wrap:anywhere;
+161-}
+162-.liveLyricsEditor:focus{box-shadow:inset 3px 0 0 var(--mark);padding-left:8px}
+163-.lrow{white-space:nowrap}
+164-.lrow.brk{height:10px}
+165-.chip{
+166-  display:inline-block;padding:1px 4px;margin-right:2px;border-radius:2px;
+167:  color:rgba(232,195,76,.48);cursor:pointer;user-select:none;-webkit-user-select:none;
+168-}
+169-#lyricsInner::selection{background:transparent;color:inherit}
+170-.chip.timed{color:#F2B705;background:rgba(242,183,5,.07)}
+171-/* La marca inferior depende de TIMED + ROL, nunca de locked. */
+172-.chip.timed{box-shadow:inset 0 -2px 0 var(--roleColor,#E8C34C)}
+173-.chip.locked{ /* estado lógico de timing; sin autoridad visual sobre el rol */ }
+174-.chip.sel{outline:2px solid #f4f7f5;outline-offset:1px;background:rgba(255,255,255,.06);color:var(--text)}
+175-.chip.spoken{color:#ff7777;background:rgba(232,93,93,.13)}
+176-.chip.spoken.sel{outline-color:#f4f7f5;background:rgba(255,255,255,.06)}
+177-/* V05: el rol es un estado visual persistente e independiente de locked/selección. */
+178-.chip.roleMale{color:#83d2ff;background:rgba(50,183,255,.10)}
+179-.chip.roleFemale{color:#ff8cc3;background:rgba(255,79,163,.10)}
+180-.chip.roleDuet{color:#9ae17d;background:rgba(126,217,87,.10)}
+181-.chip.spoken{color:#ff7777;background:rgba(232,93,93,.13)}
+182-/* Botones de rol SIEMPRE visibles mientras se hace scroll en las letras:
+183-   quedan pegados arriba del panel, sin tapar el texto ni requerir subir. */
+--
+187-.chip.playHi{
+188-  background:#fff!important;color:#111!important;
+189-  box-shadow:0 0 0 1px #fff,0 0 16px 3px rgba(255,255,255,.85);
+190-  transition:background .08s linear,box-shadow .08s linear;
+191-}
+192-/* Aviso permanente mientras un rol está ARMADO: imposible que Valeria no lo note. */
+193-#vocalRoles.armed{background:linear-gradient(rgba(139,92,246,.14),rgba(139,92,246,.14)),var(--bg-elevated);box-shadow:inset 0 0 0 1px rgba(139,92,246,.45)}
+194-#vocalRoles::after{content:"";display:none}
+195-#vocalRoles.armed::after{
+196-  content:"ARMADO · toda selección nueva se pinta sola";
+197-  display:inline-block;margin-left:6px;font:700 9px/1 var(--mono);letter-spacing:.06em;
+198-  text-transform:uppercase;color:#a78bfa;
+199-}
+200-.roleLineBtn{
+201-  display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;
+202-  min-width:25px;height:20px;margin:0 6px 0 0;padding:0 4px;border:1px solid var(--line);border-radius:4px;
+203:  color:var(--dimmer);background:transparent;font:700 8px/1 var(--mono);cursor:pointer;
+204-}
+205-.roleLineBtn:hover{border-color:#a78bfa;color:#a78bfa}
+206-.roleLineBtn.role-none{border-color:rgba(232,195,76,.46);color:#E8C34C}
+207-.roleLineBtn.role-hombre{border-color:rgba(50,183,255,.65);color:#32B7FF}
+208-.roleLineBtn.role-mujer{border-color:rgba(255,79,163,.65);color:#FF4FA3}
+209-.roleLineBtn.role-duo{border-color:rgba(126,217,87,.65);color:#7ED957}
+210-.roleLineBtn.role-hablado{border-color:rgba(232,93,93,.68);color:#E85D5D}
+211-.chip:hover{background:rgba(255,255,255,.09)}
+212-
+213-/* ---------- transport ---------- */
+214-#transport{
+215-  flex:0 0 68px;border-top:1px solid var(--line);background:var(--bg-surface);
+216-  display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px;
+217-}
+218-.tbtn{
+219-  display:flex;flex-direction:column;align-items:center;gap:3px;
+--
+236-
+237-
+238-/* RONDA 12: Fase 1 usa el mismo panel central, sin modal superpuesto */
+239-#setup.phase1Embedded{position:static;inset:auto;background:transparent;z-index:auto;display:block;padding:0;overflow:hidden;height:100%;flex:1 1 auto;min-height:0}
+240-#setup.phase1Embedded .phase1Card{width:100%;max-height:none;height:100%;border:0;border-radius:0;background:transparent;padding:0 14px 12px;display:flex;flex-direction:column}
+241-#setup.phase1Embedded .phase1Body{flex:1 1 auto;min-height:0;overflow:hidden;padding:8px 0 0;display:flex;flex-direction:column}
+242-#setup.phase1Embedded .phase1Body > .field:last-child{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:0}
+243-#setup.phase1Embedded .lyricsFree{flex:1 1 auto;min-height:0;height:auto;overflow-y:auto}
+244-body:not(.phase2) #now,body:not(.phase2) #lyricsDrawer{display:none}
+245-body.phase2 #setup{display:none!important}
+246-body.phase2.lyricEditMode #setup{display:block!important}
+247-body.phase2.lyricEditMode #now,body.phase2.lyricEditMode #lyricsDrawer{display:none!important}
+248-#phaseRailGlobal{flex:0 0 auto;display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--bg-surface)}
+249-#phaseRailGlobal .phaseStep{padding:6px 9px;border-radius:4px;min-height:42px}
+250-#phaseRailGlobal .phaseStep b{font-size:9px}
+251-#phaseRailGlobal .phaseStep span{font-size:11px;margin-top:1px}
+252:#phaseRailGlobal .phaseStep.action{cursor:pointer;border-color:var(--markEdge)}
+253-#phaseRailGlobal .phaseStep.action b,#phaseRailGlobal .phaseStep.action span{color:var(--mark)}
+254:#phaseRailGlobal .phaseStep.disabled{opacity:.45;cursor:default}
+255-#phaseMeta.collapsed{display:none!important}
+256-#phaseIntroCopy{margin-bottom:10px}
+257-body.phase2 #phaseIntroCopy{display:none}
+258-#btnResync{display:none;border:1px solid var(--markEdge);color:var(--mark);background:var(--amber-dim);padding:6px 10px;border-radius:4px;font:700 11px var(--sans);margin-left:auto}
+259-#btnResync.show{display:inline-flex}
+260-#editHint{display:flex;align-items:center;gap:10px}
+261-.chip.provisional{outline:1px dashed rgba(241,239,234,.46);outline-offset:2px}
+262-
+263-/* ---------- overlays ---------- */
+264-.veil{
+265-  position:fixed;inset:0;background:rgba(11,13,12,.93);z-index:20;
+266-  display:flex;align-items:center;justify-content:center;padding:24px;
+267-}
+268-.veil[hidden]{display:none}
+269-.card{
+270-  width:min(620px,100%);background:var(--bg-surface);border:1px solid var(--line);
+--
+284-@media(max-height:700px){#settings .card{height:92vh}.settingsHead{padding:11px 14px 8px}.settingsBody{padding:10px 14px 8px}.settingsFoot{padding:8px 14px}}
+285-.card h2{font-size:15px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+286-.card p.sub{font-size:12.5px;color:var(--dim);margin-bottom:16px;line-height:1.5}
+287-.field{margin-bottom:13px}
+288-.field label{
+289-  display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+290-  text-transform:uppercase;color:var(--dim);margin-bottom:5px;
+291-}
+292-input[type=text],textarea{
+293-  width:100%;background:var(--bg-base);border:1px solid var(--line);border-radius:6px;
+294-  color:var(--text);padding:9px 11px;font-family:inherit;font-size:13px;
+295-}
+296-textarea{font-family:var(--mono);font-size:12px;line-height:1.75;resize:vertical}
+297-input:focus,textarea:focus{border-color:var(--dimmer);outline:none}
+298-.drop{
+299-  border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;
+300:  color:var(--dim);font-size:13px;cursor:pointer;
+301-}
+302-.drop:hover,.drop.over{border-color:var(--mark);color:var(--text)}
+303-
+304-.driveLoad{padding:4px 2px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+305-.driveLoadTop{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+306-.driveLoadStage{color:#c9b8ff;text-align:left;font-weight:700}
+307-.driveLoadPct{font-family:var(--mono);font-size:12px;color:var(--text);min-width:44px;text-align:right}
+308-.driveLoadTrack{height:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+309-.driveLoadFill{height:100%;width:0%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd);transition:width .16s ease-out}
+310-.driveLoadFill.indeterminate{width:34%!important;animation:driveLoadSweep 1.05s ease-in-out infinite}
+311-@keyframes driveLoadSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
+312-.driveLoadBytes{font-family:var(--mono);font-size:10px;color:var(--dimmer);text-align:left}
+313-.onlineLoadOverlay{position:absolute;inset:0;z-index:18;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,10,14,.88);backdrop-filter:blur(2px)}
+314-.onlineLoadOverlay[hidden]{display:none!important}
+315-.onlineLoadCard{width:min(390px,calc(100% - 28px));padding:20px;border:1px solid #53457d;border-radius:12px;background:#171922;box-shadow:0 18px 55px rgba(0,0,0,.5)}
+316-.onlineLoadHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+317-.onlineLoadTitle{font:700 14px/1.35 var(--sans);color:#eee9ff}
+318-.onlineLoadPct{font:700 18px var(--mono);color:#c4b5fd;white-space:nowrap}
+319-.onlineLoadTrack{height:11px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+320-.onlineLoadFill{height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#c4b5fd);transition:width .22s ease-out}
+321-.onlineLoadDetail{margin-top:10px;font:11px/1.45 var(--mono);color:var(--dim)}
+322-.onlineLoadWarning{margin-top:13px;padding:9px 10px;border-radius:7px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);font:700 11px/1.4 var(--sans);color:#f6c86b}
+323:.onlineLoadRetry{margin-top:14px;border:1px solid #8b5cf6;border-radius:7px;padding:8px 13px;color:#eee9ff;background:#2c2050;font-weight:700;cursor:pointer}
+324-.rowbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center}
+325-.ghost{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);padding:9px 14px;border:1px solid var(--line);border-radius:6px}
+326-.ghost:hover{color:var(--text);background:var(--bg-elevated)}
+327-.primary{
+328-  font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none;
+329-  background:var(--mark);color:#fff;padding:10px 16px;border-radius:6px;border:1px solid var(--mark);
+330-}
+331:.primary:disabled{opacity:.35;cursor:not-allowed}
+332-.ruler{
+333-  font-family:var(--mono);font-size:10px;color:var(--dimmer);letter-spacing:.05em;
+334-  margin-top:6px;display:flex;justify-content:space-between;
+335-}
+336-.ruler .over{color:var(--danger)}
+337-.setrow{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+338-.setrow label{flex:1;font-size:12.5px;color:var(--text);font-family:var(--sans);text-transform:none;letter-spacing:0}
+339-.setrow label small{display:block;color:var(--dim);font-size:11px;margin-top:2px;line-height:1.4}
+340-#tplBox{margin:2px 0 4px}
+341-#tplPrev{width:100%;max-width:260px;border:1px solid var(--line);
+342-  background:#000;image-rendering:auto;display:block;margin:0 auto}
+343-.setrow select{
+344-  background:var(--ink);border:1px solid var(--line);border-radius:3px;color:var(--text);
+345-  padding:7px 9px;font-family:var(--mono);font-size:12px;
+346-}
+347-#tplNote.bad{color:var(--danger)}
+348-.setrow input[type=number]{
+349-  width:88px;background:var(--ink);border:1px solid var(--line);border-radius:3px;
+350-  color:var(--text);padding:7px 9px;font-family:var(--mono);font-size:12px;text-align:right;
+351-}
+352-#calStatus{font-family:var(--mono);font-size:11px;color:var(--dim);min-height:16px;margin-top:8px}
+353-#calStatus b{color:var(--mark)}
+354-#status{
+355-  font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--dim);
+356-  white-space:nowrap;
+357-}
+358-#status.work{color:var(--mark)}
+359-#status.bad{color:var(--danger)}
+360:#status.good{color:var(--wave)}
+361-
+362-/* edición de letra */
+363-.lrow{position:relative;padding-right:44px}
+364-.rowTools{
+365-  position:absolute;right:4px;top:0;display:none;gap:2px;
+366-}
+367-#lyricsDrawer.edit .lrow:hover .rowTools{display:flex}
+368-.rowTools button{
+369-  font-size:11px;color:var(--dimmer);padding:1px 5px;border-radius:2px;line-height:1.6;
+370-}
+371-.rowTools button:hover{color:var(--text);background:rgba(255,255,255,.08)}
+372-.rowTools button.del:hover{color:var(--danger)}
+373:#lyricsDrawer.edit .chip{cursor:text}
+374-.chip input{
+375-  background:var(--ink);border:1px solid var(--mark);border-radius:2px;color:var(--text);
+376-  font:inherit;padding:0 3px;width:9ch;
+377-}
+378-#editHint{
+379-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--dimmer);
+380-  padding:6px 14px 0;
+381-}
+382-#editHint[hidden]{display:none}
+383-.issue{
+384-  display:flex;gap:10px;align-items:baseline;padding:6px 0;
+385-  border-bottom:1px solid var(--line);font-size:12.5px;
+386-}
+387-.issue b{font-family:var(--mono);font-size:11px;color:var(--mark);min-width:96px}
+388-.issue span{color:var(--dim)}
+389-
+--
+402-.busyCard{min-width:290px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+403-.busyRow{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+404-.busySpin{width:20px;height:20px;border:3px solid rgba(139,92,246,.22);border-top-color:var(--mark);border-radius:999px;animation:spin .9s linear infinite}
+405-.busyTitle{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mark)}
+406-.busyMsg{font-size:13px;color:var(--text);line-height:1.45}
+407-.busySub{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.05em;margin-top:6px}
+408-@keyframes spin{to{transform:rotate(360deg)}}
+409-kbd{
+410-  font-family:var(--mono);font-size:10px;border:1px solid var(--dimmer);
+411-  border-radius:2px;padding:1px 4px;color:var(--dim);
+412-}
+413-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+414-
+415-.lineEditWrap{display:flex;align-items:center;gap:7px;width:100%;padding:3px 0}
+416-.lineEditInput{flex:1;min-width:0;background:var(--bg-base);border:1px solid var(--markEdge);color:var(--text);font:600 14px/1.35 var(--sans);padding:8px 10px;border-radius:7px;outline:none}
+417-.lineEditInput:focus{border-color:var(--mark);box-shadow:0 0 0 2px var(--amber-dim)}
+418:.lineDeleteBtn{border:1px solid #633;background:#211;color:#ffaaaa;border-radius:7px;padding:7px 9px;cursor:pointer}
+419-#btnSpoken.on{border-color:#E85D5D;color:#ff8f7d;background:rgba(232,93,93,.13);box-shadow:0 0 0 1px rgba(232,93,93,.18) inset}
+420-.chip.spoken{color:#ff7666!important;background:rgba(232,93,93,.12)!important;border-color:rgba(232,93,93,.55)!important}
+421-.chip .inlineWordInput,.inlineWordInput{min-width:180px;width:min(320px,38vw);max-width:420px;background:var(--bg-base);border:1px solid var(--mark);color:var(--text);font:700 14px/1.25 var(--sans);padding:6px 8px;border-radius:6px;outline:none;box-shadow:0 0 0 2px var(--amber-dim)}
+422-
+423-#setLines{width:78px}
+424-.settingsSectionTitle{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+425-
+426-.phaseRail{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:8px;margin:4px 0 18px}
+427-.phaseStep{border:1px solid var(--line);background:var(--bg-elevated);border-radius:8px;padding:10px 12px;min-width:0}
+428-.phaseStep b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+429-.phaseStep span{display:block;margin-top:3px;font-size:13px;color:var(--text)}
+430-.phaseStep.on{border-color:var(--mark);background:var(--amber-dim)}
+431-.phaseStep.on b{color:var(--mark)}
+432-.phaseArrow{color:var(--dim);font-family:var(--mono)}
+433-.phase1Card{width:min(980px,94vw);max-height:92vh;display:flex;flex-direction:column}
+434-.phase1Body{overflow:auto;padding-right:4px}
+--
+615-<body>
+616-
+617-<header>
+618-  <div id="songName"><span class="art">—</span></div>
+619-  <div class="spacer"></div>
+620-  <div id="counter">0/0 · 0%</div>
+621-  <span id="status"></span>
+622-  <button class="hbtn" id="btnPreview">Pantalla</button>
+623-  <button class="hbtn" id="btnLyrics">Letra</button>
+624-  <button class="hbtn" id="btnSettings">Ajustes</button>
+625-  <button class="hbtn" id="btnSave">Guardar proyecto</button>
+626-  <button class="hbtn go" id="btnCdg">Crear CDG</button>
+627-</header>
+628-
+629-<div id="workspace">
+630-  <div id="leftPane">
+631:    <div id="waveWrap">
+632:      <canvas id="wave"></canvas>
+633-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+634-        <div class="onlineLoadCard">
+635-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+636-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+637-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+638-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+639-          <button id="onlineLoadRetry" class="onlineLoadRetry" type="button" hidden>Reintentar carga</button>
+640-        </div>
+641-      </div>
+642:      <div id="zoomHud" title="Ctrl + rueda del mouse = zoom centrado en el cursor"></div><div id="zoomQuick" style="position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:5"><button class="hbtn zq" data-z="10">10s</button><button class="hbtn zq" data-z="5">5s</button><button class="hbtn zq" data-z="2">2s</button><button class="hbtn zq" data-z="1">1s</button></div>
+643-    </div>
+644-  </div>
+645-  <div class="split" id="splitLeft"></div>
+646-  <div id="centerPane">
+647-    <div id="phaseRailGlobal">
+648-      <div class="phaseStep on" id="phase1Step" role="button" tabindex="0"><b>CARGAR</b><span>Audio + letra</span></div>
+649-      <div class="phaseArrow">→</div>
+650-      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+651-      <div class="phaseArrow">→</div>
+652-      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+653-    </div>
+654-    <div id="now">
+655-      <div id="reticle"></div>
+656-      <div id="slots">
+657-        <span class="slot prev"></span>
+658-        <span class="slot cur">—</span>
+659-        <span class="slot next"></span>
+660-      </div>
+661-      <div id="lineEcho"></div>
+662-      <div id="hint">Espacio = siguiente palabra&nbsp;&nbsp;·&nbsp;&nbsp;P = pantalla</div>
+663-    </div>
+664-    <div id="lyricsDrawer">
+665-      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+666-      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Selecciona (clic/Shift/Ctrl+arrastre/L#) → pulsa el rol</span></div>
+667-      <div id="lyricsInner"></div>
+668-    </div>
+669-  </div>
+670-  <div class="split" id="splitRight"></div>
+671-  <aside id="preview">
+672-    <div class="pvHead">Vista de pantalla · editor visual</div>
+673-    <div class="pvTabs"><button class="pvTab on" data-pvmode="lyrics">Karaoke</button><button class="pvTab" data-pvmode="intro">Opening</button><button class="pvTab" data-pvmode="outro">Ending</button></div>
+674:    <div id="pvBox"><canvas id="pv"></canvas></div>
+675-    <div id="pvInfo">—</div>
+676-    <div id="pvDesigner">
+677-      <div class="pvCtlGroup on" data-group="lyrics">
+678-        <div class="pvCtlTitle">Diseño de letra CDG</div>
+679-        <div class="pvCtl"><label>Líneas / pantalla</label><select id="pvLines"><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select></div>
+680-        <div class="pvCtl"><label>Fuente</label><select id="pvFont"><option value="impact">Impact</option><option value="arialbd">Arial Bold</option><option value="arial">Arial</option></select></div>
+681-        <div class="pvCtl"><label>Tamaño</label><input id="pvFontSize" type="number" min="12" max="24" value="18"></div>
+682-        <div class="pvCtl"><label>Grosor borde</label><input id="pvStroke" type="number" min="0" max="3" value="1"></div>
+683-        <div class="pvCtl"><label>Posición vertical</label><input id="pvLyricY" type="number" min="-5" max="5" value="0"></div>
+684-        <div class="pvMini">Texto blanco · barrido por rol · borde negro. Los cambios se guardan con esta canción y pasan al render final.</div>
+685-      </div>
+686-      <div class="pvCtlGroup" data-group="intro">
+687-        <div class="pvCtlTitle">Opening beta · automático</div>
+688-        <div class="pvMini" style="line-height:1.45">
+689-          Fondo negro sólido. El sistema genera automáticamente:<br>
+690-          <b style="color:var(--text)">TÍTULO DE LA CANCIÓN</b><br>
+--
+867-
+868-<div id="renderBusy" hidden>
+869-  <div class="busyCard">
+870-    <div class="busyRow"><div class="busySpin"></div><div class="busyTitle">Creando CDG</div></div>
+871-    <div class="busyMsg" id="renderBusyMsg">Preparando proyecto…</div>
+872-    <div class="renderProg"><div class="renderProgFill" id="renderProgFill"></div></div>
+873-    <div class="renderProgMeta"><span id="renderProgPct">0%</span><span id="renderProgStage">Backend online</span></div>
+874-    <div class="busySub" id="renderBusySub">El proceso continúa en el backend aunque cambies de trabajo. Nada se descarga como CDG en esta PC.</div>
+875-  </div>
+876-</div>
+877-<div id="toast"></div>
+878-
+879-<script>
+880-"use strict";
+881-/* ==========================================================================
+882-   Sincronizador de karaoke — flujo en 3 fases
+883:   Capas: audio · peaks · documento · sync · undo · canvas · UI
+884-   El editor no sabe nada de CDG. Sólo produce palabras con tiempos.
+885-   ========================================================================== */
+886-
+887-const $ = s => document.querySelector(s);
+888-const clamp = (v,a,b) => v<a?a:v>b?b:v;
+889-
+890-/* ---------------- estado ---------------- */
+891-const S = {
+892-  audio: new Audio(),
+893-  audioName: "", sha1: "",
+894-  duration: 0,
+895-  peaks: null,          // {min:Float32Array, max:Float32Array, rate:buckets/seg}
+896-  doc: null,            // {song, segments[]}
+897-  words: [],            // lista plana, referencias a los objetos de doc
+898:  cursor: 0,            // índice de la siguiente palabra a marcar
+899-  sel: -1,              // palabra principal seleccionada
+900-  selStart: -1,         // selección múltiple inclusiva
+
+=== KEYBOARD HANDLERS ===
+1-<!DOCTYPE html>
+2-<html lang="es">
+3-<head>
+4-<meta charset="utf-8">
+5-<meta name="viewport" content="width=device-width, initial-scale=1">
+6-<title>Sincronizador de karaoke · DJGABO</title>
+7-<link rel="preconnect" href="https://fonts.googleapis.com">
+8:<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+9-<style>
+10-:root{
+11-  /* Tema CONTROL_EDITOR_LETRAS_KARAOKE_DJGABO.
+12-     Se mantienen los alias originales para que el motor V1 siga intacto. */
+13-  --bg-base:#12141A; --bg-surface:#1B1E26; --bg-elevated:#232733;
+14-  --border:#2E3340;
+15-  --amber:#8B5CF6; --amber-dim:rgba(139,92,246,.16);
+16-  --teal:#4FD1C5; --teal-dim:rgba(79,209,197,.14);
+17-  --danger:#E85D5D; --danger-dim:rgba(232,93,93,.14);
+18-  --orange:#F0A860; --yellow:#E8C34C; --blue:#5C9DE8; --green:#5BC98C;
+19-  --text-1:#F1EFEA; --text-2:#9AA0AC; --text-3:#5C6270;
+20-
+21-  --ink:var(--bg-base); --panel:var(--bg-surface); --panel2:var(--bg-elevated); --line:var(--border);
+22-  --text:var(--text-1); --dim:var(--text-2); --dimmer:var(--text-3);
+23-  --mark:var(--amber); --markSoft:var(--amber-dim); --markEdge:rgba(139,92,246,.55);
+24-  --wave:var(--teal); --waveHi:#7BE1D8; --good:var(--green);
+25-  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+26-  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+27:  --display:"Space Grotesk",var(--sans);
+28-}
+29-*{box-sizing:border-box;margin:0;padding:0}
+30-html,body{height:100%;overflow:hidden}
+31-body{
+32-  background:var(--ink);color:var(--text);font-family:var(--sans);
+33-  font-size:14px;-webkit-font-smoothing:antialiased;
+34-  display:flex;flex-direction:column;
+35-}
+36-button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+37-:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+38-
+39-/* ---------- header ---------- */
+40-header{
+41-  height:46px;flex:0 0 46px;display:flex;align-items:center;gap:16px;
+42-  padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel);
+43-}
+44-#songName{font-family:var(--display);font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+45-#songName .art{color:var(--dim);font-weight:500}
+--
+414-
+415-.lineEditWrap{display:flex;align-items:center;gap:7px;width:100%;padding:3px 0}
+416-.lineEditInput{flex:1;min-width:0;background:var(--bg-base);border:1px solid var(--markEdge);color:var(--text);font:600 14px/1.35 var(--sans);padding:8px 10px;border-radius:7px;outline:none}
+417-.lineEditInput:focus{border-color:var(--mark);box-shadow:0 0 0 2px var(--amber-dim)}
+418-.lineDeleteBtn{border:1px solid #633;background:#211;color:#ffaaaa;border-radius:7px;padding:7px 9px;cursor:pointer}
+419-#btnSpoken.on{border-color:#E85D5D;color:#ff8f7d;background:rgba(232,93,93,.13);box-shadow:0 0 0 1px rgba(232,93,93,.18) inset}
+420-.chip.spoken{color:#ff7666!important;background:rgba(232,93,93,.12)!important;border-color:rgba(232,93,93,.55)!important}
+421-.chip .inlineWordInput,.inlineWordInput{min-width:180px;width:min(320px,38vw);max-width:420px;background:var(--bg-base);border:1px solid var(--mark);color:var(--text);font:700 14px/1.25 var(--sans);padding:6px 8px;border-radius:6px;outline:none;box-shadow:0 0 0 2px var(--amber-dim)}
+422-
+423-#setLines{width:78px}
+424-.settingsSectionTitle{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+425-
+426-.phaseRail{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:8px;margin:4px 0 18px}
+427-.phaseStep{border:1px solid var(--line);background:var(--bg-elevated);border-radius:8px;padding:10px 12px;min-width:0}
+428-.phaseStep b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+429-.phaseStep span{display:block;margin-top:3px;font-size:13px;color:var(--text)}
+430-.phaseStep.on{border-color:var(--mark);background:var(--amber-dim)}
+431-.phaseStep.on b{color:var(--mark)}
+432:.phaseArrow{color:var(--dim);font-family:var(--mono)}
+433-.phase1Card{width:min(980px,94vw);max-height:92vh;display:flex;flex-direction:column}
+434-.phase1Body{overflow:auto;padding-right:4px}
+435-.lyricsFree{min-height:300px;height:calc(100vh - 255px);resize:none;font-size:17px;line-height:1.55;font-family:var(--sans);letter-spacing:.01em}
+436-.draftPlayer{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;border:1px solid var(--line);background:var(--bg-base);border-radius:8px;padding:10px 12px;margin-top:8px}
+437-.draftPlayer button{min-width:74px}
+438-.draftTime{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
+439-.draftSeek{width:100%;accent-color:var(--mark)}
+440-.draftRate{display:flex;gap:4px}
+441-.draftRate button{min-width:auto;padding:7px 9px}
+442-.draftRate button.on{border-color:var(--mark);color:var(--mark)}
+443-.phaseNote{font-size:12px;color:var(--dim);line-height:1.45;margin-top:7px}
+444-.phase2Badge{display:none;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--good);margin-left:10px;text-transform:uppercase}
+445-body.phase2 .phase2Badge{display:inline-block}
+446-
+447-
+448-/* ---------- editor visual CDG en panel derecho ---------- */
+449-#preview{align-items:stretch;overflow:hidden}
+450-.pvTabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;width:100%}
+--
+539-
+540-  #editHint{
+541-    padding:7px 9px!important;font-size:10px!important;line-height:1.35!important;
+542-    white-space:normal!important;overflow-wrap:anywhere;
+543-  }
+544-  #editHint>span{min-width:0}
+545-  #vocalRoles{
+546-    width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;
+547-    flex-wrap:nowrap!important;scrollbar-width:none;padding:6px 8px!important;
+548-  }
+549-  #vocalRoles::-webkit-scrollbar{display:none}
+550-  #vocalRoles>.hbtn{flex:0 0 auto;min-height:34px;padding:6px 9px;font-size:10.5px}
+551-  #vocalRoles>span{display:none!important}
+552-
+553-  #phaseRailGlobal,.phaseRail{
+554-    display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+555-    gap:6px!important;margin:6px 8px 9px!important;
+556-  }
+557:  #phaseRailGlobal .phaseArrow,.phaseRail .phaseArrow{display:none!important}
+558-  .phaseStep{padding:8px 7px!important;border-radius:8px}
+559-  .phaseStep b{font-size:9px}
+560-  .phaseStep span{font-size:10.5px;line-height:1.25}
+561-
+562-  /* PANTALLA: onda y preview, ambos a ancho completo y apilados.
+563-     Se desplaza verticalmente dentro del área de trabajo si hace falta. */
+564-  body.mobile-view-screen #workspace{
+565-    overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+566-  }
+567-  body.mobile-view-screen #centerPane{display:none!important}
+568-  body.mobile-view-screen #leftPane{
+569-    display:flex!important;width:100%!important;height:max(52vh,350px)!important;min-height:350px!important;
+570-    border-bottom:1px solid var(--line);
+571-  }
+572-  body.mobile-view-screen #preview{
+573-    display:flex!important;width:100%!important;height:auto!important;min-height:600px!important;
+574-    padding:10px 12px;border-top:0;overflow:visible!important;
+575-  }
+--
+631-    <div id="waveWrap">
+632-      <canvas id="wave"></canvas>
+633-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+634-        <div class="onlineLoadCard">
+635-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+636-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+637-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+638-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+639-          <button id="onlineLoadRetry" class="onlineLoadRetry" type="button" hidden>Reintentar carga</button>
+640-        </div>
+641-      </div>
+642-      <div id="zoomHud" title="Ctrl + rueda del mouse = zoom centrado en el cursor"></div><div id="zoomQuick" style="position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:5"><button class="hbtn zq" data-z="10">10s</button><button class="hbtn zq" data-z="5">5s</button><button class="hbtn zq" data-z="2">2s</button><button class="hbtn zq" data-z="1">1s</button></div>
+643-    </div>
+644-  </div>
+645-  <div class="split" id="splitLeft"></div>
+646-  <div id="centerPane">
+647-    <div id="phaseRailGlobal">
+648-      <div class="phaseStep on" id="phase1Step" role="button" tabindex="0"><b>CARGAR</b><span>Audio + letra</span></div>
+649:      <div class="phaseArrow">→</div>
+650-      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+651:      <div class="phaseArrow">→</div>
+652-      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+653-    </div>
+654-    <div id="now">
+655-      <div id="reticle"></div>
+656-      <div id="slots">
+657-        <span class="slot prev"></span>
+658-        <span class="slot cur">—</span>
+659-        <span class="slot next"></span>
+660-      </div>
+661-      <div id="lineEcho"></div>
+662-      <div id="hint">Espacio = siguiente palabra&nbsp;&nbsp;·&nbsp;&nbsp;P = pantalla</div>
+663-    </div>
+664-    <div id="lyricsDrawer">
+665:      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+666-      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Selecciona (clic/Shift/Ctrl+arrastre/L#) → pulsa el rol</span></div>
+667-      <div id="lyricsInner"></div>
+668-    </div>
+669-  </div>
+670-  <div class="split" id="splitRight"></div>
+671-  <aside id="preview">
+672-    <div class="pvHead">Vista de pantalla · editor visual</div>
+673-    <div class="pvTabs"><button class="pvTab on" data-pvmode="lyrics">Karaoke</button><button class="pvTab" data-pvmode="intro">Opening</button><button class="pvTab" data-pvmode="outro">Ending</button></div>
+674-    <div id="pvBox"><canvas id="pv"></canvas></div>
+675-    <div id="pvInfo">—</div>
+676-    <div id="pvDesigner">
+677-      <div class="pvCtlGroup on" data-group="lyrics">
+678-        <div class="pvCtlTitle">Diseño de letra CDG</div>
+679-        <div class="pvCtl"><label>Líneas / pantalla</label><select id="pvLines"><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select></div>
+680-        <div class="pvCtl"><label>Fuente</label><select id="pvFont"><option value="impact">Impact</option><option value="arialbd">Arial Bold</option><option value="arial">Arial</option></select></div>
+681-        <div class="pvCtl"><label>Tamaño</label><input id="pvFontSize" type="number" min="12" max="24" value="18"></div>
+682-        <div class="pvCtl"><label>Grosor borde</label><input id="pvStroke" type="number" min="0" max="3" value="1"></div>
+683-        <div class="pvCtl"><label>Posición vertical</label><input id="pvLyricY" type="number" min="-5" max="5" value="0"></div>
+--
+737-          <label>Audio</label>
+738-          <div class="drop" id="drop">Suelta un MP3 o WAV aquí, o haz clic para elegirlo</div>
+739-          <input type="file" id="file" accept="audio/*" hidden>
+740-        </div>
+741-        <div class="field" style="display:flex;gap:10px">
+742-          <div style="flex:1"><label>Artista</label><input type="text" id="inArtist" placeholder="Bareto"></div>
+743-          <div style="flex:2"><label>Título</label><input type="text" id="inTitle" placeholder="Ya se ha muerto mi abuelo"></div>
+744-        </div>
+745-      </div>
+746-
+747-      <div class="field">
+748-        <label>Letra libre</label>
+749-        <textarea class="lyricsFree" id="inLyrics" rows="14" placeholder="Escribe o pega aquí toda la letra.
+750-
+751-Puedes cambiar una vocal, agregar palabras, borrar frases y crear líneas nuevas mientras escuchas el audio.
+752-
+753-Cuando la letra esté lista, pulsa SINCRONIZAR en la parte superior."></textarea>
+754-        <div class="ruler">
+755:          <span>Texto libre · Enter crea una nueva línea · línea en blanco = separación de estrofa</span>
+756-          <span id="widthWarn"></span>
+757-        </div>
+758-        <div class="phaseNote" id="phaseNoteText">Aquí corriges libremente la letra. Pulsa SINCRONIZAR cuando estés listo para marcar timings.</div>
+759-      </div>
+760-    </div>
+761-
+762-    <div class="rowbtns" style="padding-top:8px;border-top:1px solid var(--line);margin-top:6px">
+763-      <button class="ghost" id="btnOpen">Abrir proyecto</button>
+764-      <input type="file" id="fileProj" accept=".json" hidden>
+765-      <button id="btnStart" hidden disabled></button>
+766-    </div>
+767-  </div>
+768-</div>
+769-
+770-<!-- ============ settings ============ -->
+771-<div class="veil" id="settings" hidden>
+772-  <div class="card">
+773-    <div class="settingsHead">
+--
+1130-}
+1131-function undo(){
+1132-  if(!S.undo.length) return false;
+1133-  S.redo.push(applyInverse(S.undo.pop()));
+1134-  return true;
+1135-}
+1136-function redo(){
+1137-  if(!S.redo.length) return false;
+1138-  S.undo.push(applyInverse(S.redo.pop()));
+1139-  return true;
+1140-}
+1141-function snapshot(i){
+1142-  const w = S.words[i];
+1143-  return {i, start:w.start_time, end:w.end_time, locked:w.locked, cursor:S.cursor};
+1144-}
+1145-
+1146-/* ---------------- sincronización ---------------- */
+1147-function mark(){
+1148:  if(!S.playing) { flashHint("Pulsa Enter para reproducir"); return; }
+1149-  let targetIndex=S.cursor;
+1150-  if(S.resyncSession){
+1151-    if(S.resyncSession.pos>=S.resyncSession.ids.length){ S.resyncSession=null; flashHint("Resincronización terminada"); return; }
+1152-    targetIndex=S.resyncSession.ids[S.resyncSession.pos];
+1153-  }else if(S.clickResync){
+1154-    // Clic normal: SPACE remarca EXACTAMENTE desde esa palabra, aunque ya tenga timing.
+1155-    targetIndex=S.cursor;
+1156-  }else{
+1157-    // Sincronización normal: sólo palabras todavía pendientes.
+1158-    if(targetIndex>=S.words.length || S.words[targetIndex]?.start_time!==null) targetIndex=nextPendingIndex(targetIndex);
+1159-  }
+1160-  if(targetIndex >= S.words.length){ flashHint("Canción completa"); return; }
+1161-  const t = S.audio.currentTime;
+1162-  if(S.lastMarkT >= 0 && t >= S.lastMarkT && (t - S.lastMarkT) * 1000 < S.cfg.minGap) return;
+1163-
+1164-  push(snapshot(targetIndex));
+1165-  const w=S.words[targetIndex];
+1166-  const session=S.resyncSession;
+--
+1862-      row.appendChild(c); gi++;
+1863-    }
+1864-    if(seg.kind!=="break"){
+1865-      const lb=row.querySelector(".roleLineBtn");
+1866-      if(lb){ lb.dataset.end=gi-1; paintRoleLineLabel(lb,lineStart,gi-1); }
+1867-    }
+1868-    box.appendChild(row);
+1869-  }
+1870-  refreshSelectionVisual();
+1871-  refreshRolePickVisual();
+1872-  // El DOM se reconstruyó: el brillo de reproducción debe reaplicarse al
+1873-  // nuevo chip aunque la palabra activa no haya cambiado.
+1874-  S.playHiIndex=-2; S.playHiEl=null;
+1875-  // Nunca saltar al cursor de sincronización por un simple repintado.
+1876-  drawer.scrollTop=oldScroll;
+1877-}
+1878-
+1879-/* edición directa estilo PowerKaraoke: el MISMO panel de sincronización
+1880:   se convierte temporalmente en texto libre. Enter crea líneas nuevas;
+1881-   al salir se conservan timings/roles de las palabras reconocidas y sólo
+1882-   lo verdaderamente nuevo queda pendiente. */
+1883-function lyricsCharOffsetForWord(gi, atEnd=true){
+1884-  if(gi<0) return 0;
+1885-  let off=0, idx=0;
+1886-  for(let si=0;si<S.doc.segments.length;si++){
+1887-    const seg=S.doc.segments[si];
+1888-    if(seg.kind==="break"){ off+=1; continue; }
+1889-    for(let wi=0;wi<seg.words.length;wi++){
+1890-      const w=seg.words[wi];
+1891-      if(idx===gi) return off + (atEnd ? w.text.length : 0);
+1892-      off += w.text.length; idx++;
+1893-      if(wi<seg.words.length-1) off+=1;
+1894-    }
+1895-    if(si<S.doc.segments.length-1) off+=1;
+1896-  }
+1897-  return off;
+1898-}
+--
+1961-        toast(`${result.added} palabra${result.added===1?" nueva":"s nuevas"} pendiente${result.added===1?"":"s"} para sincronizar · PLAY + SPACE`,3200);
+1962-      }else if(result.pending){
+1963-        toast(`${result.pending} palabra${result.pending===1?" pendiente":"s pendientes"} para sincronizar`,2600);
+1964-      }else{
+1965-        toast("Letra guardada · volvimos a sincronización",1800);
+1966-      }
+1967-    }else{
+1968-      paintLyrics();
+1969-      toast("Edición cancelada",1200);
+1970-    }
+1971-    requestAnimationFrame(()=>{ drawer.scrollTop=Math.min(st.oldScroll,Math.max(0,drawer.scrollHeight-drawer.clientHeight)); });
+1972-  };
+1973-  state.finish=finish;
+1974-
+1975-  // Un solo clic dentro del texto sigue siendo edición normal (posicionar
+1976-  // el cursor, seleccionar): no se usa blur para salir. DOBLE clic dentro del
+1977-  // texto guarda y sale — simétrico con el doble clic que abrió la edición.
+1978-  // ESC cancela sin guardar.
+1979:  ed.addEventListener("keydown",ev=>{
+1980-    if(ev.key==="Escape"){ ev.preventDefault(); ev.stopPropagation(); finish(false); }
+1981:    // Enter queda libre: crea una línea nueva como en un editor normal.
+1982-  });
+1983-  ed.addEventListener("pointerdown",ev=>ev.stopPropagation());
+1984-  ed.addEventListener("click",ev=>ev.stopPropagation());
+1985-  // Doble clic dentro del texto = guarda y regresa a sincronizar. Simétrico con
+1986-  // el doble clic que abrió la edición: fácil de recordar, no depende de acertar
+1987-  // un botón. Si el doble clic cae sobre una palabra, se ignora la selección
+1988-  // nativa del navegador (no aporta nada aquí, ya estamos saliendo).
+1989-  ed.addEventListener("dblclick",ev=>{ ev.preventDefault(); ev.stopPropagation(); finish(true); });
+1990-
+1991-  ed.focus({preventScroll:true});
+1992-  requestAnimationFrame(()=>{ setPlainCaret(ed,caret); drawer.scrollTop=oldScroll; });
+1993-}
+1994-
+1995-/* edición en el sitio antigua, conservada como fallback interno */
+1996-function inlineEdit(chip, gi){
+1997-  const w = S.words[gi], prev = w.text;
+1998-  chip.textContent = "";
+1999-  const inp = document.createElement("input");
+2000-  inp.className = "inlineWordInput";
+2001-  inp.value = prev;
+2002-  inp.size = Math.max(12, Math.min(36, prev.length + 6));
+2003-  inp.style.width = Math.max(180, Math.min(420, prev.length * 13 + 70)) + "px";
+2004-  chip.appendChild(inp);
+2005-  inp.onpointerdown = ev => ev.stopPropagation();
+2006-  inp.onclick = ev => ev.stopPropagation();
+2007-  inp.ondblclick = ev => ev.stopPropagation();
+2008-  inp.focus();
+2009-  requestAnimationFrame(()=>{ const n=inp.value.length; try{ inp.setSelectionRange(n,n); }catch(e){} });
+2010-  let cerrado = false;
+2011-  const fin = commit => {
+2012-    if(cerrado) return; cerrado = true;
+2013-    if(commit) editWordText(gi, inp.value); else paintLyrics();
+2014-  };
+2015:  inp.onkeydown = ev => {
+2016-    ev.stopPropagation();
+2017:    if(ev.key === "Enter"){ ev.preventDefault(); fin(true); }
+2018-    else if(ev.key === "Escape"){ ev.preventDefault(); fin(false); }
+2019-  };
+2020-  inp.onblur = () => setTimeout(()=>fin(true),0);
+2021-}
+2022-
+2023-/* ---------------- ROLES V07 · "selecciona, luego pulsa el botón" ----------------
+2024-   Flujo para Valeria, sin modos que cambien el clic normal:
+2025-   1) Selecciona con el Motor V1 de siempre (clic, Shift+clic para rango, o
+2026-      Ctrl+clic/arrastrar para selección libre). Nada de esto se toca ni se
+2027-      intercepta: sigue navegando/reproduciendo exactamente igual que antes.
+2028-   2) Pulsa HOMBRE/MUJER/DUO/HABLADO: la selección actual se pinta al instante
+2029-      (0ms, sin animación) y el botón queda ARMADO (iluminado).
+2030-   3) Mientras el botón siga armado, CUALQUIER selección nueva que haga se
+2031-      pinta sola con ese rol — si esa selección YA tenía el mismo rol, se
+2032-      quita (vuelve a SIN ROL); si no, se aplica. Así corrige de más sin
+2033-      tocar lo que ya estaba bien.
+2034-   4) Pulsar el mismo botón armado lo apaga; no toca nada de lo ya pintado.
+2035-      Pulsar otro botón de rol cambia el armado al nuevo.
+--
+2625-/* pellizco en táctil */
+2626-let pinch = null;
+2627-cv.addEventListener("touchstart", e => {
+2628-  if(e.touches.length === 2){
+2629-    const [a,b] = e.touches;
+2630-    pinch = {d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), dur: S.view.dur};
+2631-  }
+2632-}, {passive:true});
+2633-cv.addEventListener("touchmove", e => {
+2634-  if(pinch && e.touches.length === 2){
+2635-    const [a,b] = e.touches;
+2636-    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+2637-    S.view.dur = clamp(pinch.dur * pinch.d / Math.max(1,d), 0.4, S.duration||60);
+2638-  }
+2639-}, {passive:true});
+2640-cv.addEventListener("touchend", ()=>{ pinch = null; }, {passive:true});
+2641-
+2642-/* ---------------- teclado ---------------- */
+2643:document.addEventListener("keydown", e => {
+2644-  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) || !!e.target.isContentEditable;
+2645-  if(typing) return;
+2646-  if(!$("#setup").hidden || !$("#settings").hidden){
+2647-    if(e.code === "Escape" && $("#setup").hidden) closeSettings();
+2648:    if(calibrating && e.code === "Space"){ e.preventDefault(); calTap(); return; }
+2649-    if(!$("#setup").hidden){
+2650:      if(e.code==="Enter"){ e.preventDefault(); toggle(); }
+2651:      else if(e.code==="ArrowLeft"){ e.preventDefault(); nudge(-2); }
+2652:      else if(e.code==="ArrowRight"){ e.preventDefault(); nudge(2); }
+2653-    }
+2654-    return;
+2655-  }
+2656-
+2657-  // En SINCRONIZAR, 0–4 controlan roles. En CORREGIR, 1–6 conservan las velocidades.
+2658-  if(document.body.classList.contains("phase2") && !e.ctrlKey && !e.metaKey && !e.altKey){
+2659:    const roleKeys={Digit0:"none",Numpad0:"none",Digit1:"hombre",Numpad1:"hombre",Digit2:"mujer",Numpad2:"mujer",Digit3:"duo",Numpad3:"duo",Digit4:"hablado",Numpad4:"hablado"};
+2660-    const rr=roleKeys[e.code];
+2661-    if(rr){ e.preventDefault(); roleButtonPress(rr); return; }
+2662-  }
+2663-
+2664-  switch(e.code){
+2665:    case "Space":
+2666-      e.preventDefault();
+2667-      if(e.repeat) return;
+2668-      if(S.resyncSession){ mark(); return; }
+2669-
+2670-      // RONDA20: durante una sincronización normal, SPACE SIEMPRE marca la
+2671-      // siguiente palabra pendiente. Una selección/rango anterior no puede
+2672-      // apropiarse de SPACE y convertir la captura en un LOOP accidental.
+2673-      // El LOOP con SPACE queda disponible cuando ya no estamos capturando
+2674-      // palabras pendientes (revisión de material ya sincronizado).
+2675-      const pendingAtCursor = S.cursor < S.words.length && S.words[S.cursor]?.start_time === null;
+2676-      if(S.playing && pendingAtCursor){
+2677-        if(S.loopingRange) stopRangeLoop(false);
+2678-        S.range=null; S.rangeSource=null; S.loopingRange=false;
