@@ -75,3 +75,5 @@ jobs:
           echo "=== LOCAL HTML HEAD ==="
           curl -fsS http://127.0.0.1:8765/ | head -n 80 || true
           REMOTE
+
+# retrigger: inspect live CDG UI before waveform zoom integration
