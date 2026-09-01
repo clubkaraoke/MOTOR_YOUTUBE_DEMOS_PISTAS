@@ -1,0 +1,134 @@
+name: Wave Peaks Auto
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Pending IDs to process in this run (max 200)"
+        required: true
+        default: "200"
+        type: string
+      resume:
+        description: "Remove AUTO_PAUSED marker and resume"
+        required: true
+        default: false
+        type: boolean
+  schedule:
+    # Conservative cadence: one batch every 3 hours.
+    # The remote runner enforces max 200, 10s minimum delay and no overlap.
+    - cron: "25 */3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wave-peaks-auto
+  cancel-in-progress: false
+
+jobs:
+  run-wave-peaks:
+    name: Safe wave peaks batch
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate deployment secrets
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$OVH_HOST"
+          test -n "$OVH_PORT"
+          test -n "$OVH_SSH_KEY"
+          test -n "$OVH_USER"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EJvmNCxljj7XEHw7ym3mdvmmbCf+XQxqpbc/XRKnz70"
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+          keyscan_file="$(mktemp)"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$keyscan_file"
+          test -s "$keyscan_file"
+
+          actual_fingerprint="$(
+            ssh-keygen -lf "$keyscan_file" -E sha256 |
+            awk 'NR==1 {print $2}'
+          )"
+
+          echo "Verified OVH ED25519 fingerprint: $actual_fingerprint"
+          if [ "$actual_fingerprint" != "$OVH_EXPECTED_FINGERPRINT" ]; then
+            echo "ERROR: OVH SSH host fingerprint mismatch." >&2
+            exit 1
+          fi
+
+          cp "$keyscan_file" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          rm -f "$keyscan_file"
+
+      - name: Validate runner script
+        run: |
+          set -euo pipefail
+          bash -n deploy/run_wave_peaks_batch.sh
+          grep -q 'BATCH_SIZE > 200' deploy/run_wave_peaks_batch.sh
+          grep -q 'DELAY_SUCCESS < 10' deploy/run_wave_peaks_batch.sh
+          grep -q 'CIRCUIT_BREAKER_STOP' deploy/run_wave_peaks_batch.sh
+          grep -q 'generator_already_running' deploy/run_wave_peaks_batch.sh
+
+      - name: Run safe batch on OVH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          DISPATCH_BATCH_SIZE: ${{ inputs.batch_size }}
+          DISPATCH_RESUME: ${{ inputs.resume }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          batch_size="200"
+          resume_auto="false"
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            batch_size="${DISPATCH_BATCH_SIZE:-200}"
+            resume_auto="${DISPATCH_RESUME:-false}"
+          fi
+
+          echo "Starting safe OVH wave-peaks run: batch_size=$batch_size resume=$resume_auto"
+          echo "Fixed protections: max=200 delay>=10s concurrency=1 R2-first circuit-breaker remote-lock"
+
+          ssh \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
+            -p "$OVH_PORT" \
+            "$OVH_USER@$OVH_HOST" \
+            "BATCH_SIZE='$batch_size' DELAY_SUCCESS='10' RESUME_AUTO='$resume_auto' bash -s" \
+            < deploy/run_wave_peaks_batch.sh
+
+      - name: Automation policy summary
+        if: always()
+        run: |
+          {
+            echo "### Wave Peaks Auto"
+            echo "- Cadence: every 3 hours"
+            echo "- Maximum batch: 200 pending IDs"
+            echo "- Minimum delay: 10 seconds"
+            echo "- Concurrency: 1 (generator) + remote lock"
+            echo "- Existing R2 peaks: skipped before Google"
+            echo "- Quota/circuit-breaker: automatic pause"
+            echo "- Repeated per-file errors: quarantine after 3 final ERROR records"
+            echo "- No --force"
+          } >> "$GITHUB_STEP_SUMMARY"
