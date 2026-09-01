@@ -53,10 +53,8 @@ jobs:
             sudo find "$cwd" -maxdepth 3 -type f \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" \) -printf '%p\n' | sort | head -n 160
             echo "=== UI STRING MATCHES HOST ==="
             sudo grep -RIl -E "LETRA LIBRE|Comenzar corrección|Siguiente trabajo recomendado|Pantalla|Ajustes" "$cwd" 2>/dev/null | head -n 50 || true
-            echo "=== EDITOR V1 BUTTON HANDLERS ==="
-            sudo grep -n -C 12 -E "btnPreview|btnLyrics|btnSettings|preview\.hidden|lyricsDrawer.*hidden|toggle.*preview|toggle.*lyrics" "$cwd/editor_v1/index.html" | tail -n 260 || true
-            echo "=== EDITOR V1 RESPONSIVE EXISTING ==="
-            sudo grep -n -C 10 -E "@media.*max-width|matchMedia|innerWidth|resize.*mobile|mobile" "$cwd/editor_v1/index.html" | head -n 220 || true
+            echo "=== PANEL MOBILE NAV + IFRAME ==="
+            sudo grep -n -C 18 -E "bottom-nav|mobile-nav|nav-bottom|v1-editor-frame|v1-editor-mode|@media\(max-width:880px\)|@media \(max-width:880px\)" "$cwd/panel.html" | head -n 360 || true
           fi
 
           echo "=== DOCKER PORTS ==="
