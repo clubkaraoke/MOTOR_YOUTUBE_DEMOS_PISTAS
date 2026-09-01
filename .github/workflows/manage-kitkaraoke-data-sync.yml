@@ -45,6 +45,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check out KITKARAOKE DATA SYNC
+        if: inputs.operation == 'deploy' || inputs.operation == 'install_oauth'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: clubkaraoke/KITKARAOKE_DATA_SYNC
@@ -98,6 +99,7 @@ jobs:
           chmod 600 "$HOME/.ssh/known_hosts"
 
       - name: Resolve KIT revision
+        if: inputs.operation == 'deploy'
         id: kit
         working-directory: kit-source
         run: printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -181,8 +183,8 @@ jobs:
           OVH_USER: ${{ secrets.OVH_USER }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' \
-            < kit-source/deploy/diagnose_ovh.sh
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash deploy/diagnose_ovh.sh'
 
       - name: Refresh and persist source inventory
         if: inputs.operation == 'inventory_refresh'
