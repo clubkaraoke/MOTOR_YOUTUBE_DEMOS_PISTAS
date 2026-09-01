@@ -1,0 +1,125 @@
+name: Patch CDG waveform navigator V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_waveform_navigator_v1.py"
+      - ".github/workflows/patch-cdg-waveform-navigator-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cdg-waveform-navigator-v1
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate patch and JavaScript
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_waveform_navigator_v1.py
+          grep -q 'DJGABO_WAVEFORM_NAVIGATOR_V1' deploy/patch_cdg_waveform_navigator_v1.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          p = Path("deploy/patch_cdg_waveform_navigator_v1.py")
+          spec = importlib.util.spec_from_file_location("navpatch", p)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          js = m.NAV_JS
+          js = js.replace('<script id="djgabo-waveform-navigator-v1">', '', 1)
+          js = js.rsplit('</script>', 1)[0]
+          Path("/tmp/djgabo-waveform-navigator-v1.js").write_text(js, encoding="utf-8")
+          PY
+          node --check /tmp/djgabo-waveform-navigator-v1.js
+
+      - name: Prepare SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EJvmNCxljj7XEHw7ym3mdvmmbCf+XQxqpbc/XRKnz70"
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+          keyscan_file="$(mktemp)"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$keyscan_file"
+          test -s "$keyscan_file"
+          actual_fingerprint="$(ssh-keygen -lf "$keyscan_file" -E sha256 | awk '{print $2}' | head -n1)"
+          test "$actual_fingerprint" = "$OVH_EXPECTED_FINGERPRINT"
+          cat "$keyscan_file" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          rm -f "$keyscan_file"
+
+      - name: Backup and apply patch on OVH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          remote_patch="/tmp/patch_cdg_waveform_navigator_v1.py"
+          scp -P "$OVH_PORT" deploy/patch_cdg_waveform_navigator_v1.py "$OVH_USER@$OVH_HOST:$remote_patch"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo python3 '$remote_patch'; rc=\$?; rm -f '$remote_patch'; exit \$rc" | tee diagnostics/cdg-waveform-navigator-v1-live.txt
+
+      - name: Verify live editor
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' >> diagnostics/cdg-waveform-navigator-v1-live.txt <<'REMOTE'
+          set -euo pipefail
+          f=/opt/djgabo-cdg/editor_v1/index.html
+
+          sudo grep -q 'DJGABO_WAVEFORM_NAVIGATOR_V1' "$f"
+          sudo grep -q 'id="waveNavStage"' "$f"
+          sudo grep -q 'id="waveNavigator"' "$f"
+          sudo grep -q 'id="waveNavThumb"' "$f"
+          sudo grep -q 'id="waveNavTop"' "$f"
+          sudo grep -q 'id="waveNavBottom"' "$f"
+          sudo grep -q 'data-z="999999">FULL' "$f"
+          sudo grep -q 'data-z="120"' "$f"
+          sudo grep -q 'data-z="0.1"' "$f"
+          sudo grep -q 'const MIN_DUR = 0.1;' "$f"
+          test "$(sudo grep -o 'id="waveNavigator"' "$f" | wc -l)" -eq 1
+
+          html="$(curl -fsS 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          grep -q 'DJGABO_WAVEFORM_NAVIGATOR_V1' <<< "$html"
+          grep -q 'id="waveNavigator"' <<< "$html"
+          grep -q 'id="waveNavThumb"' <<< "$html"
+
+          echo "LIVE_MARKER=DJGABO_WAVEFORM_NAVIGATOR_V1"
+          echo "LIVE_SHA256=$(sudo sha256sum "$f" | awk '{print $1}')"
+          echo "LIVE_SIZE_BYTES=$(sudo stat -c %s "$f")"
+          echo "LIVE_VERIFY=OK"
+          REMOTE
+
+      - name: Save verification report
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-waveform-navigator-v1-live.txt
+          if git diff --cached --quiet; then
+            echo "Verification report unchanged"
+            exit 0
+          fi
+          git commit -m "diag: verify live CDG waveform navigator V1"
+          git pull --rebase origin main
+          git push origin HEAD:main
