@@ -67,6 +67,10 @@ jobs:
           echo "=== QUICK ZOOM BUTTON HANDLERS ==="
           sudo grep -n -C 24 -E '\\.zq|zoomQuick|dataset\\.z|data-z' "$f" | tail -n 320 || true
           echo
+          echo "=== EXACT .zq REFERENCES ==="
+          sudo grep -n -C 28 -F '.zq' "$f" | tail -n 260 || true
+          sudo grep -n -C 28 -F 'dataset.z' "$f" | tail -n 260 || true
+          echo
           echo "=== VIEW STATE / TIME TRANSFORMS ==="
           sudo grep -n -C 14 -E 'view:[[:space:]]*\{|S\.view|function t2y|function y2t|const t2y|const y2t' "$f" | head -n 360 || true
           REMOTE
