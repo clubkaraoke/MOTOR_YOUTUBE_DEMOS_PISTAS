@@ -1,5 +1,5 @@
 name: Deploy CDG IA Sync Test
-# diagnostics deploy
+# inline transcription deploy
 
 on:
   push:
