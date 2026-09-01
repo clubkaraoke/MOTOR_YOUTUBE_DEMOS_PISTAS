@@ -60,6 +60,12 @@ jobs:
           echo
           echo "=== KEYBOARD HANDLERS ==="
           sudo grep -n -C 18 -E 'keydown|keyup|event\.key|e\.key|Enter|Arrow|Backspace|Space|Numpad|Equal|Minus' "$f" | head -n 420 || true
+          echo
+          echo "=== EXACT WAVE INTERACTION BLOCK 2460-2715 ==="
+          sudo nl -ba "$f" | sed -n '2460,2715p'
+          echo
+          echo "=== VIEW STATE / TIME TRANSFORMS ==="
+          sudo grep -n -C 14 -E 'view:[[:space:]]*\{|S\.view|function t2y|function y2t|const t2y|const y2t' "$f" | head -n 360 || true
           REMOTE
 
       - name: Commit snapshot
