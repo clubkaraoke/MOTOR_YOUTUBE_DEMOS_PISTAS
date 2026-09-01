@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "app/static/**"
+      - "deploy/portal/**"
       - "lyrics_engine/**"
       - "deploy/deploy_ovh.sh"
       - ".github/workflows/deploy-ovh.yml"
@@ -25,6 +27,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Run test suite
         run: |
@@ -155,7 +159,25 @@ jobs:
             "bash -s -- '/tmp/djgabo-youtube-${GITHUB_SHA}.tar.gz' '${GITHUB_SHA}'" \
             < deploy/deploy_ovh.sh
 
+      - name: Detect Motor 03 backend changes
+        id: motor03_backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          if [ -z "$base" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --name-only "$base" HEAD | grep -Eq '^lyrics_engine/(engine/|main\.py$|requirements\.txt$|data/)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Start controlled V0.9 reprocess
+        if: steps.motor03_backend.outputs.changed == 'true'
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
