@@ -55,26 +55,11 @@ jobs:
           cd "$APP" || { echo "APP_MISSING"; exit 0; }
 
           echo "=== SAFE ENV ==="
-          python3 - <<'PY'
-from pathlib import Path
-p=Path('/opt/KITKARAOKE_DATA_SYNC/.env')
-safe={'DATASET_KEY','SOURCE_PATH','DEST_PATH','BLOCK_PREFIX','BLOCK_SIZE','DRY_RUN','AUTO_SYNC','MIN_EXPECTED_SOURCE_COUNT','COPY_WORKERS','SYNC_INTERVAL_SECONDS','DATA_DIR'}
-if not p.exists():
-    print('.env MISSING')
-else:
-    found=0
-    for raw in p.read_text(errors='replace').splitlines():
-        line=raw.strip()
-        if not line or line.startswith('#') or '=' not in line:
-            continue
-        k,v=line.split('=',1)
-        k=k.strip()
-        if k.startswith('export '): k=k[7:].strip()
-        if k in safe:
-            print(f'{k}={v.strip()}')
-            found += 1
-    print('SAFE_KEYS_FOUND=', found)
-PY
+          if [ -f "$APP/.env" ]; then
+            grep -E '^(DATASET_KEY|SOURCE_PATH|DEST_PATH|BLOCK_PREFIX|BLOCK_SIZE|DRY_RUN|AUTO_SYNC|MIN_EXPECTED_SOURCE_COUNT|COPY_WORKERS|SYNC_INTERVAL_SECONDS|DATA_DIR)=' "$APP/.env" || true
+          else
+            echo ".env MISSING"
+          fi
           echo
 
           echo "=== MIGRATION STATE ==="
@@ -122,5 +107,3 @@ PY
           git add OVH_KITKARAOKE_LIVE_NOW.txt
           git commit -m "diag: save current KITKARAOKE OVH state" || exit 0
           git push origin main
-
-# trigger diagnostic run
