@@ -1,0 +1,163 @@
+name: One-time KITKARAOKE OVH state diagnostic
+
+on:
+  push:
+    branches:
+      - diag-kitkaraoke-state
+    paths:
+      - '.github/workflows/diag-kitkaraoke-state.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure OVH SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          {
+            printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+            printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
+          } > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Read only OVH diagnostic
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > "$RUNNER_TEMP/ovh_diag.txt" <<'REMOTE'
+          set -u
+          echo "=== KITKARAOKE DATA SYNC OVH DIAG ==="
+          date -Is
+          echo
+
+          ROOT=/opt/KITKARAOKE_DATA_SYNC
+          if [ ! -d "$ROOT" ]; then
+            echo "ERROR: $ROOT no existe"
+            exit 2
+          fi
+          cd "$ROOT"
+
+          echo "=== SAFE ENV ==="
+          if [ -f .env ]; then
+            grep -E '^(DATASET_KEY|SOURCE_PATH|DEST_PATH|BLOCK_PREFIX|BLOCK_SIZE|DRY_RUN|AUTO_SYNC|MIN_EXPECTED_SOURCE_COUNT|COPY_WORKERS|SYNC_INTERVAL_SECONDS)=' .env || true
+          else
+            echo ".env MISSING"
+          fi
+          echo
+
+          echo "=== FILES ==="
+          for f in .env data/state.sqlite3 data/catalogo_universal_03_INGLES.json rclone.conf docker-compose.yml; do
+            if [ -e "$f" ]; then
+              stat -c '%n | size=%s | mtime=%y' "$f"
+            else
+              echo "$f | MISSING"
+            fi
+          done
+          echo
+
+          echo "=== DOCKER ==="
+          sudo docker compose ps 2>&1 || true
+          echo
+
+          echo "=== SQLITE READ-ONLY ==="
+          python3 - <<'PY'
+          import os, sqlite3, json
+          db='/opt/KITKARAOKE_DATA_SYNC/data/state.sqlite3'
+          if not os.path.exists(db):
+              print('state.sqlite3 MISSING')
+              raise SystemExit(0)
+          conn=sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+          conn.row_factory=sqlite3.Row
+          try:
+              print('-- datasets --')
+              for r in conn.execute("SELECT dataset_key,source_path,dest_path,block_prefix,block_size,inventory_count,inventory_generation,inventory_refreshed_at,updated_at FROM datasets ORDER BY dataset_key"):
+                  print(dict(r))
+
+              print('-- inventory status --')
+              for r in conn.execute("SELECT dataset_key,status,COUNT(*) AS n FROM inventory GROUP BY dataset_key,status ORDER BY dataset_key,status"):
+                  print(dict(r))
+
+              print('-- blocks summary --')
+              rows=conn.execute("""
+                SELECT dataset_key, block_name, COUNT(*) total,
+                       SUM(CASE WHEN status='copied' THEN 1 ELSE 0 END) copied,
+                       SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending,
+                       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) failed
+                FROM inventory
+                GROUP BY dataset_key, block_name
+                ORDER BY dataset_key, block_name
+              """).fetchall()
+              print('block_count=', len(rows))
+              for r in rows:
+                  print(dict(r))
+
+              print('-- last sync runs --')
+              for r in conn.execute("""
+                SELECT id,started_at,finished_at,discovered,copied,skipped,failed,dry_run,dataset_key,operation,block_name,details
+                FROM sync_runs ORDER BY id DESC LIMIT 12
+              """):
+                  d=dict(r)
+                  if d.get('details') and len(str(d['details']))>500:
+                      d['details']=str(d['details'])[:500]+'...'
+                  print(d)
+          finally:
+              conn.close()
+          PY
+          echo
+
+          echo "=== CATALOG JSON ==="
+          python3 - <<'PY'
+          import os, json
+          p='/opt/KITKARAOKE_DATA_SYNC/data/catalogo_universal_03_INGLES.json'
+          if not os.path.exists(p):
+              print('catalog MISSING')
+              raise SystemExit(0)
+          try:
+              d=json.load(open(p,encoding='utf-8'))
+              print({
+                'schema': d.get('schema'),
+                'dataset': d.get('dataset'),
+                'root': d.get('root'),
+                'count': d.get('count'),
+                'blocks': d.get('blocks'),
+                'blockSizeMax': d.get('blockSizeMax'),
+                'generatedAt': d.get('generatedAt'),
+              })
+          except Exception as e:
+              print('catalog ERROR', type(e).__name__, str(e))
+          PY
+          echo
+
+          echo "=== HOST ==="
+          df -h / | tail -n 1 || true
+          free -h | sed -n '1,2p' || true
+          echo "=== END ==="
+          REMOTE
+
+          sed -E 's/(token|secret|client_id|client_secret|password|pass)=.*/\1=[REDACTED]/Ig' "$RUNNER_TEMP/ovh_diag.txt" > OVH_KITKARAOKE_DIAG.txt
+
+      - name: Commit diagnostic result to temporary branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add OVH_KITKARAOKE_DIAG.txt
+          git commit -m "diag: capture live KITKARAOKE OVH state"
+          git push origin HEAD:diag-kitkaraoke-state
