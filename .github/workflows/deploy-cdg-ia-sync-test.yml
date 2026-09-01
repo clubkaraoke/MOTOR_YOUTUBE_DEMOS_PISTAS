@@ -1,0 +1,117 @@
+name: Deploy CDG IA Sync Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-sync-test.yml"
+      - "deploy/nginx-panel-integrado.conf"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cdg-ia-sync-test-ovh
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy isolated test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out deployment repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out CDG IA test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: clubkaraoke/CDG_IA_SYNC_TEST
+          ref: main
+          path: cdg-ia-test
+
+      - name: Validate test package
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q cdg-ia-test/app
+          grep -q '127.0.0.1:8091:8000' cdg-ia-test/docker-compose.yml
+          grep -q 'location /cdg-ia-test/' deploy/nginx-panel-integrado.conf
+
+      - name: Validate deployment secrets
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$OVH_HOST"
+          test -n "$OVH_PORT"
+          test -n "$OVH_SSH_KEY"
+          test -n "$OVH_USER"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          OVH_EXPECTED_FINGERPRINT: "SHA256:EJvmNCxljj7XEHw7ym3mdvmmbCf+XQxqpbc/XRKnz70"
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+          keyscan_file="$(mktemp)"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$keyscan_file"
+          test -s "$keyscan_file"
+
+          actual_fingerprint="$(
+            ssh-keygen -lf "$keyscan_file" -E sha256 |
+            awk 'NR==1 {print $2}'
+          )"
+
+          echo "Verified OVH ED25519 fingerprint: $actual_fingerprint"
+          test "$actual_fingerprint" = "$OVH_EXPECTED_FINGERPRINT"
+
+          cp "$keyscan_file" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          rm -f "$keyscan_file"
+
+      - name: Package isolated test
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cdg-ia-sync-test-${GITHUB_SHA}.tar.gz"
+          tar             --exclude='.git'             --exclude='.env'             --exclude='./runtime'             -czf "$archive"             -C cdg-ia-test .
+
+      - name: Upload release and nginx config
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT"             "$RUNNER_TEMP/cdg-ia-sync-test-${GITHUB_SHA}.tar.gz"             "$OVH_USER@$OVH_HOST:/tmp/cdg-ia-sync-test-${GITHUB_SHA}.tar.gz"
+
+          scp -P "$OVH_PORT"             deploy/nginx-panel-integrado.conf             "$OVH_USER@$OVH_HOST:/tmp/nginx-panel-cdg-ia-${GITHUB_SHA}.conf"
+
+      - name: Deploy test container and route
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST"             "bash -s -- '/tmp/cdg-ia-sync-test-${GITHUB_SHA}.tar.gz' '${GITHUB_SHA}' '/tmp/nginx-panel-cdg-ia-${GITHUB_SHA}.conf'"             < cdg-ia-test/deploy/deploy_ovh.sh
+
+      - name: Verify public route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://panel.kitkaraoke.com/cdg-ia-test/ || true)"
+          echo "Public route HTTP status: $code"
+          case "$code" in
+            200|301|302|303|307|308) ;;
+            *) echo "Unexpected public route status: $code" >&2; exit 1 ;;
+          esac
