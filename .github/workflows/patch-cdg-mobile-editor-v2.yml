@@ -1,0 +1,80 @@
+name: Patch CDG mobile editor V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_mobile_editor_v2.py"
+      - ".github/workflows/patch-cdg-mobile-editor-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cdg-mobile-editor-v2
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate patch script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_mobile_editor_v2.py
+          grep -q 'DJGABO_MOBILE_EDITOR_V2' deploy/patch_cdg_mobile_editor_v2.py
+          grep -q 'DJGABO_MOBILE_EDITOR_PARENT_V2' deploy/patch_cdg_mobile_editor_v2.py
+
+      - name: Prepare SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload and apply patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          remote_patch="/tmp/patch_cdg_mobile_editor_v2.py"
+          scp -P "$OVH_PORT" deploy/patch_cdg_mobile_editor_v2.py "$OVH_USER@$OVH_HOST:$remote_patch"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo python3 '$remote_patch' && rm -f '$remote_patch'"
+
+      - name: Verify live files
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          sudo grep -q 'DJGABO_MOBILE_EDITOR_V2' /opt/djgabo-cdg/editor_v1/index.html
+          sudo grep -q 'DJGABO_MOBILE_EDITOR_PARENT_V2' /opt/djgabo-cdg/panel.html
+          sudo grep -q 'mobile-view-lyrics' /opt/djgabo-cdg/editor_v1/index.html
+          sudo grep -q 'mobile-view-screen' /opt/djgabo-cdg/editor_v1/index.html
+
+          root_html="$(curl -fsS http://127.0.0.1:8765/)"
+          printf '%s' "$root_html" | grep -q 'DJGABO_MOBILE_EDITOR_PARENT_V2'
+
+          editor_html="$(curl -fsS 'http://127.0.0.1:8765/editor-v1?embed=1' || true)"
+          if [ -n "$editor_html" ]; then
+            printf '%s' "$editor_html" | grep -q 'DJGABO_MOBILE_EDITOR_V2'
+          fi
+
+          echo "LIVE_CDG_MOBILE_EDITOR_V2_OK"
+          REMOTE
