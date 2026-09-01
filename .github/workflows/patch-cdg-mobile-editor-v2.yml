@@ -69,11 +69,11 @@ jobs:
           sudo grep -q 'mobile-view-screen' /opt/djgabo-cdg/editor_v1/index.html
 
           root_html="$(curl -fsS http://127.0.0.1:8765/)"
-          printf '%s' "$root_html" | grep -q 'DJGABO_MOBILE_EDITOR_PARENT_V2'
+          grep -q 'DJGABO_MOBILE_EDITOR_PARENT_V2' <<< "$root_html"
 
           editor_html="$(curl -fsS 'http://127.0.0.1:8765/editor-v1?embed=1' || true)"
           if [ -n "$editor_html" ]; then
-            printf '%s' "$editor_html" | grep -q 'DJGABO_MOBILE_EDITOR_V2'
+            grep -q 'DJGABO_MOBILE_EDITOR_V2' <<< "$editor_html"
           fi
 
           echo "LIVE_CDG_MOBILE_EDITOR_V2_OK"
