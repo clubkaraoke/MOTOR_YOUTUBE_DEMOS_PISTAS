@@ -1,0 +1,76 @@
+name: Snapshot live CDG waveform once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/snapshot-cdg-waveform-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Prepare SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Capture targeted live waveform source
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-waveform-live.txt <<'REMOTE'
+          set -euo pipefail
+          f=/opt/djgabo-cdg/editor_v1/index.html
+          test -f "$f"
+          echo "LIVE_FILE=$f"
+          echo "SIZE_BYTES=$(sudo stat -c %s "$f")"
+          echo "SHA256=$(sudo sha256sum "$f" | awk '{print $1}')"
+          echo
+          echo "=== ZOOM QUICK / PRESET MARKUP ==="
+          sudo grep -n -C 14 -E 'zoomQuick|>10s<|>5s<|>2s<|>1s<|10s|5s|2s|1s' "$f" | head -n 260 || true
+          echo
+          echo "=== WHEEL / CTRL / ZOOM HANDLERS ==="
+          sudo grep -n -C 18 -E 'wheel|ctrlKey|deltaY|zoom|Zoom|secondsPer|viewStart|viewEnd|windowSec|scale|preventDefault' "$f" | head -n 420 || true
+          echo
+          echo "=== POINTER / TOUCH / MOUSE HANDLERS ==="
+          sudo grep -n -C 16 -E 'pointerdown|pointermove|pointerup|mousedown|mousemove|mouseup|touchstart|touchmove|touchend|gesture|drag' "$f" | head -n 360 || true
+          echo
+          echo "=== PLAYHEAD / CURSOR / SEEK / DRAW ==="
+          sudo grep -n -C 16 -E 'playhead|cursor|seek|currentTime|draw\(|function draw|canvas|wave' "$f" | head -n 480 || true
+          echo
+          echo "=== KEYBOARD HANDLERS ==="
+          sudo grep -n -C 18 -E 'keydown|keyup|event\.key|e\.key|Enter|Arrow|Backspace|Space|Numpad|Equal|Minus' "$f" | head -n 420 || true
+          REMOTE
+
+      - name: Commit snapshot
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-waveform-live.txt
+          if git diff --cached --quiet; then
+            echo "No snapshot changes"
+            exit 0
+          fi
+          git commit -m "diag: snapshot live CDG waveform handlers"
+          git push origin HEAD:main
