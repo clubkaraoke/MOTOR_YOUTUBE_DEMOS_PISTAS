@@ -1851,3 +1851,623 @@ SHA256=2e37adf75dc29e7219ca22ba1ae984edfaa3dc420d24dc0acfcfc94131b7abbf
 2676-      if(S.playing && pendingAtCursor){
 2677-        if(S.loopingRange) stopRangeLoop(false);
 2678-        S.range=null; S.rangeSource=null; S.loopingRange=false;
+
+=== EXACT WAVE INTERACTION BLOCK 2460-2715 ===
+  2460	  if(!w.spoken && en!==null && en>w.start_time){
+  2461	    S.range={start:w.start_time,end:en}; S.rangeSource="word";
+  2462	  }else{
+  2463	    S.range=null; S.rangeSource=null;
+  2464	  }
+  2465	  refreshSelectionVisual();
+  2466	}
+  2467	
+  2468	function beginTimingDrag(hit,e,y){
+  2469	  if(S.playing) pause();
+  2470	  const i=hit.i, w=S.words[i], en=effectiveTimingEnd(i);
+  2471	  if(!w || w.start_time===null || en===null) return;
+  2472	  const snap=snapshot(i); // conserva END=null en Undo si venía de un proyecto antiguo
+  2473	  selectTimingWord(i);
+  2474	  S.drag={
+  2475	    kind:"timing", mode:hit.mode, i, pointerId:e.pointerId,
+  2476	    y0:y, start0:w.start_time, end0:en,
+  2477	    duration0:en-w.start_time,
+  2478	    snap, moved:false, materialized:(w.end_time===null)
+  2479	  };
+  2480	  cv.style.cursor = hit.mode==="move" ? "grabbing" : "ns-resize";
+  2481	  draw();
+  2482	}
+  2483	
+  2484	function beginMultiMove(e,y){
+  2485	  if(S.playing) pause();
+  2486	  const ids=selectedTimedIndices();
+  2487	  const items=ids.map(i=>({i,start:S.words[i].start_time,end:S.words[i].end_time,locked:S.words[i].locked}));
+  2488	  const minStart=Math.min(...items.map(it=>it.start)), maxEnd=Math.max(...items.map(it=>it.end));
+  2489	  S.drag={kind:"multi-move",pointerId:e.pointerId,y0:y,moved:false,snap:docSnapshot(),items,minStart,maxEnd};
+  2490	  cv.style.cursor="grabbing";
+  2491	}
+  2492	
+  2493	function releaseCanvasPointer(pointerId){
+  2494	  try{ if(cv.hasPointerCapture(pointerId)) cv.releasePointerCapture(pointerId); }catch(_){ }
+  2495	}
+  2496	
+  2497	cv.addEventListener("pointerdown", e => {
+  2498	  if(!S.peaks) return;
+  2499	  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  2500	  e.preventDefault();
+  2501	
+  2502	  if(rangePlayHit(x,y)){ toggleRangeLoop(); return; }
+  2503	
+  2504	  const hit=hitTimingAction(x,y);
+  2505	  if(hit){
+  2506	    cv.setPointerCapture(e.pointerId);
+  2507	    if(hit.mode==="multi-move") beginMultiMove(e,y);
+  2508	    else beginTimingDrag(hit,e,y);
+  2509	    return;
+  2510	  }
+  2511	
+  2512	  // Espacio libre = SEEK. Nunca reproduce ni modifica timings.
+  2513	  cv.setPointerCapture(e.pointerId);
+  2514	  const target=clamp(y2t(y),0,S.duration);
+  2515	  S.audio.currentTime=target;
+  2516	  S.sel=-1; S.selStart=-1; S.selEnd=-1; S.range=null; S.rangeSource=null;
+  2517	  S.capturePrevIndex=null; S.lastMarkT=-1; S.clickResync=false; clearPlayHighlight();
+  2518	  paintLyrics(); draw();
+  2519	  S.drag={kind:"seek",pointerId:e.pointerId,y0:y,tStart:target,moved:false};
+  2520	});
+  2521	
+  2522	cv.addEventListener("pointermove", e => {
+  2523	  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  2524	
+  2525	  if(!S.drag){
+  2526	    if(rangePlayHit(x,y)) cv.style.cursor="pointer";
+  2527	    else {
+  2528	      const h=hitTimingAction(x,y);
+  2529	      if(h?.mode==="start" || h?.mode==="end") cv.style.cursor="ns-resize";
+  2530	      else if(h?.mode==="move" || h?.mode==="multi-move") cv.style.cursor="grab";
+  2531	      else cv.style.cursor="crosshair";
+  2532	    }
+  2533	    return;
+  2534	  }
+  2535	
+  2536	  const d=S.drag;
+  2537	  if(d.pointerId!==undefined && e.pointerId!==d.pointerId) return;
+  2538	  e.preventDefault();
+  2539	  const dy=y-(d.y0??y); if(Math.abs(dy)>2) d.moved=true;
+  2540	  if(d.kind==="seek") return;
+  2541	
+  2542	  if(d.kind==="multi-move"){
+  2543	    cv.style.cursor="grabbing";
+  2544	    let dt=y2t(y)-y2t(d.y0);
+  2545	    dt=clamp(dt,-d.minStart,S.duration-d.maxEnd);
+  2546	    for(const it of d.items){
+  2547	      const w=S.words[it.i];
+  2548	      w.start_time=it.start+dt; w.end_time=it.end+dt;
+  2549	      w.locked=true; w.provisional=false;
+  2550	    }
+  2551	    draw();
+  2552	    return;
+  2553	  }
+  2554	
+  2555	  if(d.kind!=="timing") return;
+  2556	  const w=S.words[d.i];
+  2557	  if(!w) return;
+  2558	  const t=clamp(y2t(y),0,S.duration);
+  2559	
+  2560	  // En el primer movimiento materializamos END si venía nulo (p.ej. proyecto viejo).
+  2561	  if(w.end_time===null) w.end_time=d.end0;
+  2562	
+  2563	  if(d.mode==="start"){
+  2564	    cv.style.cursor="ns-resize";
+  2565	    w.start_time=clamp(t,0,Math.max(0,d.end0-.03));
+  2566	    // END permanece fijo: cambiar START cambia duración.
+  2567	    w.end_time=d.end0;
+  2568	  }else if(d.mode==="end"){
+  2569	    cv.style.cursor="ns-resize";
+  2570	    // END libre hacia abajo/arriba: START permanece fijo y cambia duración.
+  2571	    w.start_time=d.start0;
+  2572	    w.end_time=clamp(t,d.start0+.03,S.duration);
+  2573	  }else if(d.mode==="move"){
+  2574	    cv.style.cursor="grabbing";
+  2575	    const ns=clamp(d.start0+(y2t(y)-y2t(d.y0)),0,Math.max(0,S.duration-d.duration0));
+  2576	    w.start_time=ns; w.end_time=ns+d.duration0; // duración EXACTA
+  2577	  }
+  2578	
+  2579	  w.locked=true; w.provisional=false;
+  2580	  if(!w.spoken && w.end_time>w.start_time){ S.range={start:w.start_time,end:w.end_time}; S.rangeSource="word"; }
+  2581	  draw(); // feedback visual continuo
+  2582	});
+  2583	
+  2584	function finishCanvasDrag(e){
+  2585	  const d=S.drag; S.drag=null;
+  2586	  releaseCanvasPointer(e.pointerId);
+  2587	  cv.style.cursor="crosshair";
+  2588	  if(!d) return;
+  2589	
+  2590	  if(d.kind==="seek"){
+  2591	    const r=cv.getBoundingClientRect(), y=e.clientY-r.top;
+  2592	    S.audio.currentTime=clamp(y2t(y),0,S.duration);
+  2593	    draw(); return;
+  2594	  }
+  2595	
+  2596	  if(!d.moved){ draw(); return; }
+  2597	  if(d.kind==="multi-move") push(d.snap);
+  2598	  else if(d.kind==="timing") push(d.snap);
+  2599	  else return;
+  2600	
+  2601	  S.dirty=true; pvInvalidate();
+  2602	  paintLyrics(); draw(); scheduleSave();
+  2603	}
+  2604	
+  2605	cv.addEventListener("pointerup", finishCanvasDrag);
+  2606	cv.addEventListener("pointercancel", finishCanvasDrag);
+  2607	
+  2608	cv.addEventListener("wheel", e => {
+  2609	  if(!S.peaks) return;
+  2610	  e.preventDefault();
+  2611	  const r = cv.getBoundingClientRect(), y = e.clientY - r.top;
+  2612	  if(e.ctrlKey || e.metaKey){
+  2613	    const anchor = y2t(y);
+  2614	    const factor = Math.exp(e.deltaY * 0.0016);
+  2615	    const newDur = clamp(S.view.dur * factor, 0.4, Math.max(4, S.duration || 60));
+  2616	    S.view.dur = newDur;
+  2617	    S.view.t0 = clamp(anchor - (y / CH) * newDur, -1, Math.max(0, S.duration-newDur));
+  2618	  }else{
+  2619	    // Rueda normal: desplazamiento temporal, sin zoom accidental.
+  2620	    S.view.t0 = clamp(S.view.t0 + (e.deltaY/CH)*S.view.dur*0.8, -1, Math.max(0,S.duration-S.view.dur));
+  2621	  }
+  2622	  draw();
+  2623	}, {passive:false});
+  2624	
+  2625	/* pellizco en táctil */
+  2626	let pinch = null;
+  2627	cv.addEventListener("touchstart", e => {
+  2628	  if(e.touches.length === 2){
+  2629	    const [a,b] = e.touches;
+  2630	    pinch = {d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), dur: S.view.dur};
+  2631	  }
+  2632	}, {passive:true});
+  2633	cv.addEventListener("touchmove", e => {
+  2634	  if(pinch && e.touches.length === 2){
+  2635	    const [a,b] = e.touches;
+  2636	    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+  2637	    S.view.dur = clamp(pinch.dur * pinch.d / Math.max(1,d), 0.4, S.duration||60);
+  2638	  }
+  2639	}, {passive:true});
+  2640	cv.addEventListener("touchend", ()=>{ pinch = null; }, {passive:true});
+  2641	
+  2642	/* ---------------- teclado ---------------- */
+  2643	document.addEventListener("keydown", e => {
+  2644	  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) || !!e.target.isContentEditable;
+  2645	  if(typing) return;
+  2646	  if(!$("#setup").hidden || !$("#settings").hidden){
+  2647	    if(e.code === "Escape" && $("#setup").hidden) closeSettings();
+  2648	    if(calibrating && e.code === "Space"){ e.preventDefault(); calTap(); return; }
+  2649	    if(!$("#setup").hidden){
+  2650	      if(e.code==="Enter"){ e.preventDefault(); toggle(); }
+  2651	      else if(e.code==="ArrowLeft"){ e.preventDefault(); nudge(-2); }
+  2652	      else if(e.code==="ArrowRight"){ e.preventDefault(); nudge(2); }
+  2653	    }
+  2654	    return;
+  2655	  }
+  2656	
+  2657	  // En SINCRONIZAR, 0–4 controlan roles. En CORREGIR, 1–6 conservan las velocidades.
+  2658	  if(document.body.classList.contains("phase2") && !e.ctrlKey && !e.metaKey && !e.altKey){
+  2659	    const roleKeys={Digit0:"none",Numpad0:"none",Digit1:"hombre",Numpad1:"hombre",Digit2:"mujer",Numpad2:"mujer",Digit3:"duo",Numpad3:"duo",Digit4:"hablado",Numpad4:"hablado"};
+  2660	    const rr=roleKeys[e.code];
+  2661	    if(rr){ e.preventDefault(); roleButtonPress(rr); return; }
+  2662	  }
+  2663	
+  2664	  switch(e.code){
+  2665	    case "Space":
+  2666	      e.preventDefault();
+  2667	      if(e.repeat) return;
+  2668	      if(S.resyncSession){ mark(); return; }
+  2669	
+  2670	      // RONDA20: durante una sincronización normal, SPACE SIEMPRE marca la
+  2671	      // siguiente palabra pendiente. Una selección/rango anterior no puede
+  2672	      // apropiarse de SPACE y convertir la captura en un LOOP accidental.
+  2673	      // El LOOP con SPACE queda disponible cuando ya no estamos capturando
+  2674	      // palabras pendientes (revisión de material ya sincronizado).
+  2675	      const pendingAtCursor = S.cursor < S.words.length && S.words[S.cursor]?.start_time === null;
+  2676	      if(S.playing && pendingAtCursor){
+  2677	        if(S.loopingRange) stopRangeLoop(false);
+  2678	        S.range=null; S.rangeSource=null; S.loopingRange=false;
+  2679	        mark();
+  2680	        return;
+  2681	      }
+  2682	
+  2683	      if(rangeBounds()){ toggleRangeLoop(); return; }
+  2684	      mark();
+  2685	      return;
+  2686	    case "Enter":
+  2687	      e.preventDefault(); toggle(); return;
+  2688	    case "Backspace":
+  2689	      e.preventDefault();
+  2690	      if(S.selStart>=0){ deleteSelectedWords(); return; }
+  2691	      undoMark(); return;
+  2692	    case "ArrowLeft":
+  2693	      e.preventDefault();
+  2694	      if(e.shiftKey) nudgeSel(-0.01); else if(e.altKey) jumpMark(-1); else nudge(-2);
+  2695	      return;
+  2696	    case "ArrowRight":
+  2697	      e.preventDefault();
+  2698	      if(e.shiftKey) nudgeSel(0.01); else if(e.altKey) jumpMark(1); else nudge(2);
+  2699	      return;
+  2700	    case "Tab":
+  2701	      e.preventDefault(); selectWord(clamp(S.sel+1, 0, S.words.length-1), false); return;
+  2702	    case "Escape":
+  2703	      if(S.armedRole!==null || S.rolePick?.size){ S.armedRole=null; renderRoleButtons(); clearRolePick(false); paintLyrics(); draw(); toast("Roles en NORMAL",900); return; }
+  2704	      if(S.loopingRange){ stopRangeLoop(true); return; }
+  2705	      S.clickResync=false; clearPlayHighlight();
+  2706	      S.sel = -1; S.selStart=-1; S.selEnd=-1; S.range=null; S.rangeSource=null; paintLyrics(); draw(); return;
+  2707	    case "Delete":
+  2708	      if(S.selStart>=0){ e.preventDefault(); deleteSelectedWords(); }
+  2709	      return;
+  2710	    case "KeyL":
+  2711	      if(S.sel >= 0){ push(snapshot(S.sel)); S.words[S.sel].locked = !S.words[S.sel].locked; refreshEnds(S.sel); paintLyrics(); }
+  2712	      return;
+  2713	    case "KeyZ":
+  2714	      if(e.ctrlKey || e.metaKey){
+  2715	        e.preventDefault();
+
+=== VIEW STATE / TIME TRANSFORMS ===
+888-const clamp = (v,a,b) => v<a?a:v>b?b:v;
+889-
+890-/* ---------------- estado ---------------- */
+891-const S = {
+892-  audio: new Audio(),
+893-  audioName: "", sha1: "",
+894-  duration: 0,
+895-  peaks: null,          // {min:Float32Array, max:Float32Array, rate:buckets/seg}
+896-  doc: null,            // {song, segments[]}
+897-  words: [],            // lista plana, referencias a los objetos de doc
+898-  cursor: 0,            // índice de la siguiente palabra a marcar
+899-  sel: -1,              // palabra principal seleccionada
+900-  selStart: -1,         // selección múltiple inclusiva
+901-  selEnd: -1,
+902:  view: {t0:0, dur:30},
+903-  playing: false,
+904-  lastMarkT: -1,
+905-  capturePrevIndex: null, // palabra anterior marcada en la captura ACTUAL; nunca toca timings viejos al insertar letra
+906-  undo: [], redo: [],
+907-  cfg: {cal:0, minGap:60, maxWord:2.5, stall:4, introMode:"auto", introDuration:6, introShort:3, linesPerPage:6,
+908-        fontFamily:"impact", fontSize:18, strokeWidth:1, lyricYOffset:0,
+909-        introTitleSize:28, introArtistSize:20, introTitleX:0, introTitleY:0, introArtistX:0, introArtistY:0,
+910-        introTransition:"centertexttoplogobottomtext", outroLine1:"Ediciones Personalizadas.", outroLine2:"Whatsapp +51921675846",
+911-        outroSize:18, outroX:0, outroY:0, outroTransition:"centertexttoplogobottomtext"},
+912-  drag: null,
+913-  range: null,          // rango derivado únicamente de la selección sincronizada
+914-  rangeSource: null,    // sólo "word"
+915-  loopingRange: false,
+916-  dirty: false,
+--
+1236-   centro. Cada marca es una línea horizontal con su palabra al lado, y la
+1237-   cabeza de reproducción es otra línea horizontal.                        */
+1238-const cv = $("#wave"), cx = cv.getContext("2d");
+1239-let CW=0, CH=0, DPR=1;
+1240-const RULER_W = 46;              // franja de tiempos, a la izquierda
+1241-function resize(){
+1242-  DPR = window.devicePixelRatio || 1;
+1243-  const r = cv.getBoundingClientRect();
+1244-  CW = Math.max(1, Math.floor(r.width)); CH = Math.max(1, Math.floor(r.height));
+1245-  cv.width = CW*DPR; cv.height = CH*DPR;
+1246-  cx.setTransform(DPR,0,0,DPR,0,0);
+1247-}
+1248-new ResizeObserver(()=>{ resize(); draw(); }).observe($("#waveWrap"));
+1249-
+1250:const t2y = t => (t - S.view.t0) / S.view.dur * CH;
+1251:const y2t = y => S.view.t0 + y / CH * S.view.dur;
+1252-
+1253-function tickStep(){
+1254:  const target = S.view.dur / (CH/56);
+1255-  const steps = [.05,.1,.25,.5,1,2,5,10,15,30,60,120,300];
+1256-  return steps.find(s => s >= target) || 600;
+1257-}
+1258-function fmtShort(t){
+1259-  if(t < 0) return "";
+1260-  const m = Math.floor(t/60), s = t - m*60;
+1261:  return m + ":" + (s<10?"0":"") + (S.view.dur<8 ? s.toFixed(1) : Math.floor(s));
+1262-}
+1263-
+1264-function draw(){
+1265-  if(!CH) resize();
+1266-  cx.fillStyle = "#0B0D0C"; cx.fillRect(0,0,CW,CH);
+1267-  if(!S.peaks) return;
+1268-
+1269-  const x0 = RULER_W, wavW = CW - RULER_W, mid = x0 + wavW/2, amp = (wavW/2 - 3) * 0.62; // R26: waveform ~38% más fino, sólo visual
+1270-  const mono = getComputedStyle(document.body).getPropertyValue("--mono");
+1271-  const sans = getComputedStyle(document.body).getPropertyValue("--sans");
+1272-
+1273-  /* franja de tiempos */
+1274-  cx.fillStyle = "#111514"; cx.fillRect(0,0,RULER_W,CH);
+1275-  cx.strokeStyle = "#262E2A";
+1276-  cx.beginPath(); cx.moveTo(RULER_W-.5,0); cx.lineTo(RULER_W-.5,CH); cx.stroke();
+1277-  cx.font = "10px " + mono; cx.textBaseline = "middle"; cx.textAlign = "right";
+1278-  const st = tickStep();
+1279:  for(let t = Math.ceil(S.view.t0/st)*st; t < S.view.t0 + S.view.dur; t += st){
+1280-    const y = t2y(t);
+1281-    cx.strokeStyle = "#202824";
+1282-    cx.beginPath(); cx.moveTo(RULER_W, y+.5); cx.lineTo(CW, y+.5); cx.stroke();
+1283-    cx.fillStyle = "#414D47";
+1284-    cx.fillText(fmtShort(t), RULER_W-6, y);
+1285-  }
+1286-
+1287-  /* onda */
+1288-  const {min,max,rate} = S.peaks;
+1289-  cx.strokeStyle = "#2E5F4B";
+1290-  cx.beginPath(); cx.moveTo(mid+.5,0); cx.lineTo(mid+.5,CH); cx.stroke();
+1291-  cx.fillStyle = "#3E7C63";
+1292:  const perPx = S.view.dur / CH * rate;
+1293-  for(let py=0; py<CH; py++){
+1294:    const a = Math.floor((S.view.t0 + py/CH*S.view.dur) * rate);
+1295-    const b = Math.max(a+1, Math.floor(a + perPx));
+1296-    if(b <= 0 || a >= min.length) continue;
+1297-    let lo=0, hi=0;
+1298-    for(let i=Math.max(0,a); i<Math.min(min.length,b); i++){
+1299-      if(min[i]<lo) lo=min[i]; if(max[i]>hi) hi=max[i];
+1300-    }
+1301-    const xa = mid + lo*amp, xb = mid + hi*amp;
+1302-    cx.fillRect(xa, py, Math.max(1, xb-xa), 1);
+1303-  }
+1304-
+1305-  /* marcas */
+1306:  const showLabels = S.view.dur < 90;
+1307-  cx.textAlign = "left";
+1308-  for(let i=0;i<S.words.length;i++){
+1309-    const w = S.words[i];
+1310-    if(w.start_time === null) continue;
+1311-    const y1 = t2y(w.start_time);
+1312-    if(y1 > CH + 300) break;
+1313-    const y2 = t2y(effectiveTimingEnd(i) ?? (w.start_time + .2));
+1314-    if(y2 < -300) continue;
+1315-    const sel = S.selStart>=0 ? (i>=Math.min(S.selStart,S.selEnd) && i<=Math.max(S.selStart,S.selEnd)) : i === S.sel;
+1316-
+1317-    const roleColor = w.vocal_role==="female"?"#FF4FA3":w.vocal_role==="male"?"#32B7FF":w.vocal_role==="duet"?"#7ED957":"#F2A900";
+1318-    cx.fillStyle = w.spoken ? (sel ? "rgba(224,86,62,.30)" : "rgba(224,86,62,.16)") : (sel ? roleColor+"47" : roleColor+"1C");
+1319-    cx.fillRect(x0, y1, wavW, Math.max(1, y2-y1));
+1320-
+--
+1348-    cx.font="700 10px "+mono; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillStyle="#D6DED8";
+1349-    cx.fillText(S.loopingRange?"■ STOP":"▶ LOOP",bx+bw/2,by+bh/2);
+1350-    cx.textAlign="left";
+1351-  }
+1352-
+1353-  /* cabeza de reproducción */
+1354-  const py = t2y(S.audio.currentTime);
+1355-  if(py >= -1 && py <= CH+1){
+1356-    cx.strokeStyle = "#FFFFFF"; cx.lineWidth = 1;
+1357-    cx.beginPath(); cx.moveTo(0, py+.5); cx.lineTo(CW, py+.5); cx.stroke();
+1358-    cx.fillStyle = "#FFFFFF";
+1359-    cx.beginPath(); cx.moveTo(CW,py-4); cx.lineTo(CW,py+4); cx.lineTo(CW-6,py); cx.closePath(); cx.fill();
+1360-  }
+1361-
+1362:  $("#zoomHud").textContent = S.view.dur.toFixed(1) + " s";
+1363-}
+1364-
+1365-/* ==========================================================================
+1366-   VISTA DE PANTALLA
+1367-   Reproduce lo que hará el CD+G, con las mismas reglas que el renderer:
+1368-     · misma fuente y mismas anchuras (tabla de avances extraída del TTF)
+1369-     · mismo corte de línea
+1370-     · mismo planificador de dibujado y borrado, portado de cdgmaker
+1371-   Si esto miente, no sirve de nada. Cualquier cambio en style.json debe
+1372-   reflejarse también en PV.cfg.
+1373-   ========================================================================== */
+1374-const PV_FONT = "Impact";
+1375-let pvMeasureCanvas=document.createElement("canvas"), pvMeasureCtx=pvMeasureCanvas.getContext("2d");
+1376-function pvFontCss(size=S.cfg.fontSize){ const fam=S.cfg.fontFamily==="arial"?"Arial":S.cfg.fontFamily==="arialbd"?"Arial Black":"Impact"; return `${size}px ${fam}, Arial, sans-serif`; }
+--
+2213-  if(w.start_time !== null){
+2214-    centerOn(w.start_time);
+2215-    if(!modifiedSelection){
+2216-      if(S.loopingRange) stopRangeLoop(true);
+2217-      else if(S.playing && !completeReviewClick) pause();
+2218-      S.audio.currentTime = clamp(w.start_time, 0, S.duration||0);
+2219-    }
+2220-    if(w.end_time!==null && w.end_time>w.start_time){
+2221-      S.range={start:w.start_time,end:w.end_time}; S.rangeSource="word";
+2222-    }else{ S.range=null; S.rangeSource=null; }
+2223-  }
+2224-  refreshSelectionVisual(); draw();
+2225-}
+2226-function centerOn(t){
+2227:  S.view.t0 = clamp(t - S.view.dur*0.4, -1, Math.max(0, S.duration - S.view.dur*0.4));
+2228-}
+2229-
+2230-/* ---------------- selección temporal / loop ---------------- */
+2231-function rangeBounds(){
+2232-  if(S.resyncSession || S.clickResync) return null;
+2233-  if(S.selStart < 0) return null;
+2234-  const a=Math.min(S.selStart,S.selEnd), b=Math.max(S.selStart,S.selEnd);
+2235-  const ws=S.words.slice(a,b+1).filter(w=>!w.spoken && w.start_time!==null);
+2236-  if(!ws.length) return null;
+2237-  const st=Math.min(...ws.map(w=>w.start_time));
+2238-  const en=Math.max(...ws.map(w=>w.end_time??w.start_time+.15));
+2239-  return {start:st,end:en};
+2240-}
+2241-function selectedTimedIndices(){
+--
+2298-/* bucle de dibujo */
+2299-function loop(){
+2300-  const t = S.audio.currentTime || 0;
+2301-  if(S.loopingRange && rangeBounds()){
+2302-    const rr=rangeBounds();
+2303-    if(t >= rr.end-.006 || t < rr.start-.02) S.audio.currentTime=rr.start;
+2304-  }
+2305-  if(S.playing && S.peaks){
+2306-    const y = t2y(t);
+2307-    // RONDA19: nunca dejar que el seguimiento automático desplace la vista
+2308-    // muchos segundos antes de 0:00. Con zoom amplio eso dejaba una gran zona
+2309-    // visual de tiempo negativo; al hacer clic allí currentTime se limitaba a 0
+2310-    // y parecía que la cabeza blanca no obedecía al mouse.
+2311-    if(y > CH*0.62 || y < CH*0.06){
+2312:      const maxT0 = Math.max(0, S.duration - S.view.dur);
+2313:      S.view.t0 = clamp(t - S.view.dur*0.4, -1, maxT0);
+2314-    }
+2315-  }
+2316-  const clock=$("#clock"); if(clock) clock.innerHTML = "<b>"+fmt(t)+"</b> / "+fmt(S.duration);
+2317-  const stalled = S.playing && S.cursor < S.words.length && S.lastMarkT >= 0 && (t - S.lastMarkT) > S.cfg.stall;
+2318-  const now=$("#now"); if(now) now.classList.toggle("stalled", stalled);
+2319-  try{ if(PV.on) pvDraw(); }catch(e){ console.warn("Preview frame error",e); }
+2320-  updatePlayHighlight();
+2321-  const h = $("#hint");
+2322-  if(h){
+2323-    if(stalled && !h.classList.contains("warn")) h.textContent = "¿Perdiste el hilo? Retroceso deshace y rebobina";
+2324-    else if(!stalled && !h.classList.contains("warn")){
+2325-      const pendingAtCursor = S.cursor < S.words.length && S.words[S.cursor]?.start_time === null;
+2326-      h.textContent = (S.playing && pendingAtCursor) ? "Espacio = siguiente palabra · Ctrl+rueda = zoom · P = pantalla" : (rangeBounds() ? "Espacio = PLAY/STOP del LOOP · Ctrl+rueda = zoom · Esc = detener" : "Espacio = siguiente palabra · Ctrl+rueda = zoom · P = pantalla");
+2327-    }
+--
+2601-  S.dirty=true; pvInvalidate();
+2602-  paintLyrics(); draw(); scheduleSave();
+2603-}
+2604-
+2605-cv.addEventListener("pointerup", finishCanvasDrag);
+2606-cv.addEventListener("pointercancel", finishCanvasDrag);
+2607-
+2608-cv.addEventListener("wheel", e => {
+2609-  if(!S.peaks) return;
+2610-  e.preventDefault();
+2611-  const r = cv.getBoundingClientRect(), y = e.clientY - r.top;
+2612-  if(e.ctrlKey || e.metaKey){
+2613-    const anchor = y2t(y);
+2614-    const factor = Math.exp(e.deltaY * 0.0016);
+2615:    const newDur = clamp(S.view.dur * factor, 0.4, Math.max(4, S.duration || 60));
+2616:    S.view.dur = newDur;
+2617:    S.view.t0 = clamp(anchor - (y / CH) * newDur, -1, Math.max(0, S.duration-newDur));
+2618-  }else{
+2619-    // Rueda normal: desplazamiento temporal, sin zoom accidental.
+2620:    S.view.t0 = clamp(S.view.t0 + (e.deltaY/CH)*S.view.dur*0.8, -1, Math.max(0,S.duration-S.view.dur));
+2621-  }
+2622-  draw();
+2623-}, {passive:false});
+2624-
+2625-/* pellizco en táctil */
+2626-let pinch = null;
+2627-cv.addEventListener("touchstart", e => {
+2628-  if(e.touches.length === 2){
+2629-    const [a,b] = e.touches;
+2630:    pinch = {d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY), dur: S.view.dur};
+2631-  }
+2632-}, {passive:true});
+2633-cv.addEventListener("touchmove", e => {
+2634-  if(pinch && e.touches.length === 2){
+2635-    const [a,b] = e.touches;
+2636-    const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+2637:    S.view.dur = clamp(pinch.dur * pinch.d / Math.max(1,d), 0.4, S.duration||60);
+2638-  }
+2639-}, {passive:true});
+2640-cv.addEventListener("touchend", ()=>{ pinch = null; }, {passive:true});
+2641-
+2642-/* ---------------- teclado ---------------- */
+2643-document.addEventListener("keydown", e => {
+2644-  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName) || !!e.target.isContentEditable;
+2645-  if(typing) return;
+2646-  if(!$("#setup").hidden || !$("#settings").hidden){
+2647-    if(e.code === "Escape" && $("#setup").hidden) closeSettings();
+2648-    if(calibrating && e.code === "Space"){ e.preventDefault(); calTap(); return; }
+2649-    if(!$("#setup").hidden){
+2650-      if(e.code==="Enter"){ e.preventDefault(); toggle(); }
+2651-      else if(e.code==="ArrowLeft"){ e.preventDefault(); nudge(-2); }
+--
+3352-  if(!ready)throw new Error('La waveform online tardó demasiado.');
+3353-  const pr=await fetch(peaksUrl);const pj=await pr.json();if(!pr.ok||pj.ok===false)throw new Error(pj.error||'No pude leer la waveform.');
+3354-  S.peaks={min:Float32Array.from(pj.min||[]),max:Float32Array.from(pj.max||[]),rate:Number(pj.rate||500)};if(pj.duration)S.duration=Number(pj.duration);
+3355-  paintDriveLoad('Waveform lista · preparando reproductor…',96);
+3356-  S.audio.src=audioUrl;prepareDraftAudioOnline(audioUrl);
+3357-  await new Promise((resolve,reject)=>{
+3358-    let timer;
+3359-    const clean=()=>{clearTimeout(timer);S.audio.removeEventListener('loadedmetadata',ok);S.audio.removeEventListener('error',bad)};
+3360-    const ok=()=>{clean();resolve()};
+3361-    const bad=()=>{clean();reject(new Error('No pude abrir el streaming de audio.'))};
+3362-    S.audio.addEventListener('loadedmetadata',ok);S.audio.addEventListener('error',bad);
+3363-    timer=setTimeout(()=>{if(S.audio.readyState>=1)ok();else bad();},120000);
+3364-  });
+3365-  if(S.audio.duration)S.duration=S.audio.duration;
+3366:  S.view={t0:0,dur:Math.min(30,Math.max(8,S.duration||30))};resize();draw();syncDraftHeader();updatePhase1State();paintDriveLoad('✓ Audio online listo',100);return true;
+3367-}
+3368-async function panelLoadJob(){
+3369-  if(!PANEL_JOB_ID)return;
+3370-  try{
+3371-    paintDriveLoad('Leyendo datos y letra del trabajo…',2);
+3372-    const r=await fetch('/api/jobs/'+encodeURIComponent(PANEL_JOB_ID)+'/editor-data?token='+encodeURIComponent(PANEL_TOKEN));if(!r.ok)throw new Error('No se pudo cargar el trabajo');const d=await r.json();
+3373-    $('#inArtist').value=d.artist||'';$('#inTitle').value=d.title||'';$('#inLyrics').value=d.lyrics||'';syncDraftHeader();
+3374-    if(d.project)window._restore=d.project;
+3375-    const tokenQ='token='+encodeURIComponent(PANEL_TOKEN),audioUrl=d.voice_url+'?'+tokenQ,peaksUrl=d.peaks_url+'?'+tokenQ,peaksStatusUrl=d.peaks_status_url+'?'+tokenQ;
+3376-    pendingFile={name:d.voice_name||'voz-online.mp3',online:true};
+3377-    pendingAudioReady=loadAudioOnline(audioUrl,peaksUrl,peaksStatusUrl,pendingFile.name,(d.project&&d.project.song&&d.project.song.audio_sha1)||('online-'+PANEL_JOB_ID)).catch(e=>{console.warn(e);return false;});
+3378-    updatePhase1State();const ok=await pendingAudioReady;if(!ok)throw new Error('No se pudo preparar el audio online.');
+3379-    const dropBox=$('#drop');if(dropBox){dropBox.textContent='☁ '+pendingFile.name+' · STREAMING ONLINE';dropBox.style.color='var(--text)';}
+3380-    const hasTiming=!!(d.project&&d.project.segments&&d.project.segments.some(s=>Array.isArray(s.words)&&s.words.some(w=>w.start_time!==null)));
+--
+3393-(()=>{ const setup=$("#setup"), center=$("#centerPane"); if(setup&&center){ setup.classList.add("phase1Embedded"); center.appendChild(setup); } })();
+3394-let pendingFile = null;
+3395-let pendingAudioReady = null;
+3396-const drop = $("#drop"), fileIn = $("#file");
+3397-drop.onclick = () => fileIn.click();
+3398-drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+3399-drop.ondragleave = () => drop.classList.remove("over");
+3400-drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); takeFile(e.dataTransfer.files[0]); };
+3401-fileIn.onchange = () => takeFile(fileIn.files[0]);
+3402-
+3403-function takeFile(f){
+3404-  if(!f) return;
+3405-  pendingFile = f;
+3406-  pendingAudioReady = loadAudio(f).then(()=>{
+3407:    S.view={t0:0,dur:Math.min(30,Math.max(8,S.duration||30))}; resize(); draw();
+3408-    syncDraftHeader(); updatePhase1State();
+3409-    return true;
+3410-  }).catch(err=>{ console.warn(err); pendingAudioReady=null; return false; });
+3411-  drop.textContent = f.name;
+3412-  drop.style.color = "var(--text)";
+3413-  if(!$("#inTitle").value){
+3414-    const base = f.name.replace(/\.[^.]+$/,"");
+3415-    const m = base.split(/\s+-\s+/);
+3416-    if(m.length === 2){ $("#inArtist").value = m[0]; $("#inTitle").value = m[1]; }
+3417-    else $("#inTitle").value = base;
+3418-  }
+3419-  checkStart();
+3420-}
+3421-function syncDraftHeader(){
+--
+3491-        const g = JSON.parse(guardado);
+3492-        const n = g.segments.reduce((a,s2) => a + s2.words.filter(w => w.start_time !== null).length, 0);
+3493-        if(n && confirm("Hay un borrador autoguardado de esta canción con " + n +
+3494-                        " palabras marcadas. ¿Recuperarlo?")) window._restore = g;
+3495-      }catch(e){}
+3496-    }
+3497-  }
+3498-  if(window._restore && window._restore.song && window._restore.song.audio_sha1 === S.sha1){
+3499-    S.doc.segments = window._restore.segments;
+3500-    reindex(); refreshEnds(0);
+3501-    toast("Marcas restauradas.");
+3502-  }
+3503-  window._restore = null;
+3504-
+3505:  S.view = {t0:0, dur: Math.min(30, Math.max(8, S.duration))};
+3506-  $("#songName").innerHTML = '<span class="art">' + esc($("#inArtist").value || "—") + '</span> &nbsp;·&nbsp; ' + esc($("#inTitle").value);
+3507-  $("#setup").hidden = true;
+3508-  $("#btnPreview").style.color = "var(--text)";
+3509-  $("#btnLyrics").style.color = "var(--text)";
+3510-  resize(); pvResize(); paintNow(); paintCounter(); paintLyrics(); draw();
+3511-  document.body.classList.remove("lyricEditMode");
+3512-  document.body.classList.add("phase2");
+3513-  setRate(1, true); // R26: sincronización SIEMPRE a velocidad real
+3514-  $("#phase1Step").classList.remove("on","action"); $("#phase1Step").classList.add("disabled");
+3515-  $("#phase2Step").classList.remove("action","disabled"); $("#phase2Step").classList.add("on");
+3516-  $("#phase3Step").classList.remove("disabled"); $("#phase3Step").classList.add("action");
+3517-  btn.textContent = "Continuar a sincronizar →";
+3518-};
+3519-function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+--
+3524-$("#phase2Step").onclick=()=>{
+3525-  if(!document.body.classList.contains("phase2") && $("#phase2Step").classList.contains("action")) $("#btnStart").click();
+3526-};
+3527-$("#phase2Step").onkeydown=e=>{ if((e.key==="Enter"||e.key===" ") && $("#phase2Step").classList.contains("action")){ e.preventDefault(); $("#phase2Step").click(); } };
+3528-$("#phase3Step").onclick=()=>{ if(document.body.classList.contains("phase2") && !document.body.classList.contains("lyricEditMode") && $("#phase3Step").classList.contains("action")) { const b=$("#btnCdg"); b.dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false); } };
+3529-
+3530-/* botones */
+3531-$("#btnPlay").onclick = toggle;
+3532-$("#btnUndo").onclick = undoMark;
+3533-$("#btnBack").onclick = () => nudge(-2);
+3534-$("#btnFwd").onclick = () => nudge(2);
