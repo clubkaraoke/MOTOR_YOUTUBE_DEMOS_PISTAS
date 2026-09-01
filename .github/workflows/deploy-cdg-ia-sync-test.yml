@@ -1,4 +1,5 @@
 name: Deploy CDG IA Sync Test
+# diagnostics deploy
 
 on:
   push:
