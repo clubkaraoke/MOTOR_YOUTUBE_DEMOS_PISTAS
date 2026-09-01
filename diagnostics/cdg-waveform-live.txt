@@ -2109,6 +2109,218 @@ SHA256=2e37adf75dc29e7219ca22ba1ae984edfaa3dc420d24dc0acfcfc94131b7abbf
   2713	    case "KeyZ":
   2714	      if(e.ctrlKey || e.metaKey){
   2715	        e.preventDefault();
+  2716	        (e.shiftKey ? redo() : undo());
+  2717	        pvInvalidate(); paintNow(); paintLyrics(); paintCounter(); draw(); scheduleSave();
+  2718	      }
+  2719	      return;
+  2720	    case "KeyY":
+  2721	      if(e.ctrlKey || e.metaKey){
+  2722	        e.preventDefault(); redo();
+  2723	        pvInvalidate(); paintNow(); paintLyrics(); paintCounter(); draw(); scheduleSave();
+  2724	      }
+  2725	      return;
+  2726	    case "KeyS":
+  2727	      if(e.ctrlKey || e.metaKey){ e.preventDefault(); guardarProyecto(); }
+  2728	      return;
+  2729	    case "KeyP":
+  2730	      if(!e.ctrlKey && !e.metaKey) pvToggle();
+  2731	      return;
+  2732	    case "Digit1": setRate(1); return;
+  2733	    case "Digit2": setRate(1.25); return;
+  2734	    case "Digit3": setRate(1.5); return;
+  2735	    case "Digit4": setRate(1.75); return;
+  2736	    case "Digit5": setRate(2); return;
+  2737	    case "Digit6": setRate(3); return;
+  2738	  }
+  2739	});
+  2740	function nudgeSel(d){
+  2741	  if(S.sel < 0) return;
+  2742	  const w = S.words[S.sel]; if(w.start_time === null) return;
+  2743	  push(snapshot(S.sel));
+  2744	  const oldStart=w.start_time, oldEnd=w.end_time; w.start_time=clamp(oldStart+d,0,S.duration); if(oldEnd!==null) w.end_time=clamp(oldEnd+(w.start_time-oldStart),w.start_time+.03,S.duration); w.locked=true; refreshEnds(S.sel); paintLyrics();
+  2745	}
+  2746	function jumpMark(dir){
+  2747	  const t = S.audio.currentTime;
+  2748	  const times = S.words.filter(w=>w.start_time!==null).map(w=>w.start_time);
+  2749	  const target = dir>0 ? times.find(x=>x>t+.01) : [...times].reverse().find(x=>x<t-.01);
+  2750	  if(target!==undefined){ S.audio.currentTime = target; centerOn(target); }
+  2751	}
+  2752	function setRate(r, force=false){
+  2753	  // R26: las velocidades variables son sólo para CORREGIR LETRA.
+  2754	  // En sincronización no se pueden cambiar ni por botón ni por atajo.
+  2755	  if(document.body.classList.contains("phase2") && !force) return;
+  2756	  r=+r || 1;
+  2757	  S.audio.playbackRate = r;
+  2758	  document.querySelectorAll(".rate").forEach(b=>b.classList.toggle("on", +b.dataset.rate===r));
+  2759	}
+  2760	
+  2761	/* ---------------- calibración ---------------- */
+  2762	let calibrating = false, calCtx = null, calBeats = [], calTaps = [], calTimer = null;
+  2763	function startCal(){
+  2764	  calibrating = true; calBeats = []; calTaps = [];
+  2765	  calCtx = new (window.AudioContext||window.webkitAudioContext)();
+  2766	  $("#calStatus").innerHTML = "Marca con <kbd>Espacio</kbd> en cada clic. Van 12.";
+  2767	  let n = 0;
+  2768	  const tick = () => {
+  2769	    if(n >= 12){ endCal(); return; }
+  2770	    const t0 = calCtx.currentTime + 0.02;
+  2771	    const o = calCtx.createOscillator(), g = calCtx.createGain();
+  2772	    o.frequency.value = 1400; g.gain.setValueAtTime(.0001, t0);
+  2773	    g.gain.exponentialRampToValueAtTime(.3, t0+.005);
+  2774	    g.gain.exponentialRampToValueAtTime(.0001, t0+.05);
+  2775	    o.connect(g).connect(calCtx.destination); o.start(t0); o.stop(t0+.06);
+  2776	    calBeats.push(performance.now() + 20);
+  2777	    n++;
+  2778	    calTimer = setTimeout(tick, 900);
+  2779	  };
+  2780	  tick();
+  2781	}
+  2782	function calTap(){
+  2783	  if(!calibrating) return;
+  2784	  const now = performance.now();
+  2785	  let best = Infinity;
+  2786	  for(const b of calBeats){ const d = now - b; if(d >= -200 && d < best) best = d; }
+  2787	  if(best < 600) calTaps.push(best);
+  2788	  $("#calStatus").innerHTML = "Marcas registradas: <b>"+calTaps.length+"</b>";
+  2789	}
+  2790	function endCal(){
+  2791	  calibrating = false; clearTimeout(calTimer);
+  2792	  if(calCtx){ calCtx.close(); calCtx = null; }
+  2793	  if(calTaps.length < 5){ $("#calStatus").textContent = "Muy pocas marcas para medir. Inténtalo otra vez."; return; }
+  2794	  const s = [...calTaps].sort((a,b)=>a-b);
+  2795	  const med = Math.round(s[Math.floor(s.length/2)]);
+  2796	  const spread = Math.round(s[Math.floor(s.length*.84)] - s[Math.floor(s.length*.16)]);
+  2797	  $("#setCal").value = med;
+  2798	  $("#calStatus").innerHTML = "Tu retraso típico es de <b>"+med+" ms</b> (dispersión ±"+Math.round(spread/2)+" ms). "
+  2799	    + "Lo he puesto arriba; puedes editarlo o dejarlo en 0.";
+  2800	}
+  2801	
+  2802	/* ==========================================================================
+  2803	   EDICIÓN DE LETRA, VALIDACIÓN Y GENERACIÓN
+  2804	   ========================================================================== */
+  2805	
+  2806	/* --- instantánea completa del documento, para deshacer cambios de estructura --- */
+  2807	function docSnapshot(){
+  2808	  return {doc: JSON.stringify(S.doc.segments, (k,v) => k === "_seg" ? undefined : v),
+  2809	          cursor: S.cursor};
+  2810	}
+  2811	function restoreDoc(entry){
+  2812	  const cur = docSnapshot();
+  2813	  S.doc.segments = JSON.parse(entry.doc);
+  2814	  reindex();
+  2815	  S.cursor = Math.min(entry.cursor, S.words.length);
+  2816	  return cur;
+  2817	}
+  2818	
+  2819	/* --- operaciones sobre la letra ---
+  2820	   Todas parten de una instantánea, así que Ctrl+Z las deshace igual que una
+  2821	   marca. Después de cualquiera de ellas el documento es la única verdad: lo
+  2822	   que se borra no reaparece ni en el JSON, ni en el preview, ni en el CDG. */
+  2823	/* --- normalización de letra para CDG: MAYÚSCULAS + números en palabras --- */
+  2824	function numeroATextoES(n){
+  2825	  n=Number(n);
+
+=== QUICK ZOOM BUTTON HANDLERS ===
+555-    gap:6px!important;margin:6px 8px 9px!important;
+556-  }
+557-  #phaseRailGlobal .phaseArrow,.phaseRail .phaseArrow{display:none!important}
+558-  .phaseStep{padding:8px 7px!important;border-radius:8px}
+559-  .phaseStep b{font-size:9px}
+560-  .phaseStep span{font-size:10.5px;line-height:1.25}
+561-
+562-  /* PANTALLA: onda y preview, ambos a ancho completo y apilados.
+563-     Se desplaza verticalmente dentro del área de trabajo si hace falta. */
+564-  body.mobile-view-screen #workspace{
+565-    overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+566-  }
+567-  body.mobile-view-screen #centerPane{display:none!important}
+568-  body.mobile-view-screen #leftPane{
+569-    display:flex!important;width:100%!important;height:max(52vh,350px)!important;min-height:350px!important;
+570-    border-bottom:1px solid var(--line);
+571-  }
+572-  body.mobile-view-screen #preview{
+573-    display:flex!important;width:100%!important;height:auto!important;min-height:600px!important;
+574-    padding:10px 12px;border-top:0;overflow:visible!important;
+575-  }
+576-  body.mobile-view-screen #pvBox{min-height:220px}
+577-  body.mobile-view-screen #pvDesigner{min-height:260px;overflow:visible}
+578-
+579:  #zoomQuick{right:6px!important;top:6px!important;gap:3px!important}
+580:  #zoomQuick .hbtn{min-width:42px;padding:6px 7px;font-size:10.5px}
+581-
+582-  /* El transporte sigue disponible: scroll horizontal controlado, no corte. */
+583-  #transport{
+584-    max-width:100%;overflow-x:auto;overflow-y:hidden;gap:5px!important;
+585-    padding-left:8px!important;padding-right:8px!important;scrollbar-width:none;
+586-  }
+587-  #transport::-webkit-scrollbar{display:none}
+588-  #transport .tbtn{flex:0 0 auto;min-width:58px}
+589-  #transport .rates{flex:0 0 auto}
+590-  #clock{flex:0 0 auto;font-size:10px}
+591-
+592-  /* Fase CARGAR / letra libre */
+593-  .phase1Card{width:min(100%,100vw)!important;max-width:100%!important;border-radius:0!important}
+594-  .phase1Body{min-width:0}
+595-  .lyricsFree{
+596-    width:100%;max-width:100%;min-height:46vh;height:calc(100dvh - 330px);
+597-    font-size:16px;line-height:1.6;padding:14px;
+598-  }
+599-  .draftPlayer{
+600-    grid-template-columns:auto 1fr auto!important;gap:6px!important;
+601-  }
+602-  .draftPlayer .draftRate{grid-column:1/-1;overflow-x:auto}
+603-}
+604-
+--
+618-  <div id="songName"><span class="art">—</span></div>
+619-  <div class="spacer"></div>
+620-  <div id="counter">0/0 · 0%</div>
+621-  <span id="status"></span>
+622-  <button class="hbtn" id="btnPreview">Pantalla</button>
+623-  <button class="hbtn" id="btnLyrics">Letra</button>
+624-  <button class="hbtn" id="btnSettings">Ajustes</button>
+625-  <button class="hbtn" id="btnSave">Guardar proyecto</button>
+626-  <button class="hbtn go" id="btnCdg">Crear CDG</button>
+627-</header>
+628-
+629-<div id="workspace">
+630-  <div id="leftPane">
+631-    <div id="waveWrap">
+632-      <canvas id="wave"></canvas>
+633-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+634-        <div class="onlineLoadCard">
+635-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+636-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+637-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+638-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+639-          <button id="onlineLoadRetry" class="onlineLoadRetry" type="button" hidden>Reintentar carga</button>
+640-        </div>
+641-      </div>
+642:      <div id="zoomHud" title="Ctrl + rueda del mouse = zoom centrado en el cursor"></div><div id="zoomQuick" style="position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:5"><button class="hbtn zq" data-z="10">10s</button><button class="hbtn zq" data-z="5">5s</button><button class="hbtn zq" data-z="2">2s</button><button class="hbtn zq" data-z="1">1s</button></div>
+643-    </div>
+644-  </div>
+645-  <div class="split" id="splitLeft"></div>
+646-  <div id="centerPane">
+647-    <div id="phaseRailGlobal">
+648-      <div class="phaseStep on" id="phase1Step" role="button" tabindex="0"><b>CARGAR</b><span>Audio + letra</span></div>
+649-      <div class="phaseArrow">→</div>
+650-      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+651-      <div class="phaseArrow">→</div>
+652-      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+653-    </div>
+654-    <div id="now">
+655-      <div id="reticle"></div>
+656-      <div id="slots">
+657-        <span class="slot prev"></span>
+658-        <span class="slot cur">—</span>
+659-        <span class="slot next"></span>
+660-      </div>
+661-      <div id="lineEcho"></div>
+662-      <div id="hint">Espacio = siguiente palabra&nbsp;&nbsp;·&nbsp;&nbsp;P = pantalla</div>
+663-    </div>
+664-    <div id="lyricsDrawer">
+665-      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+666-      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Selecciona (clic/Shift/Ctrl+arrastre/L#) → pulsa el rol</span></div>
 
 === VIEW STATE / TIME TRANSFORMS ===
 888-const clamp = (v,a,b) => v<a?a:v>b?b:v;
