@@ -13,8 +13,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -34,165 +33,88 @@ jobs:
           } > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Read only OVH diagnostic
+      - name: Collect quick read-only state
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > "$RUNNER_TEMP/ovh_diag.txt" <<'REMOTE'
-          set -u
-          echo "=== KITKARAOKE DATA SYNC OVH DIAG V2 ==="
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > OVH_KITKARAOKE_DIAG.txt <<'REMOTE'
+          set +e
+          ROOT=/opt/KITKARAOKE_DATA_SYNC
+          UNIT=kitkaraoke-ingles-migration-005-035
+          echo "=== KTV OVH QUICK DIAG V3 ==="
           date -Is
           echo
-
-          ROOT=/opt/KITKARAOKE_DATA_SYNC
-          if [ ! -d "$ROOT" ]; then
-            echo "ERROR: $ROOT no existe"
-            exit 2
-          fi
-          cd "$ROOT"
+          cd "$ROOT" || { echo "ROOT_MISSING"; exit 0; }
 
           echo "=== SAFE ENV ==="
           python3 - <<'PY'
-          from pathlib import Path
-          p=Path('/opt/KITKARAOKE_DATA_SYNC/.env')
-          safe={'DATASET_KEY','SOURCE_PATH','DEST_PATH','BLOCK_PREFIX','BLOCK_SIZE','DRY_RUN','AUTO_SYNC','MIN_EXPECTED_SOURCE_COUNT','COPY_WORKERS','SYNC_INTERVAL_SECONDS','DATA_DIR'}
-          if not p.exists():
-              print('.env MISSING')
-          else:
-              for raw in p.read_text(errors='replace').splitlines():
-                  line=raw.strip()
-                  if not line or line.startswith('#') or '=' not in line:
-                      continue
-                  k,v=line.split('=',1)
-                  k=k.strip().removeprefix('export ').strip()
-                  if k in safe:
-                      print(f'{k}={v.strip()}')
-              print('ENV_KEYS=' + ','.join(sorted({
-                  raw.strip().split('=',1)[0].removeprefix('export ').strip()
-                  for raw in p.read_text(errors='replace').splitlines()
-                  if raw.strip() and not raw.lstrip().startswith('#') and '=' in raw
-              })))
-          PY
+from pathlib import Path
+p=Path('/opt/KITKARAOKE_DATA_SYNC/.env')
+safe={'DATASET_KEY','SOURCE_PATH','DEST_PATH','BLOCK_PREFIX','BLOCK_SIZE','DRY_RUN','AUTO_SYNC','MIN_EXPECTED_SOURCE_COUNT','COPY_WORKERS','SYNC_INTERVAL_SECONDS','DATA_DIR'}
+if not p.exists():
+    print('.env MISSING')
+else:
+    found=0
+    for raw in p.read_text(errors='replace').splitlines():
+        line=raw.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        k,v=line.split('=',1)
+        k=k.strip()
+        if k.startswith('export '): k=k[7:].strip()
+        if k in safe:
+            print(f'{k}={v.strip()}')
+            found+=1
+    print('SAFE_KEYS_FOUND=',found)
+PY
           echo
 
-          echo "=== DOCKER PS ==="
-          sudo docker compose ps 2>&1 || true
+          echo "=== MIGRATION STATE FILE ==="
+          if [ -f data/migracion_ingles_estado.json ]; then
+            cat data/migracion_ingles_estado.json
+          else
+            echo "MISSING"
+          fi
           echo
 
-          echo "=== CONTAINER MOUNTS ==="
-          sudo docker inspect kitkaraoke-data-sync --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}' 2>&1 || true
+          echo "=== SYSTEMD UNIT ==="
+          sudo systemctl is-active "$UNIT" 2>&1
+          sudo systemctl is-failed "$UNIT" 2>&1
+          sudo systemctl --no-pager --full status "$UNIT" 2>&1 | tail -n 35
           echo
 
-          echo "=== HOST DATA CANDIDATES ==="
-          find "$ROOT" -maxdepth 4 -type f \( -name 'state.sqlite3' -o -name 'catalogo_universal*.json' -o -name '*.log' \) -printf '%p | %s bytes | %TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | sort || true
+          echo "=== MIGRATION JOURNAL TAIL ==="
+          sudo journalctl -u "$UNIT" -n 80 --no-pager 2>&1
           echo
 
-          echo "=== CONTAINER /app/data ==="
-          sudo docker exec kitkaraoke-data-sync sh -lc 'ls -lah /app/data 2>&1 || true' || true
+          echo "=== DATA FILES ==="
+          find data -maxdepth 2 -type f -printf '%p | %s bytes | %TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | sort
           echo
 
-          echo "=== SQLITE INSIDE CONTAINER READ-ONLY ==="
-          sudo docker exec kitkaraoke-data-sync python - <<'PY' || true
-          import os, sqlite3
-          candidates=['/app/data/state.sqlite3','/data/state.sqlite3']
-          db=next((p for p in candidates if os.path.exists(p)),None)
-          print('DB=',db)
-          if not db:
-              raise SystemExit(0)
-          c=sqlite3.connect(f'file:{db}?mode=ro',uri=True)
-          c.row_factory=sqlite3.Row
-          try:
-              for table in ('datasets','inventory','sync_runs'):
-                  try:
-                      n=c.execute(f'SELECT COUNT(*) n FROM {table}').fetchone()['n']
-                      print(table,'count=',n)
-                  except Exception as e:
-                      print(table,'ERROR',e)
-              print('-- datasets --')
-              try:
-                  for r in c.execute("SELECT dataset_key,source_path,dest_path,block_prefix,block_size,inventory_count,inventory_generation,inventory_refreshed_at,updated_at FROM datasets ORDER BY dataset_key"):
-                      print(dict(r))
-              except Exception as e: print('datasets detail ERROR',e)
-              print('-- inventory status --')
-              try:
-                  for r in c.execute("SELECT dataset_key,status,COUNT(*) n FROM inventory GROUP BY dataset_key,status ORDER BY dataset_key,status"):
-                      print(dict(r))
-              except Exception as e: print('inventory status ERROR',e)
-              print('-- blocks summary --')
-              try:
-                  rows=c.execute("""
-                    SELECT dataset_key,block_name,COUNT(*) total,
-                    SUM(CASE WHEN status='copied' THEN 1 ELSE 0 END) copied,
-                    SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending,
-                    SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) failed
-                    FROM inventory GROUP BY dataset_key,block_name ORDER BY dataset_key,block_name
-                  """).fetchall()
-                  print('block_count=',len(rows))
-                  for r in rows: print(dict(r))
-              except Exception as e: print('blocks ERROR',e)
-              print('-- last runs --')
-              try:
-                  for r in c.execute("SELECT id,started_at,finished_at,discovered,copied,skipped,failed,dry_run,dataset_key,operation,block_name FROM sync_runs ORDER BY id DESC LIMIT 15"):
-                      print(dict(r))
-              except Exception as e: print('runs ERROR',e)
-          finally:
-              c.close()
-          PY
+          echo "=== DOCKER ==="
+          sudo docker compose ps 2>&1
+          echo
+          sudo docker inspect kitkaraoke-data-sync --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}' 2>&1
           echo
 
-          echo "=== RUNNING COPY/RCLONE PROCESSES ==="
-          ps -eo pid,etime,cmd | grep -E 'KITKARAOKE_DATA_SYNC|copy-block|copy_block|rclone' | grep -v grep || true
-          echo
-
-          echo "=== DRIVE DESTINATION COUNTS READ-ONLY ==="
-          sudo docker exec kitkaraoke-data-sync sh -lc '
-            if command -v rclone >/dev/null 2>&1; then
-              tmp=$(mktemp)
-              if rclone lsf "gdrive:KITKARAOKE_APP_DATA/03_INGLES" --recursive --files-only > "$tmp" 2>/tmp/ktv_rclone_err; then
-                python - "$tmp" <<"PY2"
-import sys, collections
-p=sys.argv[1]
-counts=collections.Counter()
-total=0
-with open(p,encoding="utf-8",errors="replace") as f:
-    for line in f:
-        s=line.strip()
-        if not s.lower().endswith(".mp4"): continue
-        total+=1
-        top=s.split("/",1)[0]
-        counts[top]+=1
-print("TOTAL_MP4=",total)
-print("BLOCKS=",len(counts))
-for k in sorted(counts):
-    print(k,counts[k])
-PY2
-              else
-                echo "RCLONE_LIST_ERROR"
-                tail -n 20 /tmp/ktv_rclone_err || true
-              fi
-              rm -f "$tmp" /tmp/ktv_rclone_err
-            else
-              echo "rclone MISSING in container"
-            fi
-          ' || true
+          echo "=== RUNNING RELEVANT PROCESSES ==="
+          ps -eo pid,etime,cmd | grep -E 'migrate_ingles_remaining|copy_block|rclone' | grep -v grep
           echo
 
           echo "=== HOST ==="
-          df -h / | tail -n 1 || true
-          free -h | sed -n '1,2p' || true
+          df -h / | tail -n 1
+          free -h | sed -n '1,2p'
           echo "=== END ==="
           REMOTE
 
-          sed -E 's/(token|secret|client_id|client_secret|password|pass)=.*/\1=[REDACTED]/Ig' "$RUNNER_TEMP/ovh_diag.txt" > OVH_KITKARAOKE_DIAG.txt
-
-      - name: Commit diagnostic result to temporary branch
+      - name: Commit result
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add OVH_KITKARAOKE_DIAG.txt
-          git commit -m "diag: refresh live KITKARAOKE OVH state"
+          git commit -m "diag: refresh quick KITKARAOKE OVH state"
           git push origin HEAD:diag-kitkaraoke-state
