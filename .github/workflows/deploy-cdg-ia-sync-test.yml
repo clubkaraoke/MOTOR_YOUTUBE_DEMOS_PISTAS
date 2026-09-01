@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m compileall -q cdg-ia-test/app
-          grep -q '127.0.0.1:8091:8000' cdg-ia-test/docker-compose.yml
+          grep -q '127.0.0.1:8097:8000' cdg-ia-test/docker-compose.yml
           grep -q 'location /cdg-ia-test/' deploy/nginx-panel-integrado.conf
 
       - name: Validate deployment secrets
