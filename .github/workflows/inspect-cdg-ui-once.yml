@@ -40,6 +40,23 @@ jobs:
           echo "=== LISTENER 8765 ==="
           sudo ss -ltnp | grep ':8765' || true
 
+          echo "=== GUNICORN PROCESS ==="
+          pid="$(sudo ss -ltnp | awk '/:8765/ && /gunicorn/ {match($0,/pid=[0-9]+/); if (RSTART) {print substr($0,RSTART+4,RLENGTH-4); exit}}')"
+          echo "PID=$pid"
+          if [ -n "$pid" ]; then
+            cwd="$(sudo readlink -f "/proc/$pid/cwd")"
+            echo "CWD=$cwd"
+            echo -n "CMD="
+            sudo tr '\0' ' ' < "/proc/$pid/cmdline"
+            echo
+            echo "=== SOURCE FILES ==="
+            sudo find "$cwd" -maxdepth 3 -type f \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" \) -printf '%p\n' | sort | head -n 160
+            echo "=== UI STRING MATCHES HOST ==="
+            sudo grep -RIl -E "LETRA LIBRE|Comenzar corrección|Siguiente trabajo recomendado|Pantalla|Ajustes" "$cwd" 2>/dev/null | head -n 50 || true
+            echo "=== MOBILE CSS MATCHES ==="
+            sudo grep -RIn -E "@media|max-width|editor|wave|lyric|letra|workspace|split|pane" "$cwd" --include='*.py' --include='*.html' --include='*.css' 2>/dev/null | head -n 220 || true
+          fi
+
           echo "=== DOCKER PORTS ==="
           sudo docker ps --format '{{.Names}}|{{.Image}}|{{.Ports}}' | grep -E '8765|cdg|consol|editor' || true
 
