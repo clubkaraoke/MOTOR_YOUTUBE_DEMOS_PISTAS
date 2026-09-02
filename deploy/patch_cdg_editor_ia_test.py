@@ -98,10 +98,12 @@ s = s.replace(
 
 if "Dropbox desactivado en CDG Editor IA TEST." not in s:
     s = s.replace(
-        "def dropbox_access_token():",
-        "def dropbox_access_token():\n"
+        "def dropbox_access_token(force=False):\n"
+        "    cfg=load_dropbox_cfg()",
+        "def dropbox_access_token(force=False):\n"
         "    if TEST_MODE:\n"
-        "        raise ValueError('Dropbox desactivado en CDG Editor IA TEST.')"
+        "        raise ValueError('Dropbox desactivado en CDG Editor IA TEST.')\n"
+        "    cfg=load_dropbox_cfg()"
     )
 
 s = s.replace(
