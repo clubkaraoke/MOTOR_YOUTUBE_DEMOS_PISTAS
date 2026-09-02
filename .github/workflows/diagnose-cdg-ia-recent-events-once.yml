@@ -1,0 +1,65 @@
+name: Diagnose CDG IA recent events once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-cdg-ia-recent-events-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture recent IA events only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'python3 - <<'"'"'PY'"'"'
+          import json
+          from pathlib import Path
+          p=Path("/opt/cdg-ia-sync-test/runtime/events.jsonl")
+          print("TIMESTAMP_FILE", p.exists(), p.stat().st_size if p.exists() else 0)
+          if p.exists():
+              rows=[]
+              for line in p.read_text(encoding="utf-8",errors="replace").splitlines()[-500:]:
+                  try:
+                      r=json.loads(line)
+                  except Exception:
+                      continue
+                  if str(r.get("event","")).startswith("local_cpu_align"):
+                      rows.append(r)
+              for r in rows[-20:]:
+                  print(json.dumps(r,ensure_ascii=False))
+          PY' > diagnostics/cdg-ia-recent-events.txt
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ia-recent-events.txt
+          git commit -m "diag: capture recent CDG IA events" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
