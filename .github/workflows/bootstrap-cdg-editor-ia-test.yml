@@ -75,7 +75,7 @@ jobs:
           mkdir -p diagnostics
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
             "bash /tmp/bootstrap_cdg_editor_ia_test.sh /tmp/patch_cdg_editor_ia_test.py /tmp/nginx-panel-cdg-editor-ia.conf" \
-            | tee diagnostics/cdg-editor-ia-test-bootstrap.txt
+            2>&1 | tee diagnostics/cdg-editor-ia-test-bootstrap.txt
 
       - name: Verify public route
         run: |
