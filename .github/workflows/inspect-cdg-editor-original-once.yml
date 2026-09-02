@@ -38,7 +38,7 @@ jobs:
           mkdir -p diagnostics
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-editor-original-inspect.txt <<'REMOTE'
           set -euo pipefail
-          ROOT=/opt/djgabo-cdg/editor_v1
+          ROOT=/opt/djgabo-cdg
           echo "TIMESTAMP=$(date -Is)"
           echo "ROOT=$ROOT"
           echo
@@ -77,9 +77,9 @@ jobs:
           (sudo ss -ltnp 2>/dev/null || true) | grep ':8765' || true
           echo
           echo "=== INDEX MARKERS ==="
-          if sudo test -f "$ROOT/index.html"; then
-            sudo wc -l "$ROOT/index.html"
-            sudo grep -nE '<title>|SINCRONIZAR|CREAR CDG|Dropbox|Drive|8765' "$ROOT/index.html" | head -80 || true
+          if sudo test -f "$ROOT/editor_v1/index.html"; then
+            sudo wc -l "$ROOT/editor_v1/index.html"
+            sudo grep -nE '<title>|SINCRONIZAR|CREAR CDG|Dropbox|Drive|8765' "$ROOT/editor_v1/index.html" | head -80 || true
           fi
           REMOTE
 
