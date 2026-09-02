@@ -1,0 +1,69 @@
+name: Diagnose latest CDG IA sync failure once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-latest-cdg-ia-sync-failure-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture latest sync failure
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-latest-sync-failure.txt <<'REMOTE'
+          set +e
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== WEB LOGS ==="
+          sudo docker logs --since 20m --timestamps cdg-ia-sync-test 2>&1 | tail -300
+          echo
+          echo "=== WORKER LOGS ==="
+          sudo docker logs --since 20m --timestamps cdg-ai-sync-cpu 2>&1 | tail -500
+          echo
+          echo "=== STATES ==="
+          sudo docker inspect cdg-ia-sync-test --format 'web status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restart={{.RestartCount}}'
+          sudo docker inspect cdg-ai-sync-cpu --format 'worker status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restart={{.RestartCount}}'
+          echo
+          echo "=== STATS ==="
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} ram={{.MemUsage}} cpu={{.CPUPerc}}'
+          echo
+          echo "=== RESOURCES ==="
+          df -h /
+          free -h
+          REMOTE
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ia-latest-sync-failure.txt
+          git commit -m "diag: capture latest CDG IA sync failure" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
