@@ -1,0 +1,48 @@
+TIMESTAMP=2026-09-02T23:00:14+00:00
+=== STATUS ===
+● djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST
+     Loaded: loaded (/etc/systemd/system/djgabo-cdg-ia-test.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-09-02 22:59:34 UTC; 39s ago
+   Main PID: 3808694 (gunicorn)
+      Tasks: 4 (limit: 13965)
+     Memory: 36.2M (peak: 36.8M)
+        CPU: 457ms
+     CGroup: /system.slice/djgabo-cdg-ia-test.service
+             ├─3808694 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
+             └─3808698 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
+
+Sep 02 22:59:34 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Starting gunicorn 26.2.0
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Listening at: http://127.0.0.1:8775 (3808694)
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Using worker: gthread
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808698]: [2026-09-02 22:59:34 +0000] [3808698] [INFO] Booting worker with pid: 3808698
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+
+=== JOURNAL ===
+Sep 02 22:57:17 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+Sep 02 22:57:18 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:57:18 +0000] [3806707] [INFO] Starting gunicorn 26.2.0
+Sep 02 22:57:18 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:57:18 +0000] [3806707] [INFO] Listening at: http://127.0.0.1:8775 (3806707)
+Sep 02 22:57:18 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:57:18 +0000] [3806707] [INFO] Using worker: gthread
+Sep 02 22:57:18 vps-3a3efbf9 gunicorn[3806711]: [2026-09-02 22:57:18 +0000] [3806711] [INFO] Booting worker with pid: 3806711
+Sep 02 22:57:18 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:57:18 +0000] [3806707] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+Sep 02 22:59:34 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:59:34 +0000] [3806707] [INFO] Handling signal: term
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3806711]: [2026-09-02 22:59:34 +0000] [3806711] [INFO] Worker exiting (pid: 3806711)
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3806711]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3806707]: [2026-09-02 22:59:34 +0000] [3806707] [INFO] Shutting down: Master
+Sep 02 22:59:34 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Deactivated successfully.
+Sep 02 22:59:34 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+Sep 02 22:59:34 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Starting gunicorn 26.2.0
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Listening at: http://127.0.0.1:8775 (3808694)
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [INFO] Using worker: gthread
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808698]: [2026-09-02 22:59:34 +0000] [3808698] [INFO] Booting worker with pid: 3808698
+Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [3808694] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+
+=== PORTS ===
+LISTEN 0      2048       127.0.0.1:8775      0.0.0.0:*    users:(("gunicorn",pid=3808698,fd=3),("gunicorn",pid=3808694,fd=3))                                                                                                                                 
+LISTEN 0      2048       127.0.0.1:8765      0.0.0.0:*    users:(("gunicorn",pid=2025532,fd=3),("gunicorn",pid=2025523,fd=3))                                                                                                                                 
+
+=== DIRECT IMPORT ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+IMPORT_OK test True /cdg-editor-ia
