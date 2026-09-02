@@ -1,0 +1,76 @@
+name: Remove unused cobalt images once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/remove-unused-cobalt-images-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Remove only approved unused images
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/remove-unused-cobalt-images-result.txt <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== BEFORE ==="
+          df -h /
+          sudo docker images --format '{{.Repository}}:{{.Tag}}|{{.ID}}|{{.Size}}' | grep -E 'ghcr.io/imputnet/(cobalt|yt-session-generator)' || true
+          echo
+          echo "=== CONTAINER REFERENCES ==="
+          refs="$(sudo docker ps -a --format '{{.Image}}' | grep -E 'ghcr.io/imputnet/(cobalt|yt-session-generator)' || true)"
+          if [ -n "$refs" ]; then
+            echo "ABORT: one of the approved images is referenced by a container:"
+            echo "$refs"
+            exit 23
+          fi
+          echo "No container references found."
+          echo
+          echo "=== REMOVE ==="
+          sudo docker image rm ghcr.io/imputnet/cobalt:11
+          sudo docker image rm ghcr.io/imputnet/yt-session-generator:webserver
+          echo
+          echo "=== AFTER ==="
+          df -h /
+          sudo docker system df
+          echo
+          echo "=== VERIFY ABSENT ==="
+          sudo docker images --format '{{.Repository}}:{{.Tag}}|{{.ID}}|{{.Size}}' | grep -E 'ghcr.io/imputnet/(cobalt|yt-session-generator)' || echo "OK: both images absent"
+          REMOTE
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/remove-unused-cobalt-images-result.txt
+          git commit -m "diag: record removal of unused cobalt images" || exit 0
+          git push origin HEAD:main
