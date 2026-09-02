@@ -1,0 +1,74 @@
+TIMESTAMP=2026-09-02T06:09:47+00:00
+
+=== HOST ===
+Linux vps-3a3efbf9 6.8.0-138-generic #138-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 31 22:41:49 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+6
+
+=== RAM ===
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       2.8Gi       829Mi       2.8Mi       8.1Gi       8.6Gi
+Swap:             0B          0B          0B
+
+=== DISK ROOT ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   41G   56G  42% /
+
+=== INODES ===
+Filesystem     Inodes IUsed IFree IUse% Mounted on
+/dev/sda1         13M  560K   12M    5% /
+
+=== DOCKER SPACE ===
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          20        18        10.39GB   1.522GB (14%)
+Containers      18        18        89.46MB   0B (0%)
+Local Volumes   1         1         30.03MB   0B (0%)
+Build Cache     1147      0         28.7GB    22.61GB
+
+=== TOP CONTAINERS RAM/CPU ===
+NAME                             CPU %     MEM USAGE / LIMIT    MEM %
+cdg-ia-sync-test                 0.21%     41.65MiB / 11.4GiB   0.36%
+pista-ia-web                     0.02%     65.56MiB / 11.4GiB   0.56%
+pista-ia-pot-provider            0.01%     89.04MiB / 11.4GiB   0.76%
+djgabo-youtube-worker-1          0.06%     47.88MiB / 11.4GiB   0.41%
+djgabo-youtube-web-1             0.18%     519.1MiB / 11.4GiB   4.45%
+djgabo-cdg-lyrics                0.18%     76.82MiB / 2GiB      3.75%
+kitkaraoke-data-sync             0.19%     35.86MiB / 11.4GiB   0.31%
+cdg-vector-service-claude-perf   0.00%     51.7MiB / 11.4GiB    0.44%
+cdg-player-claude-perf           0.00%     5.816MiB / 11.4GiB   0.05%
+cdg-vector-service-native-v3     0.00%     619.2MiB / 11.4GiB   5.30%
+cdg-player-online-native-v3      0.00%     6.441MiB / 11.4GiB   0.06%
+cdg-vector-service-fast-v2       0.00%     21.14MiB / 11.4GiB   0.18%
+cdg-player-online-fast-v2        0.00%     5.902MiB / 11.4GiB   0.05%
+cdg-vector-service-pruebas       0.00%     20.44MiB / 11.4GiB   0.18%
+cdg-player-online-pruebas        0.00%     6.449MiB / 11.4GiB   0.06%
+cdg-player-online                0.00%     6.145MiB / 11.4GiB   0.05%
+cdg-vector-service               0.00%     14.05MiB / 11.4GiB   0.12%
+djgabo-youtube-redis-1           0.61%     8.375MiB / 11.4GiB   0.07%
+
+=== LARGE DIRECTORIES /opt ===
+12K	/opt/containerd
+16K	/opt/djgabo-portal
+24K	/opt/djgabo
+156K	/opt/cdg-ia-sync-test-backups
+244K	/opt/cdg-ia-sync-test
+17M	/opt/KITKARAOKE_DATA_SYNC
+57M	/opt/djgabo-cdg
+369M	/opt/djgabo-youtube
+442M	/opt
+
+=== LARGE DIRECTORIES /var/lib/docker ===
+4.0K	/var/lib/docker/runtimes
+4.0K	/var/lib/docker/swarm
+8.0K	/var/lib/docker/rootfs
+8.0K	/var/lib/docker/tmp
+12K	/var/lib/docker/plugins
+168K	/var/lib/docker/network
+284K	/var/lib/docker/image
+29M	/var/lib/docker/containers
+29M	/var/lib/docker/volumes
+30M	/var/lib/docker/buildkit
+88M	/var/lib/docker
+
+=== AI/MODEL CANDIDATE DIRS ===
+57M	/opt/djgabo-cdg
+244K	/opt/cdg-ia-sync-test
