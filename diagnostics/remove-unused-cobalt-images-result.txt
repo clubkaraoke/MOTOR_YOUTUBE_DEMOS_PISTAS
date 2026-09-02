@@ -1,0 +1,28 @@
+TIMESTAMP=2026-09-02T06:20:15+00:00
+
+=== BEFORE ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   41G   56G  42% /
+ghcr.io/imputnet/cobalt:11|63186dd68afd|438MB
+ghcr.io/imputnet/yt-session-generator:webserver|95b801ce70c9|1.08GB
+
+=== CONTAINER REFERENCES ===
+No container references found.
+
+=== REMOVE ===
+Untagged: ghcr.io/imputnet/cobalt:11
+Deleted: sha256:63186dd68afd57ce3bb1f62cc4c139f5fa95b9c3e87a3cf5c6e4c7a570523f62
+Untagged: ghcr.io/imputnet/yt-session-generator:webserver
+Deleted: sha256:95b801ce70c93dfa7a0732fa52d41ef0fe891489e72926360bd50aa001797d5d
+
+=== AFTER ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   39G   58G  41% /
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          18        18        8.869GB   0B (0%)
+Containers      18        18        89.46MB   0B (0%)
+Local Volumes   1         1         30.07MB   0B (0%)
+Build Cache     1147      0         28.7GB    22.61GB
+
+=== VERIFY ABSENT ===
+OK: both images absent
