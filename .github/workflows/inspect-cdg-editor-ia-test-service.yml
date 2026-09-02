@@ -145,6 +145,16 @@ jobs:
             /opt/djgabo-cdg-ia-test/.venv/bin/python -c "import server; print('IMPORT_OK', server.ENVIRONMENT, server.TEST_MODE, server.URL_PREFIX)"
           REMOTE
 
+      - name: Verify public IA route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-editor-ia/ || true)"
+          echo "PUBLIC_ROUTE_HTTP=$code" >> diagnostics/cdg-editor-ia-test-service.txt
+          case "$code" in
+            200|301|302|303|307|308) ;;
+            *) echo "Unexpected public route status: $code" >&2; exit 1 ;;
+          esac
+
       - name: Save report
         if: always()
         run: |
