@@ -1,0 +1,43 @@
+TIMESTAMP=2026-09-02T06:30:43+00:00
+
+=== BEFORE ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   39G   58G  41% /
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       2.9Gi       1.7Gi       2.8Mi       7.2Gi       8.5Gi
+Swap:             0B          0B          0B
+
+=== TARGET ===
+name=djgabo-cdg-lyrics image=djgabo-youtube-lyrics status=Up 30 hours (healthy)
+repo=djgabo-youtube-lyrics tag=latest id=ab1d5efc3d36 size=1GB
+
+=== COMPOSE METADATA ===
+project=djgabo-youtube
+service=lyrics
+working_dir=/opt/djgabo-youtube
+config_files=/opt/djgabo-youtube/docker-compose.prod.yml
+369M	/opt/djgabo-youtube
+
+=== STOP + REMOVE CONTAINER ===
+djgabo-cdg-lyrics
+
+=== REMOVE IMAGE ===
+Untagged: djgabo-youtube-lyrics:latest
+Deleted: sha256:ab1d5efc3d3650ae17b4bd70db94cbffa5b796edc3e04329f7bab50d7246b14c
+
+=== REMOVE ONLY STANDALONE DEDICATED DIRECTORIES ===
+
+=== VERIFY ===
+OK: CDG lyrics engine container/image absent
+
+=== AFTER ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   39G   58G  40% /
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       2.8Gi       1.8Gi       2.7Mi       7.2Gi       8.6Gi
+Swap:             0B          0B          0B
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          17        17        8.046GB   0B (0%)
+Containers      17        17        89.45MB   0B (0%)
+Local Volumes   1         1         30.12MB   0B (0%)
+Build Cache     1147      0         28.7GB    23.43GB
