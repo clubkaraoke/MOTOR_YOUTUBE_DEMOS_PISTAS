@@ -1,0 +1,173 @@
+name: Deploy CDG IA ElevenLabs Scribe LAB once
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-elevenlabs-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Install ElevenLabs key if secret exists
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ELEVENLABS_API_KEY:-}" ]; then
+            printf '%s' "$ELEVENLABS_API_KEY" | ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'umask 077; cat > /tmp/cdg-elevenlabs-key'
+            echo "ElevenLabs secret staged securely on OVH."
+          else
+            echo "ELEVENLABS_API_KEY secret is not configured yet; deploying UI/backend without key."
+          fi
+
+      - name: Deploy Scribe LAB web only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-elevenlabs-deploy.txt <<'REMOTE'
+          set -euo pipefail
+          TARGET=/opt/cdg-ia-sync-test
+          STAGE=/tmp/cdg-ia-sync-test-elevenlabs
+          ARCHIVE=/tmp/cdg-ia-sync-test-elevenlabs.tar.gz
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== BEFORE ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          mkdir -p "$STAGE"
+          curl -fL --retry 3 -o "$ARCHIVE" https://github.com/clubkaraoke/CDG_IA_SYNC_TEST/archive/refs/heads/main.tar.gz
+          tar -xzf "$ARCHIVE" -C "$STAGE" --strip-components=1
+
+          echo "=== STATIC CHECKS ==="
+          python3 -m py_compile "$STAGE/app/main.py" "$STAGE/app/elevenlabs_scribe.py"
+          if command -v node >/dev/null 2>&1; then
+            node --check "$STAGE/static/app.js"
+          fi
+          grep -q 'api/elevenlabs/transcribe' "$STAGE/app/main.py"
+          grep -q 'scribeBtn' "$STAGE/static/index.html"
+          grep -q 'ElevenLabs Scribe v2' "$STAGE/static/app.js"
+
+          sudo rsync -a --delete \
+            --exclude='.env' \
+            --exclude='/runtime/' \
+            "$STAGE/" "$TARGET/"
+
+          if [ -s /tmp/cdg-elevenlabs-key ]; then
+            sudo python3 - <<'PY'
+          from pathlib import Path
+          env_path = Path("/opt/cdg-ia-sync-test/.env")
+          key_path = Path("/tmp/cdg-elevenlabs-key")
+          key = key_path.read_text(encoding="utf-8").strip()
+          lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+          out = []
+          found = False
+          for line in lines:
+              if line.startswith("ELEVENLABS_API_KEY="):
+                  out.append("ELEVENLABS_API_KEY=" + key)
+                  found = True
+              else:
+                  out.append(line)
+          if not found:
+              out.append("ELEVENLABS_API_KEY=" + key)
+          env_path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+          PY
+            sudo chmod 600 "$TARGET/.env"
+            rm -f /tmp/cdg-elevenlabs-key
+            echo "ELEVENLABS_KEY_INSTALLED=yes"
+          else
+            echo "ELEVENLABS_KEY_INSTALLED=no"
+          fi
+
+          cd "$TARGET"
+          echo "=== BUILD WEB LAB ONLY ==="
+          sudo docker compose -p cdg-ia-sync-test build cdg-ia-sync-test
+          sudo docker compose -p cdg-ia-sync-test up -d --no-deps cdg-ia-sync-test
+
+          echo "=== WAIT HEALTH ==="
+          ok=0
+          for i in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:8097/api/health >/tmp/lab-health.json \
+              && curl -fsS http://127.0.0.1:8097/api/elevenlabs/health >/tmp/scribe-health.json; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          [ "$ok" = 1 ]
+          cat /tmp/lab-health.json
+          echo
+          cat /tmp/scribe-health.json
+          echo
+
+          echo "=== MAPPER REGRESSION ==="
+          sudo docker exec -i cdg-ia-sync-test python - <<'PY'
+          from app.elevenlabs_scribe import map_scribe_to_master
+          lyrics = "YA TE OLVIDE, VUELVO A SER LIBRE OTRA VEZ"
+          scribe = [
+              {"text":"Ya","start":23.66,"end":23.78},
+              {"text":"te","start":23.84,"end":23.94},
+              {"text":"olvidé","start":24.02,"end":25.34},
+              {"text":"Vuelvo","start":28.90,"end":29.30},
+              {"text":"a","start":29.32,"end":29.42},
+              {"text":"ser","start":29.56,"end":29.86},
+              {"text":"libre","start":29.90,"end":30.72},
+              {"text":"otra","start":30.73,"end":31.24},
+              {"text":"vez","start":31.28,"end":32.299},
+          ]
+          out = map_scribe_to_master(lyrics, scribe)
+          assert len(out["words"]) == 9, out
+          assert out["metrics"]["coverage_ratio"] == 1.0, out
+          assert abs(out["words"][0]["start"] - 23.66) < 0.01, out
+          assert abs(out["words"][3]["start"] - 28.90) < 0.01, out
+          print("SCRIBE_MAPPER_TEST=PASS", out["metrics"])
+          PY
+
+          echo "=== AFTER ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} mem={{.MemUsage}} cpu={{.CPUPerc}}'
+          free -h
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          REMOTE
+
+      - name: Commit result
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-ia-elevenlabs-deploy.txt ]; then
+            git add diagnostics/cdg-ia-elevenlabs-deploy.txt
+            git commit -m "diag: record CDG IA ElevenLabs LAB deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
