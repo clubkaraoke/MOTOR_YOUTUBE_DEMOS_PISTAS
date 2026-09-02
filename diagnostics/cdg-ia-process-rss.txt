@@ -1,0 +1,29 @@
+TIMESTAMP=2026-09-02T07:46:23+00:00
+=== WORKER PROCESS 1 STATUS ===
+Name:	uvicorn
+Pid:	1
+VmPeak:	 6203388 kB
+VmSize:	 3880996 kB
+VmHWM:	 2317904 kB
+VmRSS:	 1725464 kB
+RssAnon:	 1560772 kB
+RssFile:	  164688 kB
+RssShmem:	       4 kB
+
+=== WORKER SMAPS ROLLUP ===
+Rss:             1725464 kB
+Pss:             1721480 kB
+Anonymous:       1560772 kB
+LazyFree:              0 kB
+Swap:                  0 kB
+
+=== WEB PROCESS 1 STATUS ===
+Name:	uvicorn
+Pid:	1
+VmPeak:	  444620 kB
+VmSize:	  444620 kB
+VmHWM:	   58528 kB
+VmRSS:	   58528 kB
+RssAnon:	   39600 kB
+RssFile:	   18928 kB
+RssShmem:	       0 kB
