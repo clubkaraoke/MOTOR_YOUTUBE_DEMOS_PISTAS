@@ -1,0 +1,67 @@
+TIMESTAMP=2026-09-02T22:18:52+00:00
+ROOT=/opt/djgabo-cdg/editor_v1
+
+=== EXISTS ===
+ROOT_EXISTS=yes
+
+=== DISK ===
+196K	/opt/djgabo-cdg/editor_v1
+
+=== TOP LEVEL ===
+f index.html 196251 bytes
+
+=== FILE TREE (NO SECRETS) ===
+index.html|196251 bytes
+
+=== GIT ===
+IS_GIT=no
+
+=== RELATED SERVICES ===
+name=cdg-ia-sync-test ports=127.0.0.1:8097->8000/tcp status=Up 2 hours
+name=cdg-ai-sync-cpu ports=127.0.0.1:8098->8001/tcp status=Up 14 hours
+name=kitkaraoke-data-sync ports=127.0.0.1:8091->8091/tcp status=Up 16 hours (healthy)
+name=cdg-vector-service-claude-perf ports=3000/tcp status=Up 3 days
+name=cdg-player-claude-perf ports=0.0.0.0:8770->80/tcp, [::]:8770->80/tcp status=Up 3 days (healthy)
+name=cdg-vector-service-native-v3 ports=3000/tcp status=Up 3 days
+name=cdg-player-online-native-v3 ports=0.0.0.0:8769->80/tcp, [::]:8769->80/tcp status=Up 3 days (healthy)
+name=cdg-vector-service-fast-v2 ports=3000/tcp status=Up 3 days
+name=cdg-player-online-fast-v2 ports=0.0.0.0:8768->80/tcp, [::]:8768->80/tcp status=Up 3 days (healthy)
+name=cdg-vector-service-pruebas ports=3000/tcp status=Up 3 days
+name=cdg-player-online-pruebas ports=0.0.0.0:8767->80/tcp, [::]:8767->80/tcp status=Up 3 days (healthy)
+name=cdg-player-online ports=0.0.0.0:8766->80/tcp, [::]:8766->80/tcp status=Up 3 days (healthy)
+name=cdg-vector-service ports=3000/tcp status=Up 3 days
+
+=== PORT 8765 ===
+LISTEN 0      2048       127.0.0.1:8765      0.0.0.0:*    users:(("gunicorn",pid=2025532,fd=3),("gunicorn",pid=2025523,fd=3))                                                                                                                                 
+
+=== INDEX MARKERS ===
+4216 /opt/djgabo-cdg/editor_v1/index.html
+6:<title>Sincronizador de karaoke · DJGABO</title>
+469:/* SINCRONIZAR — regla visual aprobada:
+788:      <div class="phaseStep disabled" id="phase2Step" role="button" tabindex="0"><b>SINCRONIZAR</b><span>Editar + timings</span></div>
+790:      <div class="phaseStep disabled" id="phase3Step" role="button" tabindex="0"><b>CREAR CDG</b><span>Exportar</span></div>
+803:      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+891:Cuando la letra esté lista, pulsa SINCRONIZAR en la parte superior."></textarea>
+896:        <div class="phaseNote" id="phaseNoteText">Aquí corriges libremente la letra. Pulsa SINCRONIZAR cuando estés listo para marcar timings.</div>
+1953:  if(rb){ const n=S.selStart>=0 ? Math.abs(S.selEnd-S.selStart)+1 : 0; rb.classList.toggle("show", n>1); rb.textContent=n>1 ? `↻ RESINCRONIZAR ${n} PALABRAS` : "↻ RESINCRONIZAR SELECCIÓN"; }
+2065:  // ÚNICO editor de letra de la fase SINCRONIZAR: texto libre a pantalla completa.
+2795:  // En SINCRONIZAR, 0–4 controlan roles. En CORREGIR, 1–6 conservan las velocidades.
+3135:  toast("Edita o agrega letra · luego pulsa SINCRONIZAR",2200);
+3340:    const msg=err.message||'Error al exportar';setRenderProgress(0,'Error al exportar · Reintentar','ERROR');setStatus("Error al exportar · Reintentar","bad");toast(msg.slice(0,420),5200);console.error('CREAR CDG:',err);
+3345:async function reintentarDropboxCdg(){
+3348:  showRenderBusy("Reintentando sólo la subida del CDG a Dropbox…");
+3352:    delete btn.dataset.retryDropbox; btn.textContent="Crear CDG";
+3353:    setStatus("CDG + WAV listos en Dropbox","good"); toast("✓ CDG subido a "+(j.dropbox_folder||"Dropbox"),3200);
+3354:  }catch(e){ btn.dataset.retryDropbox="1"; btn.textContent="Reintentar Dropbox"; setStatus("Dropbox pendiente","bad"); toast((e.message||String(e)).slice(0,420),5000); }
+3444:function paintDriveLoad(stage,pct=null,loaded=0,total=0){
+3461:    warning.textContent='No actualices ni cierres esta página. La primera carga desde Drive puede tardar; las siguientes serán rápidas.';
+3468:function paintDriveLoadError(message){
+3482:  paintDriveLoad('Conectando con Google Drive…',3);
+3486:    paintDriveLoad(st.message||'Preparando waveform online…',st.progress??null,st.loaded||0,st.total||0);
+3493:  paintDriveLoad('Waveform lista · preparando reproductor…',96);
+3504:  S.view={t0:0,dur:Math.min(30,Math.max(8,S.duration||30))};resize();draw();syncDraftHeader();updatePhase1State();paintDriveLoad('✓ Audio online listo',100);return true;
+3509:    paintDriveLoad('Leyendo datos y letra del trabajo…',2);
+3520:  }catch(e){console.error(e);const msg=(e&&e.message)?e.message:'No se pudo cargar el trabajo online.';const dropBox=$('#drop');if(dropBox)dropBox.innerHTML='<div style="padding:14px;color:#ff9b9b;line-height:1.35"><b>⚠ No se pudo cargar la voz online</b><br><span style="font-size:12px">'+String(msg).replace(/[<>]/g,'')+'</span></div>';paintDriveLoadError(msg);toast(msg);}
+3659:/* Flujo beta: CARGAR → SINCRONIZAR (editar + timings en el mismo panel) → CREAR CDG. */
+3666:$("#phase3Step").onclick=()=>{ if(document.body.classList.contains("phase2") && !document.body.classList.contains("lyricEditMode") && $("#phase3Step").classList.contains("action")) { const b=$("#btnCdg"); b.dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false); } };
+3674:$("#btnCdg").onclick = () => $("#btnCdg").dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false);
