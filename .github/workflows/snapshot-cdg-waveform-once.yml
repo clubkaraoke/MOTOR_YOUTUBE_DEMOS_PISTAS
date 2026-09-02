@@ -106,12 +106,31 @@ jobs:
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/deploy/env.production.example' > diagnostics/cdg-editor-live-env-example.txt
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/deploy/gunicorn.conf.py' > diagnostics/cdg-editor-live-gunicorn.py
 
+      - name: Capture renderer source for IA clone
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics/cdg-renderer-live/vendor/cdgmaker diagnostics/cdg-renderer-live/assets
+          for rel in \
+            check_template.py normalize.py preview.py render.py requirements.txt style.json \
+            vendor/README.md \
+            vendor/cdgmaker/LICENSE vendor/cdgmaker/VENDOR_COMMIT.txt vendor/cdgmaker/__init__.py \
+            vendor/cdgmaker/cdg.py vendor/cdgmaker/composer.py vendor/cdgmaker/config.py \
+            vendor/cdgmaker/pack.py vendor/cdgmaker/render.py vendor/cdgmaker/utils.py \
+            assets/Antonio-LICENSE.txt assets/advances-16.json
+          do
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/renderer/$rel" > "diagnostics/cdg-renderer-live/$rel"
+          done
+
       - name: Commit snapshot
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt diagnostics/cdg-editor-live-service.txt diagnostics/cdg-editor-live-env-example.txt diagnostics/cdg-editor-live-gunicorn.py
+          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt diagnostics/cdg-editor-live-service.txt diagnostics/cdg-editor-live-env-example.txt diagnostics/cdg-editor-live-gunicorn.py diagnostics/cdg-renderer-live
           if git diff --cached --quiet; then
             echo "No snapshot changes"
             exit 0
