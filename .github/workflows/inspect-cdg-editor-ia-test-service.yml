@@ -114,6 +114,9 @@ jobs:
           PID=$(sudo systemctl show -p MainPID --value djgabo-cdg-ia-test)
           sudo sh -c "tr '\\0' '\\n' < /proc/$PID/environ" | grep -E '^(DJGABO_ENV|DJGABO_TEST_MODE|DJGABO_URL_PREFIX|DJGABO_DATA_DIR|DJGABO_DB_PATH|DJGABO_BIND|DJGABO_CONFIG_DIR|DJGABO_VOICE_CACHE_DIR|DJGABO_OUTPUT_DIR)=' || true
           echo
+          echo "=== GUNICORN PROCESS ENV ==="
+          sudo sh -c "tr '\\0' '\\n' < /proc/$PID/environ" | grep -Ei 'GUNICORN|CONTROL' || true
+          echo
           echo "=== SAFE EFFECTIVE ENV ==="
           sudo systemctl show djgabo-cdg-ia-test -p Environment --value | tr ' ' '\n' | grep -E '^(DJGABO_ENV|DJGABO_TEST_MODE|DJGABO_URL_PREFIX|DJGABO_DATA_DIR|DJGABO_DB_PATH|DJGABO_BIND|DJGABO_CONFIG_DIR|DJGABO_VOICE_CACHE_DIR|DJGABO_OUTPUT_DIR)=' || true
           echo
