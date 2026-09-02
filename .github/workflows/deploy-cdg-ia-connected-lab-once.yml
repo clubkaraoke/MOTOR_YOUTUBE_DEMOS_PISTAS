@@ -1,0 +1,86 @@
+name: Deploy CDG IA connected LAB once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-connected-lab-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy connected LAB
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-connected-lab-deploy.txt <<'REMOTE'
+          set -euo pipefail
+          TARGET=/opt/cdg-ia-sync-test
+          STAGE=/tmp/cdg-ia-sync-test-main
+          ARCHIVE=/tmp/cdg-ia-sync-test-main.tar.gz
+
+          echo "TIMESTAMP=$(date -Is)"
+          rm -rf "$STAGE" "$ARCHIVE"
+          mkdir -p "$STAGE"
+          curl -fL --retry 3 -o "$ARCHIVE" https://github.com/clubkaraoke/CDG_IA_SYNC_TEST/archive/refs/heads/main.tar.gz
+          tar -xzf "$ARCHIVE" -C "$STAGE" --strip-components=1
+          sudo rsync -a --delete --exclude='.env' --exclude='/runtime/' "$STAGE/" "$TARGET/"
+
+          cd "$TARGET"
+          sudo docker compose -p cdg-ia-sync-test up -d --build cdg-ia-sync-test
+
+          echo "=== PAGE ==="
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8097/ >/tmp/lab.html; then break; fi
+            sleep 2
+          done
+          grep -q "syncBtn" /tmp/lab.html
+          grep -q "Sincronizar con IA" /tmp/lab.html
+          echo "UI_OK"
+
+          echo "=== LOCAL ENGINE THROUGH LAB ==="
+          curl -fsS http://127.0.0.1:8097/api/local/health
+          echo
+
+          echo "=== CONTAINERS ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}} image={{.Image}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} ram={{.MemUsage}} cpu={{.CPUPerc}}'
+
+          echo "=== SERVER ==="
+          df -h /
+          free -h
+          sudo du -sh /data/cdg-ai-models
+          rm -rf "$STAGE" "$ARCHIVE"
+          REMOTE
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ia-connected-lab-deploy.txt
+          git commit -m "diag: record connected IA LAB deploy" || exit 0
+          git push origin HEAD:main
