@@ -48,6 +48,15 @@ jobs:
           echo "=== PORTS ==="
           sudo ss -ltnp | grep -E ':8765|:8775' || true
           echo
+          echo "=== SAFE EFFECTIVE ENV ==="
+          sudo systemctl show djgabo-cdg-ia-test -p Environment --value | tr ' ' '\n' | grep -E '^(DJGABO_ENV|DJGABO_TEST_MODE|DJGABO_URL_PREFIX|DJGABO_DATA_DIR|DJGABO_DB_PATH|DJGABO_BIND|DJGABO_CONFIG_DIR|DJGABO_VOICE_CACHE_DIR|DJGABO_OUTPUT_DIR)=' || true
+          echo
+          echo "=== UNIT ==="
+          sudo systemctl cat djgabo-cdg-ia-test | grep -E '^(EnvironmentFile|Environment=DJGABO_|Environment=DROPBOX_|ExecStart|ReadWritePaths)' || true
+          echo
+          echo "=== GUNICORN SAFE CONFIG ==="
+          sudo grep -nE 'control|bind|GUNICORN|DJGABO' /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py || true
+          echo
           echo "=== HEALTH ==="
           curl -sS -i http://127.0.0.1:8775/healthz || true
           echo
