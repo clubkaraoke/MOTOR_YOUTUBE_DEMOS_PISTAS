@@ -1,0 +1,51 @@
+TIMESTAMP=2026-09-02T07:45:31+00:00
+
+=== SERVER CURRENT ===
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       4.3Gi       987Mi       2.9Mi       6.4Gi       7.1Gi
+Swap:             0B          0B          0B
+
+=== CONTAINER CURRENT ===
+name=cdg-ai-sync-cpu mem=1.799GiB / 5GiB cpu=0.17%
+name=cdg-ia-sync-test mem=40.68MiB / 11.4GiB cpu=0.20%
+
+=== cdg-ai-sync-cpu ===
+pid=3083910
+docker_limit_bytes=5368709120
+memory_current_bytes=2544545792
+memory_peak_bytes=3175555072
+memory_max=5368709120
+oom_killed=false
+restart_count=0
+current_mib=2426.7
+peak_mib=3028.4
+peak_gib=2.957
+limit_gib=5.000
+peak_pct_of_limit=59.1%
+--- memory.events ---
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+
+=== cdg-ia-sync-test ===
+pid=3119146
+docker_limit_bytes=0
+memory_current_bytes=47206400
+memory_peak_bytes=60223488
+memory_max=max
+oom_killed=false
+restart_count=0
+current_mib=45.0
+peak_mib=57.4
+peak_gib=0.056
+--- memory.events ---
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+
