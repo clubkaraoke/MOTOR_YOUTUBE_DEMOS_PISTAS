@@ -1,0 +1,131 @@
+name: Remove CDG lyrics engine once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/remove-cdg-lyrics-engine-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: \${{ secrets.OVH_HOST }}
+          OVH_PORT: \${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: \${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Remove CDG lyrics engine only
+        env:
+          OVH_HOST: \${{ secrets.OVH_HOST }}
+          OVH_PORT: \${{ secrets.OVH_PORT }}
+          OVH_USER: \${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/remove-cdg-lyrics-engine-result.txt <<'REMOTE'
+          set -euo pipefail
+
+          CONTAINER="djgabo-cdg-lyrics"
+          IMAGE="djgabo-youtube-lyrics:latest"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== BEFORE ==="
+          df -h /
+          free -h
+          echo
+          echo "=== TARGET CONTAINER ==="
+          sudo docker ps -a --filter "name=^/\${CONTAINER}$" --format 'name={{.Names}} image={{.Image}} status={{.Status}}' || true
+          echo
+          echo "=== TARGET IMAGE ==="
+          sudo docker images "$IMAGE" --format 'repo={{.Repository}} tag={{.Tag}} id={{.ID}} size={{.Size}}' || true
+          echo
+          echo "=== COMPOSE METADATA ==="
+          WORKDIR="$(sudo docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$CONTAINER" 2>/dev/null || true)"
+          CONFIG_FILES="$(sudo docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$CONTAINER" 2>/dev/null || true)"
+          SERVICE="$(sudo docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "$CONTAINER" 2>/dev/null || true)"
+          PROJECT="$(sudo docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$CONTAINER" 2>/dev/null || true)"
+          echo "project=$PROJECT"
+          echo "service=$SERVICE"
+          echo "working_dir=$WORKDIR"
+          echo "config_files=$CONFIG_FILES"
+
+          echo
+          echo "=== TARGET WORKDIR SIZE ==="
+          if [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ]; then
+            sudo du -sh "$WORKDIR" || true
+          else
+            echo "No dedicated compose working_dir found."
+          fi
+
+          echo
+          echo "=== STOP + REMOVE CONTAINER ==="
+          if sudo docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER"; then
+            sudo docker stop "$CONTAINER" >/dev/null 2>&1 || true
+            sudo docker rm "$CONTAINER"
+          else
+            echo "Container already absent."
+          fi
+
+          echo
+          echo "=== REMOVE IMAGE ==="
+          if sudo docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            sudo docker image rm "$IMAGE"
+          else
+            echo "Image already absent."
+          fi
+
+          echo
+          echo "=== REMOVE DEDICATED SERVICE DIRECTORY IF SAFE ==="
+          REMOVED_DIR=""
+          for d in /opt/djgabo-youtube/lyrics /opt/cdg-lyrics-engine /opt/CDG_LYRICS_ENGINE /opt/djgabo-cdg-lyrics; do
+            if [ -d "$d" ]; then
+              echo "Removing dedicated directory: $d"
+              sudo rm -rf --one-file-system "$d"
+              REMOVED_DIR="$REMOVED_DIR $d"
+            fi
+          done
+          [ -n "$REMOVED_DIR" ] || echo "No standalone dedicated lyrics directory matched safe paths."
+
+          echo
+          echo "=== VERIFY ==="
+          if sudo docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER"; then
+            echo "ERROR: container still exists"
+            exit 31
+          fi
+          if sudo docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "ERROR: image still exists"
+            exit 32
+          fi
+          echo "OK: CDG lyrics container and image absent."
+
+          echo
+          echo "=== AFTER ==="
+          df -h /
+          free -h
+          sudo docker system df
+          REMOTE
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/remove-cdg-lyrics-engine-result.txt
+          git commit -m "diag: record CDG lyrics engine removal" || exit 0
+          git push origin HEAD:main
