@@ -1,12 +1,12 @@
-TIMESTAMP=2026-09-02T23:01:25+00:00
+TIMESTAMP=2026-09-02T23:02:05+00:00
 === STATUS ===
 ● djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST
      Loaded: loaded (/etc/systemd/system/djgabo-cdg-ia-test.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-09-02 22:59:34 UTC; 1min 51s ago
+     Active: active (running) since Wed 2026-09-02 22:59:34 UTC; 2min 30s ago
    Main PID: 3808694 (gunicorn)
       Tasks: 5 (limit: 13965)
      Memory: 36.8M (peak: 37.4M)
-        CPU: 593ms
+        CPU: 619ms
      CGroup: /system.slice/djgabo-cdg-ia-test.service
              ├─3808694 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
              └─3808698 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
@@ -42,6 +42,17 @@ Sep 02 22:59:34 vps-3a3efbf9 gunicorn[3808694]: [2026-09-02 22:59:34 +0000] [380
 === PORTS ===
 LISTEN 0      2048       127.0.0.1:8775      0.0.0.0:*    users:(("gunicorn",pid=3808698,fd=3),("gunicorn",pid=3808694,fd=3))                                                                                                                                 
 LISTEN 0      2048       127.0.0.1:8765      0.0.0.0:*    users:(("gunicorn",pid=2025532,fd=3),("gunicorn",pid=2025523,fd=3))                                                                                                                                 
+
+=== PROCESS ENV SAFE ===
+DJGABO_ENV=production
+DJGABO_TEST_MODE=1
+DJGABO_URL_PREFIX=/cdg-editor-ia
+DJGABO_DATA_DIR=/var/lib/djgabo-cdg
+DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg/config
+DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db
+DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output
+DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg/voice_cache
+DJGABO_BIND=127.0.0.1:8775
 
 === SAFE EFFECTIVE ENV ===
 DJGABO_ENV=test
@@ -81,7 +92,7 @@ ReadWritePaths=/var/lib/djgabo-cdg-ia-test
 === HEALTH ===
 HTTP/1.1 503 SERVICE UNAVAILABLE
 Server: gunicorn
-Date: Wed, 02 Sep 2026 23:01:25 GMT
+Date: Wed, 02 Sep 2026 23:02:05 GMT
 Connection: keep-alive
 Content-Type: application/json
 Content-Length: 187
@@ -91,7 +102,7 @@ Referrer-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://content.dropboxapi.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'
 
-{"checks":{"data_writable":false,"database":true,"disk_free_mb":51559,"disk_ok":true,"ffmpeg":true},"environment":"production","ok":false,"service":"djgabo-cdg","version":"16.14-server"}
+{"checks":{"data_writable":false,"database":true,"disk_free_mb":51560,"disk_ok":true,"ffmpeg":true},"environment":"production","ok":false,"service":"djgabo-cdg","version":"16.14-server"}
 
 === ROOT ===
 HTTP=200 SIZE=173602
