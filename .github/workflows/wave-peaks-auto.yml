@@ -14,9 +14,9 @@ on:
         default: false
         type: boolean
   schedule:
-    # Conservative cadence: one batch every 3 hours.
+    # Conservative cadence: one batch every 2 hours.
     # The remote runner enforces max 200, 10s minimum delay and no overlap.
-    - cron: "25 */3 * * *"
+    - cron: "25 */2 * * *"
 
 permissions:
   contents: read
@@ -123,7 +123,7 @@ jobs:
         run: |
           {
             echo "### Wave Peaks Auto"
-            echo "- Cadence: every 3 hours"
+            echo "- Cadence: every 2 hours"
             echo "- Maximum batch: 200 pending IDs"
             echo "- Minimum delay: 10 seconds"
             echo "- Concurrency: 1 (generator) + remote lock"
