@@ -72,27 +72,5 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  lyrics:
-    build:
-      context: ./lyrics_engine
-    container_name: djgabo-cdg-lyrics
-    mem_limit: 2g
-    env_file: .env
-    environment:
-      CDG_LAB_DATA_DIR: /data/cdg_lab
-      DROPBOX_APP_KEY: guz0zl0p94fhw6n
-      DROPBOX_APP_SECRET: ${DROPBOX_APP_SECRET:-}
-      DROPBOX_REDIRECT_URI: https://panel.kitkaraoke.com/cdg-lyrics/api/lab/dropbox/callback
-    ports:
-      - "127.0.0.1:8090:8090"
-    volumes:
-      - ./data/cdg_lab:/data/cdg_lab
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/health', timeout=3).read()"]
-      interval: 15s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
 volumes:
   redis_data:
