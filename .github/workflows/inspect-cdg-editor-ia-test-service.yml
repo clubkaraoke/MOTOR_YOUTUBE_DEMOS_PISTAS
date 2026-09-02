@@ -1,0 +1,75 @@
+name: Inspect CDG Editor IA test service once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-editor-ia-test-service.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect test service
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-editor-ia-test-service.txt 2>&1 <<'REMOTE'
+          set +e
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== STATUS ==="
+          sudo systemctl status djgabo-cdg-ia-test --no-pager -l
+          echo
+          echo "=== JOURNAL ==="
+          sudo journalctl -u djgabo-cdg-ia-test -n 120 --no-pager
+          echo
+          echo "=== PORTS ==="
+          sudo ss -ltnp | grep -E ':8765|:8775' || true
+          echo
+          echo "=== DIRECT IMPORT ==="
+          cd /opt/djgabo-cdg-ia-test
+          sudo -u djgabo-cdg env \
+            DJGABO_ENV=test \
+            DJGABO_TEST_MODE=1 \
+            DJGABO_URL_PREFIX=/cdg-editor-ia \
+            DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test \
+            DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config \
+            DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db \
+            DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs \
+            DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output \
+            DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache \
+            /opt/djgabo-cdg-ia-test/.venv/bin/python -c "import server; print('IMPORT_OK', server.ENVIRONMENT, server.TEST_MODE, server.URL_PREFIX)"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-editor-ia-test-service.txt
+          git commit -m "diag: inspect CDG Editor IA test service" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
