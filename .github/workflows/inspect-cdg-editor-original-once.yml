@@ -60,6 +60,10 @@ jobs:
             ! -iname '*key*' \
             -printf '%P|%s bytes\n' | sort
           echo
+          echo "=== DATA DIR SIZES ==="
+          sudo du -sh /var/lib/djgabo-cdg 2>/dev/null || true
+          sudo du -sh /var/lib/djgabo-cdg/* 2>/dev/null | sort -h || true
+          echo
           echo "=== GIT ==="
           if sudo test -d "$ROOT/.git"; then
             echo "IS_GIT=yes"
