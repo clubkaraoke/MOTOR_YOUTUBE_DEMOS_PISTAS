@@ -1,0 +1,54 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.01kB done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 268B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 75.43kB done
+#5 DONE 0.0s
+
+#6 [1/6] FROM docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+#6 resolve docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea 0.0s done
+#6 DONE 0.0s
+
+#7 [3/6] COPY requirements.txt .
+#7 CACHED
+
+#8 [2/6] WORKDIR /app
+#8 CACHED
+
+#9 [4/6] RUN pip install --no-cache-dir -r requirements.txt
+#9 CACHED
+
+#10 [5/6] COPY app ./app
+#10 DONE 0.0s
+
+#11 [6/6] COPY static ./static
+#11 DONE 0.0s
+
+#12 exporting to image
+#12 exporting layers 0.1s done
+#12 exporting manifest sha256:5db237b715ed4438ca356faf2953a54ed06d2e788bcfa8e5be5c211845747fcb 0.0s done
+#12 exporting config sha256:157de0cd21c4e75252e520e25d47856f7b8fb7dd42b35e8a40a2dac2e251158f done
+#12 exporting attestation manifest sha256:9500ecba9e59ab932c643e3c54e23e071c902db547dbd8d1f833af34dfcef83c
+#12 exporting attestation manifest sha256:9500ecba9e59ab932c643e3c54e23e071c902db547dbd8d1f833af34dfcef83c 0.0s done
+#12 exporting manifest list sha256:02eb20a7ce100949ef19a707ded56ab5e7c16dfa494cc3fed004d4c9c131c5f0 done
+#12 naming to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest done
+#12 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest 0.0s done
+#12 DONE 0.2s
+
+#13 resolving provenance for metadata file
+#13 DONE 0.0s
+{"ok":true,"worker":{"ok":true,"engine":"whisperx-style-local","device":"cpu","compute_type":"int8","whisper_model":"small","align_model":"VOXPOPULI_ASR_BASE_10K_ES","threads":4,"model_root":"/models","torch":"2.8.0+cpu","torchaudio":"2.8.0+cpu"}}
+name=cdg-ia-sync-test status=Up 2 seconds
+name=cdg-ai-sync-cpu status=Up 39 minutes
