@@ -1,0 +1,8 @@
+Flask>=3.0
+Pillow>=10.0
+attrs>=23.0
+cattrs>=23.0
+pydub>=0.25
+ffmpeg-python>=0.2
+requests>=2.32
+gunicorn>=22.0; platform_system != "Windows"

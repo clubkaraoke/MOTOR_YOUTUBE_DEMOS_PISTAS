@@ -1,0 +1,2792 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>CONTROL CDG DJGABO · LOCAL 16</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-base:#12141A; --bg-surface:#1B1E26; --bg-elevated:#232733;
+    --border:#2E3340;
+    --amber:#8B5CF6; --amber-dim: rgba(139,92,246,.16);
+    --teal:#4FD1C5; --teal-dim: rgba(79,209,197,.14);
+    --danger:#E85D5D; --danger-dim: rgba(232,93,93,.14);
+    --orange:#F0A860; --orange-dim: rgba(240,168,96,.14);
+    --yellow:#E8C34C; --yellow-dim: rgba(232,195,76,.14);
+    --blue:#5C9DE8; --blue-dim: rgba(92,157,232,.14);
+    --green:#5BC98C; --green-dim: rgba(91,201,140,.14);
+    --text-1:#F1EFEA; --text-2:#9AA0AC; --text-3:#5C6270;
+  }
+  *{box-sizing:border-box;}
+  html,body{overflow-x:hidden;max-width:100%;}
+  body{margin:0;background:var(--bg-base);color:var(--text-1);font-family:'Inter',sans-serif;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .app{display:flex;min-height:100vh;}
+  button{font-family:inherit;}
+  input,textarea{font-family:inherit;color:var(--text-1);background:var(--bg-base);border:1px solid var(--border);border-radius:6px;padding:9px 11px;font-size:13.5px;}
+  input:focus,textarea:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber);}
+  a{color:var(--amber);}
+
+  /* Sidebar */
+  .sidebar{width:220px;flex-shrink:0;background:var(--bg-surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;}
+  .brand{display:flex;align-items:center;gap:8px;padding:6px 8px 22px;font-weight:700;font-size:17px;letter-spacing:.2px;}
+  .brand .dot{width:10px;height:10px;border-radius:3px;background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-2);font-size:14px;font-weight:500;cursor:pointer;transition:.15s;}
+  .nav-item:hover{background:var(--bg-elevated);color:var(--text-1);}
+  .nav-item.active{background:var(--amber-dim);color:var(--amber);}
+  .nav-spacer{flex:1;}
+  .role-switch{font-size:11px;color:var(--text-3);padding:10px 8px;border-top:1px solid var(--border);margin-top:8px;}
+  .role-pill{display:inline-flex;gap:6px;margin-top:6px;}
+  .role-btn{font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;}
+  .role-btn.active{background:var(--amber);color:#ffffff;border-color:var(--amber);font-weight:600;}
+
+  /* Main */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{display:flex;align-items:center;gap:16px;padding:16px 28px;border-bottom:1px solid var(--border);}
+  .search{flex:1;max-width:420px;display:flex;align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;}
+  .search input{border:none;background:transparent;padding:0;flex:1;font-size:13px;color:var(--text-1);}
+  .search input:focus{outline:none;}
+  .dash-search{display:none;}
+  .btn{font-size:13px;font-weight:600;padding:9px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-1);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s;white-space:nowrap;}
+  .btn:hover{background:var(--bg-elevated);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-primary{background:var(--amber);border-color:var(--amber);color:#ffffff;}
+  .btn-primary:hover{background:#a075f8;}
+  .btn-danger{color:var(--danger);border-color:transparent;}
+  .btn-danger:hover{background:var(--danger-dim);}
+  .btn-sm{padding:6px 11px;font-size:12px;}
+  .content{padding:26px 28px;flex:1;overflow:auto;padding-bottom:60px;}
+
+  .vu{display:flex;gap:3px;}
+  .vu i{width:8px;height:14px;border-radius:2px;background:var(--border);font-style:normal;}
+  .vu i.on{background:var(--seg,var(--amber));}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 28px;}
+  .stat-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;cursor:pointer;}
+  .stat-card:hover{background:var(--bg-elevated);}
+  .stat-card .label{font-size:12px;color:var(--text-2);margin-bottom:8px;}
+  .stat-card .num{font-family:'Space Grotesk';font-size:26px;font-weight:600;margin-bottom:10px;}
+  .quick{display:flex;gap:10px;margin:22px 0 32px;flex-wrap:wrap;}
+  .section-title{font-size:14px;font-weight:600;color:var(--text-2);display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .activity{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .activity-row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--border);font-size:13px;}
+  .activity-row:last-child{border-bottom:none;}
+  .idtag{color:var(--text-3);width:80px;flex-shrink:0;}
+  .activity-row .who{flex:1;}
+  .activity-row .when{color:var(--text-3);font-size:12px;}
+  .empty-state{color:var(--text-3);font-size:13px;padding:24px;text-align:center;}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap;}
+  .dot-s{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+  .filters{display:flex;gap:8px;margin:18px 0 16px;flex-wrap:wrap;overflow-x:auto;}
+  .fchip{font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);color:var(--text-2);cursor:pointer;white-space:nowrap;}
+  .fchip.active{border-color:var(--amber);color:var(--amber);background:var(--amber-dim);}
+  table{width:100%;border-collapse:collapse;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+  thead th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;}
+  tbody td{padding:14px 16px;border-bottom:1px solid var(--border);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--bg-elevated);cursor:pointer;}
+  .row-id{color:var(--text-3);}
+  .actions-dot{cursor:pointer;color:var(--text-2);padding:4px 8px;border-radius:6px;position:relative;}
+  .actions-dot:hover{background:var(--bg-elevated);color:var(--text-1);}
+
+  .dropdown{position:absolute;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:190px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .dropdown .ditem{padding:8px 10px;font-size:13px;border-radius:6px;cursor:pointer;color:var(--text-1);}
+  .dropdown .ditem:hover{background:var(--bg-surface);}
+  .dropdown .ditem.danger{color:var(--danger);}
+  .dropdown hr{border:none;border-top:1px solid var(--border);margin:5px 0;}
+
+  .bulkbar{position:fixed;bottom:16px;left:236px;right:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:12px;z-index:30;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .prod-box{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:250px;padding:3px;border-radius:7px}
+  .prod-box.dragover{outline:2px dashed var(--amber);background:var(--amber-dim)}
+  .pflag{font-size:10.5px;padding:3px 6px;border-radius:999px;border:1px solid var(--border);white-space:nowrap}
+  .pflag.ok{color:var(--teal);border-color:rgba(72,199,164,.35)} .pflag.warn{color:var(--orange);border-color:rgba(239,148,75,.38)}
+  .hist-tag{font-size:9.5px;color:#bca8ff;border:1px solid rgba(167,139,250,.35);padding:2px 5px;border-radius:5px;margin-left:5px}
+  .inst-upload-btn{padding:4px 7px!important;font-size:10.5px!important}
+  .inst-upload-btn.need-wav{background:#7f1d1d!important;border-color:#dc2626!important;color:#fff!important}
+  .inst-upload-btn.need-wav:hover{background:#991b1b!important}
+  tr.job-finished{opacity:.42;filter:saturate(.55)}
+  .stat-card.job-finished{opacity:.45;filter:saturate(.55)}
+  .wav-progress{width:170px;display:inline-flex;align-items:center;gap:6px;margin-left:6px;vertical-align:middle}
+  .wav-progress-track{height:5px;flex:1;background:#2a3038;border-radius:99px;overflow:hidden}
+  .wav-progress-fill{height:100%;background:#8b5cf6;width:0%;transition:width .12s linear}
+  .wav-progress-txt{font-size:9px;color:var(--text-3);min-width:45px;text-align:right}
+  .batch-wav-progress{position:fixed;right:24px;bottom:24px;z-index:120;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;width:360px;box-shadow:0 14px 40px rgba(0,0,0,.38)}
+  .admin-list-tools{display:flex;gap:8px;justify-content:flex-end;margin:-36px 0 10px;flex-wrap:wrap}
+
+  .editor-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  .back{color:var(--text-2);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:5px;}
+  .editor-header h2{margin:0;font-size:18px;}
+  .player{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:18px;}
+  .wave-wrap{position:relative;height:84px;margin-bottom:14px;border-radius:6px;background:var(--bg-base);overflow:hidden;cursor:pointer;user-select:none;}
+  .wave-wrap canvas{display:block;width:100%;height:100%;}
+  .sel-region{position:absolute;top:0;bottom:0;display:none;background:rgba(139,92,246,.14);border-left:2px solid var(--amber);border-right:2px solid var(--amber);pointer-events:auto;z-index:3;}
+  .handle{position:absolute;top:0;bottom:0;width:16px;margin-left:-8px;display:none;align-items:center;justify-content:center;cursor:ew-resize;z-index:6;touch-action:none;}
+  .handle::after{content:'';position:absolute;top:0;bottom:0;left:7px;width:2px;background:var(--amber);}
+  .handle-grip{width:16px;height:26px;background:var(--amber);border-radius:5px;color:#ffffff;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;box-shadow:0 2px 6px rgba(0,0,0,.4);}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--text-1);pointer-events:none;z-index:4;left:0;}
+  .hover-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(241,239,234,.35);pointer-events:none;z-index:2;left:0;display:none;}
+  .sel-region{cursor:grab;}
+  .sel-region:active{cursor:grabbing;}
+  .player-toggle{display:none;}
+  .time-tooltip{position:absolute;top:-26px;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-1);font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 7px;border-radius:5px;display:none;white-space:nowrap;z-index:7;pointer-events:none;}
+  .time-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:14px;}
+  .transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .speed-group{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto;}
+  .speed-group span{padding:6px 11px;font-size:12px;color:var(--text-2);cursor:pointer;}
+  .speed-group span.active{background:var(--amber);color:#ffffff;font-weight:600;}
+  .icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-1);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .icon-btn:hover{background:var(--bg-elevated);}
+  .icon-btn.play{background:var(--amber);border-color:var(--amber);color:#ffffff;width:44px;height:44px;font-size:15px;}
+
+  .work-grid{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start;}
+  .editor-panel{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .lyric-area{width:100%;background:var(--bg-base);border:1px solid var(--border);border-radius:8px;padding:18px 20px;font-size:16px;line-height:1.7;min-height:340px;color:var(--text-1);font-family:'Inter';resize:vertical;}
+  .save-row{display:flex;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap;gap:8px;}
+  .saved-tag{font-size:12px;color:var(--teal);display:flex;align-items:center;gap:6px;}
+  .saved-tag.dirty{color:var(--orange);}
+  .saved-tag.error{color:var(--danger);}
+  .editor-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+
+  /* Herramientas para marcar HABLADO vs CANTADO (comillas) */
+  .hablado-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .hablado-hint{font-size:11.5px;color:var(--text-3);}
+  .vista-palabras{display:none;flex-wrap:wrap;gap:7px 9px;background:var(--bg-base);border:1px solid var(--border);border-radius:8px;padding:16px;min-height:340px;align-content:flex-start;}
+  .palabra-chip{display:inline-block;padding:7px 11px;border-radius:6px;background:var(--bg-elevated);border:1px solid var(--border);font-size:15px;line-height:1.3;cursor:pointer;user-select:none;color:var(--text-1);}
+  .palabra-chip.marcada{background:var(--yellow-dim);border-color:var(--yellow);color:var(--yellow);}
+  .palabra-chip.pendiente{outline:2px solid var(--amber);outline-offset:1px;}
+  .palabra-salto{flex-basis:100%;height:2px;}
+
+  .side-panel{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13px;}
+  .side-panel h4{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);color:var(--text-2);}
+  .kv b{color:var(--text-1);font-weight:500;}
+  .version-item{padding:9px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .version-item:last-child{border-bottom:none;}
+  .version-item .vname{font-weight:600;font-size:12.5px;}
+  .version-item .vdate{color:var(--text-3);font-size:11px;}
+  .file-item{display:flex;justify-content:space-between;padding:8px 0;color:var(--text-2);font-size:12.5px;}
+
+  .trash-item{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .trash-item .meta{font-size:12px;color:var(--text-3);margin-top:4px;}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow:auto;}
+  .modal h3{margin:0 0 16px;font-size:16px;display:flex;justify-content:space-between;align-items:center;}
+  .modal label{display:block;font-size:12px;color:var(--text-2);margin:12px 0 6px;font-weight:600;}
+  .modal input,.modal textarea{width:100%;}
+  .dropzone{border:1.5px dashed var(--border);border-radius:8px;padding:18px;text-align:center;color:var(--text-2);font-size:13px;cursor:pointer;}
+  .dropzone.drag{border-color:var(--amber);color:var(--amber);background:var(--amber-dim);}
+  .file-ok{font-size:12px;color:var(--teal);margin-top:8px;}
+  .warn-box{background:var(--yellow-dim);color:var(--yellow);border-radius:8px;padding:10px 12px;font-size:12.5px;margin-top:10px;}
+  .dup-box{background:var(--blue-dim);color:var(--blue);border-radius:8px;padding:10px 12px;font-size:12.5px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+  .close-x{cursor:pointer;color:var(--text-2);font-size:18px;}
+
+  /* Toast */
+  .toast-wrap{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+  .toast{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:8px;padding:11px 16px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:340px;}
+  .toast.error{border-left-color:var(--danger);}
+
+  .spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--amber);animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-block{display:flex;align-items:center;gap:10px;color:var(--text-2);font-size:13px;padding:30px;justify-content:center;}
+  .progreso-track{width:100%;height:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:999px;overflow:hidden;margin-top:6px;}
+  .progreso-fill{height:100%;width:0%;background:var(--amber);border-radius:999px;transition:width .15s ease;}
+
+  /* Bottom sheet (mobile action menu) */
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:110;}
+  .sheet-overlay.open{display:block;}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--bg-elevated);border-radius:16px 16px 0 0;padding:10px 12px 20px;z-index:111;}
+  .sheet .ditem{padding:13px 12px;font-size:14px;border-radius:8px;}
+
+  .tabs-bottom{display:none;}
+  .role-gate-hide{display:none !important;}
+
+  @media (max-width: 880px){
+    .sidebar{display:none;}
+    .bulkbar{left:16px;}
+    .work-grid{grid-template-columns:1fr;}
+    .stat-grid{grid-template-columns:1fr;grid-auto-flow:column;grid-auto-columns:78%;overflow-x:auto;padding-bottom:6px;}
+    table{display:none;}
+    .mobile-cards{display:flex;flex-direction:column;gap:10px;}
+    .content{padding:16px;padding-bottom:76px;}
+    .topbar{padding:12px 16px;}
+    .tabs-bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--bg-surface);border-top:1px solid var(--border);padding:8px 0 10px;justify-content:space-around;z-index:20;}
+    .tabs-bottom .tb-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--text-2);background:none;border:none;}
+    .tabs-bottom .tb-item.active{color:var(--amber);}
+    body{padding-bottom:56px;}
+    .modal-overlay{align-items:flex-end;padding:0;}
+    .modal{width:100%;max-width:100%;border-radius:16px 16px 0 0;max-height:94vh;}
+
+    /* Topbar: en desktop van en fila; en móvil no caben, así que se apilan */
+    .topbar{flex-wrap:wrap;gap:10px;}
+    .topbar .search{max-width:none;flex:1 1 100%;order:2;}
+    .topbar #btnNuevaCancion{flex:1 1 100%;order:1;justify-content:center;}
+    .topbar-spacer{display:none;}
+    body.vista-dashboard .topbar{display:none;}
+    .dash-search{display:block;margin:22px 0;}
+
+    /* Editor en móvil: reproductor minimizado, la letra es lo principal */
+    .editor-header h2{font-size:15px;}
+    .player{padding:10px 12px;}
+    .player-toggle{display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:none;color:var(--text-2);font-size:12px;font-weight:600;padding:2px 0 10px;cursor:pointer;}
+    .player-toggle .chev{transition:transform .15s;}
+    .player.expanded .player-toggle .chev{transform:rotate(180deg);}
+    .player .wave-wrap{height:30px;transition:height .15s;}
+    .player.expanded .wave-wrap{height:84px;}
+    .player .time-row{display:none;}
+    .player.expanded .time-row{display:flex;}
+    .transport{gap:6px;}
+    .transport .btn-sm{display:none;}
+    .player.expanded .transport .btn-sm{display:inline-flex;}
+    .transport .speed-group{margin-left:0;max-width:100%;overflow-x:auto;}
+    .transport .speed-group span{padding:6px 8px;font-size:11px;}
+    .icon-btn{width:32px;height:32px;}
+    .icon-btn.play{width:40px;height:40px;}
+    .lyric-area{min-height:54vh;font-size:16.5px;}
+    .editor-panel{padding:14px;}
+    .side-panel{order:2;}
+  }
+  .mobile-cards{display:none;}
+  @media (max-width:880px){.mobile-cards{display:flex;flex-direction:column;gap:10px;}}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* V5 productividad */
+  .session-badge{display:flex;align-items:center;gap:7px;color:var(--text-2);font-size:12px}.session-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}.session-dot.offline{background:var(--danger)}
+  .queue-card{background:linear-gradient(135deg,var(--amber-dim),rgba(79,209,197,.06));border:1px solid rgba(139,92,246,.45);border-radius:12px;padding:18px;margin:18px 0}.queue-card h3{margin:0 0 5px;font-size:16px}.queue-meta{color:var(--text-2);font-size:13px;margin-bottom:14px}.queue-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .productivity-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 22px}.mini-kpi{background:var(--bg-surface);border:1px solid var(--border);border-radius:9px;padding:12px}.mini-kpi b{font-family:'Space Grotesk';font-size:20px}.mini-kpi span{display:block;color:var(--text-3);font-size:11px;margin-top:3px}
+  .audio-loading{display:flex;align-items:center;gap:9px;color:var(--text-2);font-size:12px;padding:18px;justify-content:center}.draft-banner{display:none;background:var(--blue-dim);color:var(--blue);padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:10px}.draft-banner.show{display:block}
+  .editor-sticky-actions{position:sticky;bottom:8px;display:flex;gap:8px;background:rgba(27,30,38,.94);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:9px;margin-top:12px;z-index:12}.editor-sticky-actions .btn-primary{flex:1;justify-content:center}
+  .tools-details{margin-top:10px}.tools-details summary{cursor:pointer;color:var(--text-2);font-size:12px;padding:8px 0}.tools-details[open] summary{color:var(--amber)}
+  .login-gate{position:fixed;inset:0;background:var(--bg-base);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}.login-card{width:420px;max-width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:26px}.login-card h1{font-size:22px;margin:0 0 6px}.login-card p{color:var(--text-2);font-size:13px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.role-choice button{justify-content:center;min-height:52px}.login-admin{display:none;margin-top:16px}.login-admin.show{display:block}.login-admin input{width:100%;margin:8px 0}.hidden{display:none!important}
+  .load-more-wrap{text-align:center;margin:16px 0}.mobile-editor-bar{display:none}.connection-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;background:var(--danger);color:white;padding:8px 12px;border-radius:999px;font-size:12px;z-index:300;display:none}
+  .player{position:sticky;top:8px;z-index:11}.side-panel{max-height:calc(100vh - 160px);overflow:auto}
+  @media(max-width:880px){
+    .productivity-strip{grid-template-columns:1fr 1fr}.productivity-strip .mini-kpi:last-child{grid-column:1/-1}.queue-card{padding:15px}.queue-actions .btn{width:100%;justify-content:center}.stat-grid{grid-auto-flow:row;grid-template-columns:1fr 1fr;grid-auto-columns:auto;overflow:visible}.stat-card{padding:14px}.stat-card .num{font-size:24px}.activity-row{align-items:flex-start;flex-wrap:wrap}.activity-row .who{min-width:55%}.activity-row .when{width:100%;padding-left:94px}.player{top:0;border-radius:0;margin-left:-16px;margin-right:-16px}.work-grid{display:block}.side-panel{max-height:none;margin-top:12px}.editor-header{position:sticky;top:0;background:var(--bg-base);z-index:15;padding:8px 0}.editor-header h2{width:100%;order:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.editor-actions{display:none}.tools-details .editor-actions{display:flex}.editor-sticky-actions{bottom:66px}.lyric-area{min-height:62vh;font-size:17px;line-height:1.75;padding:16px}.mobile-editor-bar{display:flex;position:fixed;left:0;right:0;bottom:0;background:var(--bg-surface);border-top:1px solid var(--border);z-index:50;padding:8px 10px calc(8px + env(safe-area-inset-bottom));gap:8px}.mobile-editor-bar button{flex:1;min-height:44px}.tabs-bottom.editor-open{display:none}.content.editor-mode{padding-bottom:76px}.role-switch{display:none}.topbar .session-badge{margin-left:auto}.login-card{padding:22px}.role-choice{grid-template-columns:1fr}.tabs-bottom{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  }
+
+
+  /* =========================================================
+     V5.3 · EDITOR DE TRANSCRIPCIÓN COMPACTO
+     La letra es el centro; el audio permanece accesible arriba.
+     ========================================================= */
+  .editor-title-wrap{min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .editor-title-wrap h2{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .editor-finalize-top{display:none}
+  .compact-transcriber{padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+  .compact-player-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .compact-player-label{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
+  .compact-player-help{font-size:11px;color:var(--text-3)}
+  .seek-row{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:9px;margin:7px 0 10px}
+  .audio-seek{width:100%;height:5px;padding:0;border:0;background:transparent;accent-color:var(--amber);cursor:pointer}
+  .audio-seek:focus{outline:none}
+  .primary-transport{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+  .transport-main-btn{min-width:62px;height:42px;border:1px solid var(--border);border-radius:9px;background:var(--bg-base);color:var(--text-1);font-weight:700;cursor:pointer}
+  .transport-main-btn:hover{background:var(--bg-elevated)}
+  .transport-main-btn:disabled,.audio-seek:disabled{opacity:.42;cursor:not-allowed}
+  .transport-main-btn.play-main{min-width:52px;width:52px;background:var(--amber);border-color:var(--amber);color:white;font-size:17px}
+  .transport-main-btn.repeat-main{min-width:104px;color:var(--teal)}
+  .compact-save-state{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);margin-top:10px;padding-top:8px}
+  .compact-save-state small{color:var(--text-3);font-size:10.5px}
+  .audio-tools-details{margin-top:8px;border-top:1px solid var(--border)}
+  .audio-tools-details summary{list-style:none;cursor:pointer;color:var(--text-2);font-size:11.5px;padding:9px 0 1px;font-weight:600}
+  .audio-tools-details summary::-webkit-details-marker{display:none}
+  .audio-tools-details summary::after{content:'▾';float:right;transition:transform .15s}
+  .audio-tools-details[open] summary::after{transform:rotate(180deg)}
+  .advanced-audio-body{padding-top:10px}
+  .advanced-audio-body .wave-wrap{height:82px}
+  .below-editor-audio-tools{margin-top:9px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:0 12px}
+  .below-editor-audio-tools summary{padding:10px 0}
+  .advanced-audio-body .transport{margin-top:8px}
+  .transcription-grid{grid-template-columns:minmax(0,1fr) 280px}
+  .transcription-panel{min-width:0}
+  .transcription-panel .lyric-area{min-height:52vh;font-size:17px;line-height:1.78}
+  .secondary-tools .hablado-toolbar{margin:0 0 10px}
+  .metadata-details{border:0}
+  .metadata-details>summary{display:none}
+  .metadata-details>.side-panel{display:block}
+
+  @media(max-width:880px){
+    body.editor-active{overflow-x:hidden}
+    body.editor-active .topbar{display:none}
+    .content.editor-mode{padding:0 12px 10px;overflow:visible}
+    .editor-header{position:relative;top:auto;z-index:1;padding:10px 0 8px;margin:0;gap:7px}
+    .editor-header .back{font-size:0;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;justify-content:center;background:var(--bg-surface)}
+    .editor-header .back::after{content:'←';font-size:18px}
+    .editor-title-wrap{flex:1;display:block;min-width:0}
+    .editor-title-wrap h2{font-size:14px;width:100%;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .editor-title-wrap .editor-subchips{display:none}
+    .editor-header .actions-dot{font-size:0;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center}
+    .editor-header .actions-dot::after{content:'⋮';font-size:20px}
+    .editor-finalize-top{display:inline-flex;min-height:34px;padding:7px 10px;font-size:11px}
+    .player.compact-transcriber{position:sticky;top:0;z-index:45;margin:0 -12px 8px;border-radius:0;padding:9px 12px;box-shadow:0 10px 24px rgba(0,0,0,.34)}
+    .compact-player-head{margin-bottom:5px}
+    .compact-player-help{display:none}
+    .audio-loading{padding:4px 0 6px;justify-content:flex-start;font-size:11px}
+    .seek-row{grid-template-columns:40px minmax(0,1fr) 40px;gap:7px;margin:3px 0 7px}
+    .seek-row .mono{font-size:10.5px}
+    .primary-transport{display:grid;grid-template-columns:58px 52px minmax(96px,1fr) 58px;gap:6px}
+    .transport-main-btn{min-width:0;width:100%;height:40px;font-size:12px;padding:0 5px}
+    .transport-main-btn.play-main{min-width:0;width:100%;height:40px}
+    .transport-main-btn.repeat-main{min-width:0}
+    .compact-save-state{margin-top:7px;padding-top:6px}
+    .compact-save-state small{display:none}
+    .saved-tag{font-size:11px}
+    .audio-tools-details{margin-top:5px}
+    .audio-tools-details summary{padding:7px 0 0;font-size:11px}
+    .advanced-audio-body .wave-wrap{height:70px}
+    .advanced-audio-body .transport{gap:5px}
+    .advanced-audio-body .transport .btn-sm{display:inline-flex;font-size:10.5px;padding:6px 8px}
+    .advanced-audio-body .speed-group{width:100%;margin-top:3px;justify-content:space-between}
+    .advanced-audio-body .speed-group span{flex:1;text-align:center;padding:6px 3px}
+    .transcription-grid{display:block}
+    .editor-panel.transcription-panel{padding:0;background:transparent;border:0}
+    .draft-banner{margin:0 0 6px}
+    .transcription-panel .lyric-area{display:block;width:100%;height:clamp(400px,calc(100dvh - 205px),820px);min-height:400px;max-height:none;resize:none;border-radius:9px;padding:15px 14px;font-size:18px;line-height:1.78;background:var(--bg-surface)}
+    .vista-palabras{height:clamp(400px,calc(100dvh - 205px),820px);min-height:400px;overflow:auto}
+    .editor-sticky-actions{display:none}
+    .tools-details{margin:8px 0 0}
+    .tools-details summary{background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+    .tools-details .editor-actions{padding:8px 0 2px}
+    .secondary-tools .hablado-toolbar{display:flex!important}
+    #habladoToolbarDesktop{display:none!important}
+    #habladoToolbarMobile{display:flex!important}
+    .metadata-details{margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface)}
+    .metadata-details>summary{display:block;cursor:pointer;color:var(--text-2);font-size:12px;padding:11px 12px}
+    .metadata-details>.side-panel{display:none;border:0;border-top:1px solid var(--border);border-radius:0;margin:0;padding:14px}
+    .metadata-details[open]>.side-panel{display:block}
+    .side-panel{max-height:none}
+    .mobile-editor-bar{display:none!important}
+    .tabs-bottom.editor-open{display:none}
+    body.editor-active{padding-bottom:0}
+  }
+
+  /* V5.6 · reproductor unificado, zoom interno y herramientas laterales */
+  .compact-transcriber{padding:13px 16px 12px;margin-bottom:12px}
+  .compact-player-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}
+  .compact-player-label{font-size:13px;font-weight:700}
+  .compact-player-help{font-size:11px;color:var(--text-3);margin-top:2px}
+  .wave-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+  .wave-time{font:500 11px 'JetBrains Mono',monospace;color:var(--text-2)}
+  .wave-zoom-tools{display:flex;align-items:center;gap:3px;padding:2px 3px;border:1px solid var(--border);border-radius:6px;background:var(--bg-base)}
+  .zoom-btn{height:22px;min-width:25px;padding:0 6px;border:0;border-radius:4px;background:transparent;color:var(--text-1);font-size:11px;cursor:pointer}
+  .zoom-btn:hover{background:var(--bg-elevated)}
+  .zoom-btn:disabled{opacity:.35;cursor:not-allowed}
+  .zoom-reset{min-width:48px;color:var(--amber);font-size:10px;font-weight:700}
+  .zoom-level{min-width:31px;color:var(--text-2);font:600 10px 'JetBrains Mono',monospace;text-align:center}
+  .wave-viewport{position:relative;width:100%;height:72px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:7px;background:var(--bg-base);overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--amber) transparent}
+  .wave-viewport::-webkit-scrollbar{height:4px}
+  .wave-viewport::-webkit-scrollbar-thumb{background:var(--amber);border-radius:999px}
+  .wave-viewport .wave-wrap{height:68px!important;min-width:100%;margin:0!important;border:0;border-radius:0;overflow:hidden;touch-action:pan-x}
+  .wave-viewport .handle{touch-action:none}
+  .unified-controls{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:8px}
+  .unified-controls .primary-transport{display:grid;grid-template-columns:54px 48px minmax(105px,1fr) 54px;gap:5px}
+  .unified-controls .transport-main-btn{height:36px;min-width:0;padding:0 7px;font-size:11.5px}
+  .unified-controls .play-main{font-size:14px}
+  .compact-audio-tools{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+  .compact-audio-tools .speed-group{margin-left:0}
+  .compact-audio-tools .speed-group span{padding:6px 7px;font-size:10.5px}
+  .loop-actions{display:flex;align-items:center;gap:4px}
+  .loop-actions .btn{padding:6px 7px;font-size:10.5px;white-space:nowrap}
+  .loop-actions .loop-btn.active{background:var(--amber);border-color:var(--amber);color:#fff}
+  .compact-save-state{margin:0;padding:0;border:0;min-width:88px;justify-self:end}
+  .editor-sidebar{display:flex;flex-direction:column;gap:12px;position:sticky;top:8px;min-width:0}
+  .lyric-tools-panel{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .lyric-tools-panel h4{margin:0 0 11px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3)}
+  .lyric-tools-panel .editor-actions{display:grid;grid-template-columns:1fr;margin:0;gap:7px}
+  .lyric-tools-panel .editor-actions .btn{width:100%;justify-content:flex-start}
+  .metadata-details{margin:0}
+  .metadata-details>summary{display:none}
+  .metadata-details>.side-panel{display:block}
+
+  @media(max-width:1100px) and (min-width:881px){
+    .unified-controls{grid-template-columns:auto 1fr}
+    .compact-audio-tools{grid-column:1/-1;justify-content:space-between}
+    .compact-save-state{align-self:center}
+  }
+  @media(max-width:880px){
+    .compact-transcriber{padding:9px 10px;margin-left:-16px;margin-right:-16px;border-radius:0;top:0}
+    .compact-player-help{display:none}
+    .wave-head{margin-bottom:4px}
+    .wave-viewport{height:64px}
+    .wave-viewport .wave-wrap{height:60px!important}
+    .zoom-btn{min-width:23px;padding:0 4px}
+    .zoom-reset{min-width:41px;font-size:9px}
+    .zoom-level{min-width:27px;font-size:9px}
+    .unified-controls{display:block;margin-top:6px}
+    .unified-controls .primary-transport{grid-template-columns:53px 46px minmax(90px,1fr) 53px}
+    .unified-controls .transport-main-btn{height:38px;padding:0 4px;font-size:11px}
+    .compact-audio-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;margin-top:5px;gap:5px}
+    .compact-audio-tools .speed-group{width:100%;justify-content:space-between;overflow:hidden}
+    .compact-audio-tools .speed-group span{flex:1;text-align:center;padding:5px 2px;font-size:9.5px}
+    .loop-actions{gap:3px}
+    .loop-actions .btn{min-width:29px;padding:5px 6px;font-size:0;justify-content:center}
+    .loop-actions #btnLoop{min-width:48px;font-size:9px}
+    .compact-save-state{display:none}
+    .editor-sidebar{position:static;margin-top:10px}
+    .lyric-tools-panel{padding:13px}
+    .lyric-tools-panel .editor-actions{display:grid!important;grid-template-columns:1fr 1fr;padding:0}
+    .metadata-details>summary{display:block}
+    .metadata-details>.side-panel{display:none}
+    .metadata-details[open]>.side-panel{display:block}
+  }
+
+
+  /* LOCAL 08: Modo Editor. En Home/Trabajos se conserva la topbar normal;
+     al abrir Motor V1 desaparece para recuperar toda la altura útil. */
+  .editor-session-meta{display:none}
+  body.v1-editor-open .topbar{display:none!important}
+  body.v1-editor-open .role-switch{display:none}
+  body.v1-editor-open .editor-session-meta{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 8px 2px;
+    border-top:1px solid var(--border);margin-top:8px
+  }
+  body.v1-editor-open .editor-session-meta .session-badge{flex:1;min-width:90px}
+  body.v1-editor-open .editor-session-meta .editor-logout{padding:6px 9px}
+  .content.v1-editor-mode{padding:0;overflow:hidden;min-height:100vh;height:100vh}
+  .v1-editor-frame{display:block;width:100%;height:100vh;border:0;background:#12141A}
+  .local-badge{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--orange);border:1px solid rgba(240,168,96,.35);background:var(--orange-dim);padding:4px 7px;border-radius:999px}
+  .master-note{font-size:11px;color:var(--teal);margin-top:6px;line-height:1.35}
+  .dropzone.master-ready{border-color:var(--teal);color:var(--teal)}
+  .dropbox-dest-card{display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg-base)}
+  .dropbox-dest-icon{font-size:20px;flex:0 0 auto}.dropbox-dest-text{flex:1;min-width:0}
+  .dropbox-dest-name{font-weight:700;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dropbox-dest-path{font:10px var(--mono);color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+  .dropbox-status{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.4}
+  .dropbox-status.ok{color:var(--teal)}
+  .dropbox-status.bad{color:var(--danger)}
+  .dbx-browser-head{display:flex;gap:8px;align-items:center;margin:8px 0}
+  .dbx-current{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-base);font:11px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .dbx-list{border:1px solid var(--border);border-radius:8px;max-height:330px;overflow:auto;background:var(--bg-base)}
+  .dbx-folder{display:flex;width:100%;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;color:var(--text-2)}
+  .dbx-folder:last-child{border-bottom:0}.dbx-folder:hover{background:var(--bg-elevated);color:var(--text)}
+  .dbx-empty{padding:24px;text-align:center;color:var(--text-3);font-size:12px}
+  .dbx-secret-note{font-size:10.5px;color:var(--text-3);line-height:1.45;margin-top:5px}
+
+/* =========================================================
+   DJGABO_MOBILE_EDITOR_PARENT_V2
+   Reserva el espacio del nav inferior mientras el iframe V1 está abierto.
+   ========================================================= */
+@media(max-width:880px){
+  body.v1-editor-open{overflow:hidden!important}
+  body.v1-editor-open .content.v1-editor-mode{
+    padding:0!important;min-height:0!important;
+    height:calc(100dvh - 68px)!important;
+    max-height:calc(100dvh - 68px)!important;
+    overflow:hidden!important;
+  }
+  body.v1-editor-open .v1-editor-frame{
+    display:block;width:100%;height:100%!important;min-height:0!important;border:0;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="brand" style="padding:0 0 10px"><span class="dot"></span> Consola de Producción</div>
+    <h1>¿Quién está trabajando?</h1>
+    <p id="loginHelp">Valeria entra directamente a corregir. El acceso de Augusto está protegido.</p>
+    <div class="role-choice">
+      <button class="btn btn-primary" id="entrarCorrectora">🎧 Entrar como Valeria</button>
+      <button class="btn" id="mostrarLoginAdmin">⚙ Entrar como Augusto</button>
+    </div>
+    <div class="login-admin" id="loginCorrectoraBox">
+      <label>Contraseña de Valeria</label>
+      <input type="password" id="loginCorrectoraPassword" autocomplete="current-password" placeholder="Contraseña">
+      <button class="btn btn-primary" id="confirmarCorrectora" style="width:100%;justify-content:center">INGRESAR</button>
+    </div>
+    <div class="login-admin" id="loginAdminBox">
+      <label>Contraseña ADMIN</label>
+      <input type="password" id="loginAdminPassword" autocomplete="current-password" placeholder="Contraseña">
+      <button class="btn btn-primary" id="entrarAdmin" style="width:100%;justify-content:center">INGRESAR</button>
+    </div>
+    <div id="loginError" style="color:var(--danger);font-size:12px;margin-top:10px"></div>
+  </div>
+</div>
+<div class="connection-toast" id="connectionToast">Sin conexión · Tu borrador queda guardado en este dispositivo</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="brand"><span class="dot"></span> Consola</div>
+    <div class="nav-item active" data-view="dashboard">🏠 Home</div>
+    <div class="nav-item" data-view="lista">🎵 Trabajos</div>
+    <div class="nav-item role-gate-hide" data-role-admin data-view="papelera">🗑 Papelera</div>
+    <div class="nav-spacer"></div>
+    <div class="role-switch">Viendo como
+      <div class="role-pill">
+        <button class="role-btn" data-role="ADMIN">Admin</button>
+        <button class="role-btn" data-role="CORRECTORA">Correctora</button>
+      </div>
+    </div>
+    <div class="editor-session-meta" aria-label="Sesión del modo editor">
+      <span class="local-badge">LOCAL 16.14 · ONLINE CONTROLADO</span>
+      <div class="session-badge"><span class="session-dot" id="editorSessionDot"></span><span id="editorSessionName">Sin sesión</span></div>
+      <button class="btn btn-sm editor-logout" id="btnCerrarSesionEditor">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search"><span>🔍</span><input id="buscadorGlobal" placeholder="Buscar por artista o título…"></div>
+      <div class="topbar-spacer" style="flex:1"></div><span class="local-badge">LOCAL 16.14 · ONLINE CONTROLADO</span>
+      <div class="session-badge"><span class="session-dot" id="sessionDot"></span><span id="sessionName">Sin sesión</span></div>
+      <button class="btn btn-sm" id="btnCerrarSesion">Salir</button>
+      <button class="btn btn-primary role-gate-hide" data-role-admin id="btnNuevaCancion">+ Nueva canción</button>
+    </div>
+
+    <div class="content" id="content">
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <h1 style="font-size:20px;margin:0 0 2px;" id="saludoDashboard">Hola 👋</h1>
+        <div id="fechaHoy" style="color:var(--text-2);font-size:13px;"></div>
+        <div id="dashboardBody"><div class="loading-block"><span class="spinner"></span> Cargando panel…</div></div>
+      </div>
+
+      <!-- LISTA -->
+      <div class="view" id="view-lista">
+        <h1 style="font-size:20px;margin:0 0 2px;" id="saludoLista">Hola 👋</h1>
+        <div id="fechaLista" style="color:var(--text-2);font-size:13px;margin-bottom:14px;"></div>
+        <h2 style="font-size:15px;margin:0 0 10px;color:var(--text-2);font-weight:600;">Trabajos</h2>
+        <div class="admin-list-tools role-gate-hide" data-role-admin>
+  <button class="btn btn-sm" id="btnDriveHistorico">☁ Drive histórico</button>
+  <button class="btn btn-sm" id="btnJalarInstrumentalesMasivo">🎵 Jalar instrumentales WAV</button>
+</div>
+        <div class="filters" id="filtrosLista"></div>
+        <div id="listaBody"><div class="loading-block"><span class="spinner"></span> Cargando trabajos…</div></div>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="view" id="view-editor">
+        <div id="editorBody"><div class="loading-block"><span class="spinner"></span> Abriendo trabajo…</div></div>
+      </div>
+
+      <!-- PAPELERA -->
+      <div class="view" id="view-papelera">
+        <h1 style="font-size:20px;margin:0 0 2px;" id="saludoPapelera">Hola 👋</h1>
+        <div id="fechaPapelera" style="color:var(--text-2);font-size:13px;margin-bottom:14px;"></div>
+        <h2 style="font-size:15px;margin:0 0 10px;color:var(--text-2);font-weight:600;">Papelera</h2>
+        <div id="papeleraBody"><div class="loading-block"><span class="spinner"></span> Cargando papelera…</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="tabs-bottom">
+  <button class="tb-item active" data-view="dashboard">🏠<span>Home</span></button>
+  <button class="tb-item" data-view="lista">🎵<span>Trabajos</span></button>
+  <button class="tb-item role-gate-hide" data-role-admin data-view="papelera">🗑<span>Papelera</span></button>
+</div>
+
+<!-- MODAL NUEVA CANCIÓN -->
+<div class="modal-overlay" id="modalNueva">
+  <div class="modal">
+    <h3>Nueva canción <span class="close-x" id="cerrarModalNueva">×</span></h3>
+    <label>Artista</label>
+    <input id="inArtista" placeholder="Ej. Feid">
+    <label>Título</label>
+    <input id="inTitulo" placeholder="Ej. Luna">
+    <div id="dupBox"></div>
+
+    <label>Acapella / Voz</label>
+    <div class="dropzone" id="dropzone">⬆ Arrastra la VOZ aquí o haz clic para elegir archivo</div>
+    <input type="file" id="inAudio" accept="audio/mpeg,.mp3" style="display:none">
+    <div id="audioInfo"></div>
+    <div id="warnBox"></div>
+
+    <label>Instrumental <span style="color:var(--teal);font-size:10px">· NOMBRE MAESTRO</span></label>
+    <div class="dropzone" id="dropzoneInstrumental">⬆ Arrastra el INSTRUMENTAL aquí o haz clic para elegir archivo</div>
+    <input type="file" id="inInstrumental" accept="audio/wav,.wav" style="display:none">
+    <div id="instrumentalInfo"></div>
+    <div id="masterInfo" class="master-note"></div>
+
+    <label>Letra preliminar (Moisés)</label>
+    <textarea id="inLetra" rows="6" placeholder="Pega aquí la letra generada por Moisés…"></textarea>
+
+    <label>Destino Dropbox actual <span style="color:var(--teal);font-size:10px">· WAV ahora · CDG al finalizar</span></label>
+    <input id="inDropboxFolderId" type="hidden" value="">
+    <div class="dropbox-dest-card">
+      <div class="dropbox-dest-icon">📁</div>
+      <div class="dropbox-dest-text">
+        <div class="dropbox-dest-name" id="dropboxDestName">Sin carpeta seleccionada</div>
+        <div class="dropbox-dest-path" id="dropboxDestPath">Elige la carpeta mensual una vez</div>
+      </div>
+      <button class="btn" type="button" id="btnElegirDropbox">Cambiar carpeta</button>
+    </div>
+    <div id="dropboxNuevaStatus" class="dropbox-status">Comprobando Dropbox…</div>
+
+    <div id="uploadProgress" style="display:none;margin-top:10px;color:var(--teal);font-size:12px"></div>
+
+    <div class="modal-actions">
+      <button class="btn" id="btnCancelarNueva">Cancelar</button>
+      <button class="btn btn-primary" id="btnEnviarNueva">Enviar a corrección</button>
+    </div>
+  </div>
+</div>
+
+<!-- DROPBOX: configuración única + selector de carpeta -->
+<div class="modal-overlay" id="modalDropbox">
+  <div class="modal" style="width:580px">
+    <h3>Dropbox <span class="close-x" id="cerrarModalDropbox">×</span></h3>
+    <div id="dbxStatusBox" class="dropbox-status">Comprobando conexión…</div>
+
+    <div id="dbxConfigBox">
+      <label>App Key</label>
+      <input id="dbxAppKey" value="2ld58g05ug5g6i1" autocomplete="off">
+      <label>App Secret <span style="color:var(--text-3);font-size:10px">· se pega una sola vez</span></label>
+      <input id="dbxAppSecret" type="password" placeholder="Pega aquí el App Secret de DJGABO_CDG_PANEL" autocomplete="new-password">
+      <div class="dbx-secret-note">Se guarda únicamente en <b>data/dropbox_oauth.json</b> de esta instalación local. No se envía a ChatGPT. En OVH podremos moverlo a variables de entorno.</div>
+      <div class="modal-actions">
+        <button class="btn" id="btnSoloConectarDropbox" type="button" style="display:none">Autorizar Dropbox</button>
+        <button class="btn btn-primary" id="btnGuardarConectarDropbox" type="button">Guardar y conectar Dropbox</button>
+      </div>
+    </div>
+
+    <div id="dbxBrowserBox" style="display:none">
+      <div class="dbx-browser-head">
+        <button class="btn btn-sm" type="button" id="btnDbxSubir">← Arriba</button>
+        <div class="dbx-current" id="dbxCurrentPath">/</div>
+      </div>
+      <div class="dbx-list" id="dbxFolderList"><div class="dbx-empty">Cargando carpetas…</div></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="btnDbxReconfigurar">Cambiar conexión</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" type="button" id="btnUsarCarpetaDropbox">Usar esta carpeta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GOOGLE DRIVE HISTÓRICO: puente con el Apps Script existente -->
+<div class="modal-overlay" id="modalDriveHistorico">
+  <div class="modal" style="width:560px">
+    <h3>Drive histórico <span class="close-x" id="cerrarModalDrive">×</span></h3>
+    <div id="driveStatusBox" class="dropbox-status">Comprobando conexión…</div>
+    <label>URL del Web App de EDITOR_LETRAS <span style="color:var(--text-3);font-size:10px">· termina en /exec</span></label>
+    <input id="driveWebappUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+    <div class="dbx-secret-note">Los audios y letras NO se copian al PC. El panel consulta Google Drive sólo cuando abre un trabajo histórico. Al guardar una corrección, se sigue usando el mismo Sheet + carpetas + backups del panel antiguo.</div>
+    <div class="modal-actions">
+      <button class="btn" id="btnCerrarDrive" type="button">Cerrar</button>
+      <button class="btn btn-primary" id="btnGuardarDrive" type="button">Guardar y probar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM GENERICO -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="width:380px;">
+    <h3 id="confirmTitulo">Confirmar</h3>
+    <div id="confirmTexto" style="font-size:13.5px;color:var(--text-2);"></div>
+    <div class="modal-actions">
+      <button class="btn" id="confirmCancelar">Cancelar</button>
+      <button class="btn btn-danger" id="confirmAceptar" style="border:1px solid var(--danger);">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="sheet" id="sheet" style="display:none;"></div>
+
+<audio id="audioPlayer" style="display:none;"></audio>
+
+<script>
+/* =========================================================
+   ESTADO GLOBAL
+   ========================================================= */
+const ESTADOS = {
+  PENDIENTE:'PENDIENTE DE CORRECCIÓN', CORRECCION:'EN CORRECCIÓN', CORREGIDA:'LETRA CORREGIDA',
+  COPIADA:'LETRA COPIADA', TERMINADO:'KARAOKE TERMINADO', ELIMINADO:'ELIMINADO'
+};
+const ESTADO_COLOR = {
+  [ESTADOS.PENDIENTE]:'orange', [ESTADOS.CORRECCION]:'yellow', [ESTADOS.CORREGIDA]:'teal',
+  [ESTADOS.COPIADA]:'blue', [ESTADOS.TERMINADO]:'green', [ESTADOS.ELIMINADO]:'danger'
+};
+const ESTADO_LABEL = {
+  [ESTADOS.PENDIENTE]:'Pendiente', [ESTADOS.CORRECCION]:'Corrigiendo', [ESTADOS.CORREGIDA]:'Corregida',
+  [ESTADOS.COPIADA]:'Copiada', [ESTADOS.TERMINADO]:'Terminado', [ESTADOS.ELIMINADO]:'Eliminado'
+};
+
+const NOMBRES_ROL = { ADMIN: 'Augusto', CORRECTORA: 'Valeria' };
+let ROL = 'CORRECTORA';
+let SESSION_TOKEN = localStorage.getItem('consola_session_token') || '';
+let CORRECTORA_PASSWORD_REQUIRED = false;
+let listaVisible = 60;
+let lockHeartbeat = null;
+let cambiosPendientesGlobal = false;
+let trabajosCache = [];
+let filtroActivo = 'TODOS';
+let busquedaActual = '';
+let seleccionados = new Set();
+let dupEncontrado = null;
+let archivoSeleccionado = null; // VOZ
+let instrumentalSeleccionado = null; // INSTRUMENTAL = fuente maestra de artista/título
+let DROPBOX_STATUS = {configured:false,connected:false,default_folder:null};
+let DRIVE_HIST_STATUS = {configured:false,online:false,webapp_url:'',error:''};
+let DBX_SELECTED_FOLDER = null; // {id,path_display,path_lower,name}
+let DBX_BROWSER_CURRENT = {id:'',display_path:'/',path_lower:'',parent_ref:''};
+let DBX_OAUTH_POPUP = null;
+let DBX_PICK_MODE = 'new'; // new | bulk
+
+// estado del editor abierto
+let editor = {
+  idTrabajo:null, audioBuffer:null, duracion:0, selStart:null, selEnd:null,
+  loopActivo:false, guardadoTimer:null, autosaveTimer:null, ultimaLetraGuardada:'',
+  versiones:[], rolBloqueado:false, audioCargando:false
+};
+
+/* =========================================================
+   HELPERS DE UI
+   ========================================================= */
+function toast(msg, tipo){
+  const el = document.createElement('div');
+  el.className = 'toast' + (tipo==='error' ? ' error' : '');
+  el.textContent = msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>el.remove(), 4200);
+}
+
+function llamar(fn){
+  const args = Array.prototype.slice.call(arguments, 1);
+  return fetch('/api/call/' + encodeURIComponent(fn), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({args:args})
+  }).then(async function(r){
+    let data=null;
+    try{ data=await r.json(); }catch(e){}
+    if(!r.ok || (data && data.ok===false)){
+      throw new Error((data && (data.error||data.message)) || ('Error del servidor '+r.status));
+    }
+    return data;
+  });
+}
+
+function mostrarErrorAmigable(err){
+  const msg = (err && err.message) ? err.message : 'Ocurrió un error inesperado. Intenta de nuevo.';
+  toast(msg, 'error');
+}
+
+function chipEstado(estado){
+  const color = ESTADO_COLOR[estado] || 'text-2';
+  return '<span class="chip" style="background:var(--'+color+'-dim);color:var(--'+color+')">'
+    + '<span class="dot-s" style="background:var(--'+color+')"></span>' + (ESTADO_LABEL[estado] || estado) + '</span>';
+}
+
+/** Badge secundario: "Copiada" es independiente del Estado principal, no lo reemplaza. */
+function chipRender(t){
+  if(!t||!t.renderEstado)return '';
+  if(t.renderEstado==='RENDERIZANDO')return '<span class="chip" style="background:rgba(139,92,246,.14);color:#c4b5fd"><span class="dot-s" style="background:#8b5cf6"></span>Exportando '+(t.renderProgreso||0)+'%</span>';
+  if(t.renderEstado==='ERROR')return '<span class="chip" style="background:rgba(239,68,68,.12);color:#ff8f8f"><span class="dot-s" style="background:#ef4444"></span>Error exportar</span>';
+  return '';
+}
+function chipCopiada(copiada){
+  if (copiada !== 'SI') return '';
+  return '<span class="chip" style="background:var(--blue-dim);color:var(--blue);margin-left:6px;" title="Ya se copió al programa de karaoke">'
+    + '<span class="dot-s" style="background:var(--blue)"></span>Copiada</span>';
+}
+
+function formatBytes(bytes){
+  if (!bytes) return '—';
+  const mb = bytes / (1024*1024);
+  return mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(bytes/1024) + ' KB';
+}
+
+function formatDuracion(seg){
+  seg = Math.round(Number(seg)||0);
+  const m = Math.floor(seg/60), s = seg%60;
+  return m + ':' + String(s).padStart(2,'0');
+}
+
+/* =========================================================
+   ROLES
+   ========================================================= */
+function aplicarRol(){
+  document.querySelectorAll('.role-btn').forEach(b=>b.classList.toggle('active', b.dataset.role===ROL));
+  document.body.classList.toggle('rol-correctora', ROL==='CORRECTORA');
+  document.querySelectorAll('[data-role-admin]').forEach(function(el){ el.classList.toggle('role-gate-hide', ROL!=='ADMIN'); });
+  const n=document.getElementById('sessionName'); if(n)n.textContent=NOMBRES_ROL[ROL]||'';
+  const ne=document.getElementById('editorSessionName'); if(ne)ne.textContent=NOMBRES_ROL[ROL]||'';
+  actualizarSaludos();
+}
+function actualizarSaludos(){
+  const nombre=NOMBRES_ROL[ROL]||'';
+  const fechaTexto=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long'});
+  ['saludoDashboard','saludoLista','saludoPapelera'].forEach(function(id){const el=document.getElementById(id);if(el)el.textContent='Hola, '+nombre+' 👋';});
+  ['fechaHoy','fechaLista','fechaPapelera'].forEach(function(id){const el=document.getElementById(id);if(el)el.textContent=fechaTexto;});
+}
+function esAdmin(){return ROL==='ADMIN';}
+function abrirLoginAdmin(){document.getElementById('loginGate').classList.remove('hidden');document.getElementById('loginAdminBox').classList.add('show');setTimeout(()=>document.getElementById('loginAdminPassword').focus(),50);}
+function abrirLoginCorrectora(){
+  if(!CORRECTORA_PASSWORD_REQUIRED)return iniciarSesionUI('CORRECTORA','');
+  document.getElementById('loginGate').classList.remove('hidden');document.getElementById('loginCorrectoraBox').classList.add('show');
+  setTimeout(()=>document.getElementById('loginCorrectoraPassword').focus(),50);
+}
+function iniciarSesionUI(rol,password){
+  const err=document.getElementById('loginError');err.textContent='';
+  llamar('iniciarSesionConsola',rol,password||'').then(function(s){
+    SESSION_TOKEN=s.token;ROL=s.rol;localStorage.setItem('consola_session_token',SESSION_TOKEN);document.getElementById('loginGate').classList.add('hidden');aplicarRol();mostrarVista('dashboard');
+  }).catch(function(e){err.textContent=(e&&e.message)||'No se pudo iniciar sesión.';});
+}
+document.getElementById('entrarCorrectora').onclick=abrirLoginCorrectora;
+document.getElementById('confirmarCorrectora').onclick=()=>iniciarSesionUI('CORRECTORA',document.getElementById('loginCorrectoraPassword').value);
+document.getElementById('loginCorrectoraPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('confirmarCorrectora').click();});
+document.getElementById('mostrarLoginAdmin').onclick=()=>document.getElementById('loginAdminBox').classList.toggle('show');
+document.getElementById('entrarAdmin').onclick=()=>iniciarSesionUI('ADMIN',document.getElementById('loginAdminPassword').value);
+document.getElementById('loginAdminPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('entrarAdmin').click();});
+document.querySelectorAll('.role-btn').forEach(function(b){b.addEventListener('click',function(){if(b.dataset.role==='ADMIN')abrirLoginAdmin();else abrirLoginCorrectora();});});
+function cerrarSesionUI(){
+  const viejo=SESSION_TOKEN;SESSION_TOKEN='';localStorage.removeItem('consola_session_token');llamar('cerrarSesionConsola',viejo).catch(()=>{});document.getElementById('loginGate').classList.remove('hidden');
+}
+document.getElementById('btnCerrarSesion').onclick=cerrarSesionUI;
+document.getElementById('btnCerrarSesionEditor').onclick=cerrarSesionUI;
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+function mostrarVista(nombre){
+  if (nombre !== 'editor' && document.getElementById('view-editor').classList.contains('active')){
+    const fr=document.getElementById('editorV1Frame');
+    try{ if(fr&&fr.contentWindow) fr.contentWindow.postMessage({type:'panel:navigate-away'}, location.origin); }catch(e){}
+    editor.idTrabajo=null;
+    document.getElementById('content').classList.remove('v1-editor-mode');
+    document.body.classList.remove('v1-editor-open');
+  }
+  if (nombre === 'papelera' && !esAdmin()) nombre = 'dashboard';
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+nombre).classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view===nombre));
+  document.querySelectorAll('.tb-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view===nombre));
+  document.body.classList.toggle('vista-dashboard', nombre === 'dashboard');
+  if (nombre === 'dashboard') cargarDashboard();
+  if (nombre === 'lista') cargarLista();
+  if (nombre === 'papelera') cargarPapelera();
+}
+document.querySelectorAll('[data-view]').forEach(function(el){
+  el.addEventListener('click', function(){ mostrarVista(el.dataset.view); });
+});
+
+document.getElementById('buscadorGlobal').addEventListener('input', function(e){
+  busquedaActual = e.target.value.trim().toLowerCase();
+  if (document.getElementById('view-lista').classList.contains('active')) renderLista();
+  else mostrarVista('lista');
+});
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+function cargarDashboard(){
+  document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'2-digit', month:'long' });
+  llamar('obtenerDashboard', SESSION_TOKEN).then(renderDashboard).catch(function(err){
+    document.getElementById('dashboardBody').innerHTML = '<div class="empty-state">No se pudo cargar el panel.</div>';
+    mostrarErrorAmigable(err);
+  });
+}
+
+function vu(pct, colorVar){
+  let html = '<div class="vu" style="--seg:var(--'+colorVar+')">';
+  for (let i=0;i<8;i++) html += '<i class="'+(i < Math.round(pct*8) ? 'on' : '')+'"></i>';
+  return html + '</div>';
+}
+
+function renderDashboard(data){
+  const c=data.contadores,p=data.productividad||{},next=data.siguienteTrabajo;
+  const total=Math.max(1,c.pendientes+c.enCorreccion+c.corregidas+c.terminadas);
+  let html='';
+  if(next){
+    html+='<div class="queue-card"><div style="color:var(--amber);font-size:11px;font-weight:700;text-transform:uppercase">Siguiente trabajo recomendado</div>'
+      +'<h3>'+escaparHtml(next.artista)+' — '+escaparHtml(next.titulo)+'</h3><div class="queue-meta"><span class="mono">'+next.idTrabajo+'</span> · '+(ESTADO_LABEL[next.estado]||next.estado)+'</div>'
+      +'<div class="queue-actions"><button class="btn btn-primary" id="btnContinuarSiguiente">▶ '+(next.estado===ESTADOS.CORRECCION?'Continuar corrección':'Comenzar corrección')+'</button><button class="btn" id="btnVerCola">Ver cola de trabajo</button></div></div>';
+  } else html+='<div class="queue-card"><h3>🎉 No quedan canciones pendientes</h3><div class="queue-meta">La cola de corrección está al día.</div></div>';
+  html+='<div class="productivity-strip"><div class="mini-kpi"><b>'+Number(p.corregidasHoy||0)+'</b><span>Corregidas hoy</span></div><div class="mini-kpi"><b>'+(p.promedioMinutos? p.promedioMinutos+' min':'—')+'</b><span>Promedio por canción</span></div><div class="mini-kpi"><b>'+Number(p.colaPendiente||0)+'</b><span>En la cola actual</span></div></div>';
+  const cards=[{label:'Pendientes',val:c.pendientes,color:'orange',filtro:'PENDIENTE'},{label:'En corrección',val:c.enCorreccion,color:'yellow',filtro:'CORRECCION'},{label:'Corregidas',val:c.corregidas,color:'teal',filtro:'CORREGIDA'},{label:'Terminadas',val:c.terminadas,color:'green',filtro:'TERMINADO'}];
+  html+='<div class="stat-grid">';cards.forEach(function(card){html+='<div class="stat-card" data-filtro="'+card.filtro+'"><div class="label">'+card.label+'</div><div class="num">'+card.val+'</div>'+vu(card.val/total,card.color)+'</div>';});html+='</div>';
+  html+='<div class="quick"><button class="btn btn-primary role-gate-hide" data-role-admin id="qNueva">🎵 Nueva canción</button><button class="btn" id="qPendientes">⏳ Ver pendientes</button><button class="btn role-gate-hide" data-role-admin id="qPapelera">🗑 Papelera ('+c.papelera+')</button></div>';
+  html+='<div class="section-title">Actividad reciente <span style="font-size:11px;color:var(--text-3)">Copiadas: '+c.copiadas+'</span></div>';
+  if(!data.actividad.length)html+='<div class="empty-state">Todavía no hay actividad registrada.</div>';else{html+='<div class="activity">';data.actividad.forEach(function(a){html+='<div class="activity-row"><span class="idtag mono">'+a.idTrabajo+'</span><span class="who">'+a.accion.charAt(0)+a.accion.slice(1).toLowerCase()+'</span>'+(a.estadoNuevo?chipEstado(a.estadoNuevo):'')+'<span class="when">'+a.fecha+'</span></div>';});html+='</div>';}
+  html+='<div class="search dash-search"><span>🔍</span><input id="buscadorDashboard" placeholder="Buscar por artista o título…"></div>';
+  document.getElementById('dashboardBody').innerHTML=html;aplicarRol();
+  if(next)document.getElementById('btnContinuarSiguiente').onclick=()=>abrirEditor(next.idTrabajo);
+  const vc=document.getElementById('btnVerCola');if(vc)vc.onclick=function(){filtroActivo='PENDIENTE';mostrarVista('lista');};
+  const bd=document.getElementById('buscadorDashboard');if(bd)bd.oninput=function(){const g=document.getElementById('buscadorGlobal');g.value=bd.value;g.dispatchEvent(new Event('input'));};
+  document.querySelectorAll('.stat-card').forEach(el=>el.onclick=function(){filtroActivo=el.dataset.filtro;mostrarVista('lista');});
+  const qn=document.getElementById('qNueva');if(qn)qn.onclick=abrirModalNueva;document.getElementById('qPendientes').onclick=function(){filtroActivo='PENDIENTE';mostrarVista('lista');};const qp=document.getElementById('qPapelera');if(qp)qp.onclick=()=>mostrarVista('papelera');
+}
+
+
+
+/* =========================================================
+   LISTA DE TRABAJOS
+   ========================================================= */
+const FILTROS = [
+  { key:'TODOS', label:'Todos' },
+  { key:'PENDIENTE', label:'Pendientes', estado:ESTADOS.PENDIENTE },
+  { key:'CORRECCION', label:'En corrección', estado:ESTADOS.CORRECCION },
+  { key:'CORREGIDA', label:'Corregidas', estado:ESTADOS.CORREGIDA },
+  { key:'COPIADA', label:'Copiadas', copiada:true },
+  { key:'TERMINADO', label:'Terminadas', estado:ESTADOS.TERMINADO }
+];
+
+function cargarLista(){
+  seleccionados.clear(); listaVisible=60;
+  llamar('listarTrabajos', SESSION_TOKEN).then(function(data){
+    trabajosCache = data.filter(function(t){ return t.estado !== ESTADOS.ELIMINADO; });
+    renderFiltros();
+    renderLista();
+  }).catch(function(err){
+    document.getElementById('listaBody').innerHTML = '<div class="empty-state">No se pudo cargar la lista.</div>';
+    mostrarErrorAmigable(err);
+  });
+}
+
+function renderFiltros(){
+  const counts = {};
+  FILTROS.forEach(function(f){
+    if (f.key === 'TODOS') counts[f.key] = trabajosCache.length;
+    else if (f.copiada) counts[f.key] = trabajosCache.filter(function(t){ return t.copiada === 'SI'; }).length;
+    else counts[f.key] = trabajosCache.filter(function(t){ return t.estado === f.estado; }).length;
+  });
+  document.getElementById('filtrosLista').innerHTML = FILTROS.map(function(f){
+    return '<div class="fchip'+(filtroActivo===f.key?' active':'')+'" data-filtro="'+f.key+'">'+f.label+' ('+counts[f.key]+')</div>';
+  }).join('');
+  document.querySelectorAll('.fchip').forEach(function(el){
+    el.addEventListener('click', function(){ filtroActivo = el.dataset.filtro; renderFiltros(); renderLista(); });
+  });
+}
+
+function trabajosFiltrados(){
+  const f = FILTROS.find(function(x){ return x.key===filtroActivo; });
+  let lista = trabajosCache;
+  if (f && f.estado) lista = lista.filter(function(t){ return t.estado === f.estado; });
+  if (f && f.copiada) lista = lista.filter(function(t){ return t.copiada === 'SI'; });
+  if (busquedaActual){
+    lista = lista.filter(function(t){
+      return (t.artista+' '+t.titulo+' '+t.idTrabajo).toLowerCase().indexOf(busquedaActual) !== -1;
+    });
+  }
+  return lista;
+}
+
+function adminProduccionHtml(t){
+  const hist=t.origen==='HISTORICO_DRIVE'?'<span class="hist-tag">HISTÓRICO</span>':'';
+  const vozDrive=t.vozDriveEstado==='OK', jsonDrive=t.timingsDriveEstado==='OK', sheetOk=t.sheetMaestroEstado==='OK';
+  const driveRetry=(!vozDrive||t.timingsDriveEstado==='PENDIENTE'||!sheetOk)?'<button type="button" class="btn btn-sm drive-retry-btn" data-drive-id="'+t.idTrabajo+'" title="Reintentar los respaldos y el registro maestro sin duplicar archivos">Reintentar Drive/Sheet</button>':'';
+  return '<div class="prod-box" data-drop-inst="'+t.idTrabajo+'">'
+    +'<span class="pflag '+(t.vozLista?'ok':'warn')+'">Voz '+(t.vozLista?'✓':'⚠')+'</span>'
+    +'<span class="pflag '+(vozDrive?'ok':'warn')+'" title="Acapella original en 01_ACAPELLAS">Voz Drive '+(vozDrive?'✓':'PEND')+'</span>'
+    +'<span class="pflag '+(t.letraLista?'ok':'warn')+'">Letra '+(t.letraLista?'✓':'⚠')+'</span>'
+    +'<span class="pflag '+(jsonDrive?'ok':(t.timingsDriveEstado==='PENDIENTE'?'warn':''))+'" title="Proyecto recuperable en 06_PROYECTOS_TIMINGS">JSON Drive '+(jsonDrive?'✓':(t.timingsDriveEstado==='PENDIENTE'?'PEND':'—'))+'</span>'
+    +'<span class="pflag '+(sheetOk?'ok':'warn')+'" title="Registro auditado en CONTROL_EDITOR_LETRAS_KARAOKE_DJGABO">Sheet '+(sheetOk?'✓':'PEND')+'</span>'
+    +'<span class="pflag '+(t.cdgLista?'ok':'warn')+'">CDG '+(t.cdgLista?'✓':'—')+'</span>'
+    +'<span class="pflag '+(t.instrumentalLista?'ok':'warn')+'">WAV '+(t.instrumentalLista?'✓':'FALTA')+'</span>'
+    +'<span class="pflag '+(t.destinoLista?'ok':'warn')+'">Destino '+(t.destinoLista?'✓':'FALTA')+'</span>'+hist
+    +'<button type="button" class="btn btn-sm inst-upload-btn '+(t.instrumentalLista?'':'need-wav')+'" data-inst-id="'+t.idTrabajo+'">'+(t.instrumentalLista?'Cambiar WAV':'Jalar WAV')+'</button>'+driveRetry+'<span class="wav-progress" id="wavprog-'+t.idTrabajo+'" style="display:none"><span class="wav-progress-track"><span class="wav-progress-fill"></span></span><span class="wav-progress-txt">0%</span></span></div>';
+}
+function renderLista(){
+  const listaCompleta = trabajosFiltrados();
+  const lista = listaCompleta.slice(0, listaVisible);
+  if (!lista.length){ document.getElementById('listaBody').innerHTML = '<div class="empty-state">No hay trabajos que coincidan con este filtro.</div>'; return; }
+  const admin=esAdmin();
+  let tabla = '<table><thead><tr><th></th><th>ID</th><th>Artista</th><th>Título</th><th>Estado</th>'+(admin?'<th>Producción · ADMIN</th>':'')+'<th>Actualizado</th><th></th></tr></thead><tbody>';
+  let tarjetas = '';
+  lista.forEach(function(t){
+    const check = admin ? '<input type="checkbox" class="sel-check" data-id="'+t.idTrabajo+'" '+(seleccionados.has(t.idTrabajo)?'checked':'')+'>' : '';
+    tabla += '<tr class="'+(t.estado===ESTADOS.TERMINADO?'job-finished':'')+'" data-id="'+t.idTrabajo+'"><td>'+check+'</td><td class="row-id mono">'+t.idTrabajo+'</td><td>'+t.artista+'</td><td>'+t.titulo+'</td><td>'+chipEstado(t.estado)+chipCopiada(t.copiada)+chipRender(t)+'</td>'
+      +(admin?'<td>'+adminProduccionHtml(t)+'</td>':'')+'<td class="mono" style="font-size:12px;color:var(--text-2)">'+(t.actualizado||'—')+'</td><td><span class="actions-dot" data-id="'+t.idTrabajo+'">⋮</span></td></tr>';
+    tarjetas += '<div class="stat-card '+(t.estado===ESTADOS.TERMINADO?'job-finished':'')+'" data-id="'+t.idTrabajo+'" style="cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><b class="mono" style="font-size:12px;color:var(--text-3)">'+t.idTrabajo+'</b><span>'+chipEstado(t.estado)+chipCopiada(t.copiada)+chipRender(t)+'</span></div><div style="margin-top:6px;font-weight:600">'+t.artista+'</div><div style="color:var(--text-2);font-size:13px">'+t.titulo+'</div>'+(admin?'<div style="margin-top:8px">'+adminProduccionHtml(t)+'</div>':'')+'<div style="color:var(--text-3);font-size:12px;margin-top:6px" class="mono">'+(t.actualizado||'')+'</div></div>';
+  });
+  tabla += '</tbody></table>';
+  document.getElementById('listaBody').innerHTML = tabla + '<div class="mobile-cards">'+tarjetas+'</div>' + (listaCompleta.length>lista.length?'<div class="load-more-wrap"><button class="btn" id="btnCargarMas">Cargar '+Math.min(60,listaCompleta.length-lista.length)+' más</button></div>':'');
+  const mas=document.getElementById('btnCargarMas');if(mas)mas.onclick=function(){listaVisible+=60;renderLista();};
+  document.querySelectorAll('#listaBody tbody tr').forEach(function(row){ row.addEventListener('click', function(e){ if (e.target.closest('.sel-check,.actions-dot,.inst-upload-btn,.prod-box')) return; abrirEditor(row.dataset.id); }); });
+  document.querySelectorAll('.mobile-cards .stat-card').forEach(function(card){ card.addEventListener('click', function(e){ if(e.target.closest('.inst-upload-btn,.prod-box'))return; abrirEditor(card.dataset.id); }); });
+  document.querySelectorAll('.sel-check').forEach(function(chk){ chk.addEventListener('click', function(e){ e.stopPropagation(); if (chk.checked) seleccionados.add(chk.dataset.id); else seleccionados.delete(chk.dataset.id); renderBulkBar(); }); });
+  document.querySelectorAll('.actions-dot').forEach(function(dot){ dot.addEventListener('click', function(e){ e.stopPropagation(); abrirMenuAcciones(dot.dataset.id, e); }); });
+  document.querySelectorAll('.inst-upload-btn').forEach(function(b){ b.addEventListener('click',function(e){e.stopPropagation();elegirInstrumentalTrabajo(b.dataset.instId);}); });
+  document.querySelectorAll('.drive-retry-btn').forEach(function(b){ b.addEventListener('click',async function(e){
+    e.stopPropagation();b.disabled=true;b.textContent='Drive…';
+    try{
+      const r=await fetch('/api/jobs/'+encodeURIComponent(b.dataset.driveId)+'/drive/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN})});
+      const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'No se pudo reintentar Drive.');
+      toast('✓ Respaldo Drive verificado · voz '+d.voice+' · JSON '+d.timings);cargarLista();
+    }catch(err){mostrarErrorAmigable(err);b.disabled=false;b.textContent='Reintentar Drive';}
+  }); });
+  document.querySelectorAll('.prod-box[data-drop-inst]').forEach(function(z){
+    z.addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();z.classList.add('dragover');}); z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+    z.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();z.classList.remove('dragover');const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)subirInstrumentalTrabajo(z.dataset.dropInst,f);});
+  });
+  renderBulkBar();
+}
+
+function renderBulkBar(){
+  const existente = document.getElementById('bulkBar'); if (existente) existente.remove();
+  if (!seleccionados.size || !esAdmin()) return;
+  const bar = document.createElement('div'); bar.className = 'bulkbar'; bar.id = 'bulkBar';
+  bar.innerHTML = '<span>'+seleccionados.size+' seleccionado(s)</span><div style="flex:1"></div><button class="btn" id="btnComprobarDropbox">↻ Comprobar Dropbox</button><button class="btn btn-primary" id="btnDestinoSel">📁 Asignar destino</button><button class="btn btn-danger" id="btnMoverSelPapelera">Mover a papelera</button>';
+  document.body.appendChild(bar);
+  document.getElementById('btnComprobarDropbox').onclick=comprobarDropboxSeleccionados;
+  document.getElementById('btnDestinoSel').onclick=function(){DBX_PICK_MODE='bulk';abrirDropboxSelector();};
+  document.getElementById('btnMoverSelPapelera').addEventListener('click', function(){
+    confirmar('Mover a papelera', seleccionados.size+' trabajo(s) se moverán a la papelera junto a sus archivos.', function(){ llamar('moverTrabajosPapelera', Array.from(seleccionados), SESSION_TOKEN).then(function(){ toast('Trabajos movidos a la papelera.'); seleccionados.clear(); cargarLista(); }).catch(mostrarErrorAmigable); });
+  });
+}
+
+function pintarWavProgreso(id,pct,txt){
+  const box=document.getElementById('wavprog-'+id); if(!box)return;
+  box.style.display='inline-flex'; const fill=box.querySelector('.wav-progress-fill'), lab=box.querySelector('.wav-progress-txt');
+  if(fill)fill.style.width=Math.max(0,Math.min(100,pct||0))+'%'; if(lab)lab.textContent=txt||((pct||0)+'%');
+}
+function ocultarWavProgreso(id,delay=1600){setTimeout(()=>{const b=document.getElementById('wavprog-'+id);if(b)b.style.display='none';},delay);}
+function xhrUploadInstrumental(url,fd,onProgress,onReceived){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest(); xhr.open('POST',url,true);
+    xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(e.loaded,e.total)};
+    xhr.upload.onload=()=>onReceived&&onReceived();
+    xhr.onload=()=>{let d={};try{d=JSON.parse(xhr.responseText||'{}')}catch(_){}; if(xhr.status>=200&&xhr.status<300&&d.ok!==false)resolve(d);else reject(new Error(d.error||('Error '+xhr.status)));};
+    xhr.onerror=()=>reject(new Error('Se cortó la subida del WAV.')); xhr.send(fd);
+  });
+}
+async function prepararWavDirecto(file,jobId,candidateIds){
+  const r=await fetch('/api/instrumentals/prepare-direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,filename:file.name,size:file.size,job_id:jobId||'',candidate_ids:candidateIds||[]})});
+  let d={};try{d=await r.json()}catch(_){};if(!r.ok||d.ok===false)throw new Error(d.error||('No se pudo preparar Dropbox · '+r.status));return d;
+}
+function xhrDropboxDirecto(url,file,onProgress,onReceived){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();xhr.open('POST',url,true);xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(e.loaded,e.total)};
+    xhr.upload.onload=()=>onReceived&&onReceived();
+    xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300)resolve();else reject(new Error('Dropbox rechazó el WAV · HTTP '+xhr.status));};
+    xhr.onerror=()=>reject(new Error('Se cortó la subida directa a Dropbox. Puedes reintentarla sin duplicar el archivo.'));
+    xhr.send(file);
+  });
+}
+async function confirmarWavDirecto(jobId,file){
+  const r=await fetch('/api/jobs/'+encodeURIComponent(jobId)+'/instrumental/direct-confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,filename:file.name,size:file.size})});
+  let d={};try{d=await r.json()}catch(_){};if(!r.ok||d.ok===false)throw new Error(d.error||'Dropbox recibió el archivo, pero OVH todavía no pudo confirmarlo. Pulsa Comprobar Dropbox.');return d;
+}
+async function comprobarDropboxSeleccionados(){
+  if(!seleccionados.size)return;
+  const btn=document.getElementById('btnComprobarDropbox');if(btn){btn.disabled=true;btn.textContent='Comprobando…';}
+  try{
+    const r=await fetch('/api/jobs/reconcile-dropbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,job_ids:Array.from(seleccionados)})});
+    const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'No se pudo comprobar Dropbox.');
+    const wav=(d.results||[]).filter(x=>x.wav).length,cdg=(d.results||[]).filter(x=>x.cdg).length;
+    toast('Dropbox comprobado · WAV '+wav+' · CDG '+cdg);await cargarLista();
+  }catch(e){toast(e.message||String(e),'error');}
+  finally{if(btn){btn.disabled=false;btn.textContent='↻ Comprobar Dropbox';}}
+}
+async function subirInstrumentalTrabajo(idTrabajo,file){
+  if(!esAdmin())return; if(!file||!/\.wav$/i.test(file.name))return toast('El instrumental debe ser WAV.','error');
+  const btnRow=document.querySelector('.inst-upload-btn[data-inst-id="'+idTrabajo+'"]');const oldBtnTxt=btnRow?btnRow.textContent:'';if(btnRow){btnRow.disabled=true;btnRow.textContent='WAV SUBIENDO…';}
+  pintarWavProgreso(idTrabajo,1,'Preparando Dropbox…');
+  try{
+    const prep=await prepararWavDirecto(file,idTrabajo,[]);
+    await xhrDropboxDirecto(prep.upload_url,file,(loaded,total)=>{
+      const pct=Math.round(loaded/Math.max(1,total)*100); pintarWavProgreso(idTrabajo,pct,'Dropbox '+pct+'% · '+(loaded/1048576).toFixed(1)+'/'+(total/1048576).toFixed(1)+' MB');
+    },()=>pintarWavProgreso(idTrabajo,100,'Dropbox 100% · confirmando…'));
+    const d=await confirmarWavDirecto(prep.job_id,file);
+    pintarWavProgreso(idTrabajo,100,'✓ WAV'); toast('✓ '+d.artist+' - '+d.title+' · instrumental online'); await cargarLista(); ocultarWavProgreso(idTrabajo);
+  }catch(e){pintarWavProgreso(idTrabajo,0,'ERROR');toast(e.message||String(e),'error');ocultarWavProgreso(idTrabajo,3200);if(btnRow){btnRow.disabled=false;btnRow.textContent=oldBtnTxt;}}
+}
+function elegirInstrumentalTrabajo(idTrabajo){const i=document.createElement('input');i.type='file';i.accept='.wav,audio/wav';i.onchange=()=>{if(i.files&&i.files[0])subirInstrumentalTrabajo(idTrabajo,i.files[0]);};i.click();}
+function ensureBatchWavBox(){
+  let box=document.getElementById('batchWavProgress'); if(box)return box;
+  box=document.createElement('div');box.id='batchWavProgress';box.className='batch-wav-progress';box.innerHTML='<b>🎵 Jalar instrumentales WAV</b><div id="batchWavLabel" style="font-size:12px;color:var(--text-2);margin:8px 0">Preparando…</div><div class="wav-progress-track"><div class="wav-progress-fill" id="batchWavFill"></div></div>';document.body.appendChild(box);return box;
+}
+async function jalarInstrumentalesMasivo(files){
+  const arr=Array.from(files||[]).filter(f=>/\.wav$/i.test(f.name)); if(!arr.length)return toast('Selecciona uno o más WAV.','error');
+  const box=ensureBatchWavBox(),lab=document.getElementById('batchWavLabel'),fill=document.getElementById('batchWavFill'); let ok=0,pend=0;
+  for(let i=0;i<arr.length;i++){
+    const f=arr[i];
+    try{
+      lab.textContent='Archivo '+(i+1)+'/'+arr.length+' · buscando trabajo antes de subir…';
+      const prep=await prepararWavDirecto(f,'',[]);
+      if(!prep.matched){pend++;lab.textContent='NO SUBIDO · '+f.name+' · candidato '+prep.best.idTrabajo+' ('+Math.round(prep.best.score*100)+'%). Usa Jalar WAV en esa fila.';toast('⚠ No se subió '+f.name+'; coincidencia insegura.','error');continue;}
+      await xhrDropboxDirecto(prep.upload_url,f,(loaded,total)=>{const filePct=loaded/Math.max(1,total);const totalPct=((i+filePct)/arr.length)*100;fill.style.width=totalPct+'%';lab.textContent='Dropbox directo · '+(i+1)+'/'+arr.length+' · '+f.name+' · '+Math.round(filePct*100)+'%';},()=>{lab.textContent='Dropbox recibió '+f.name+' · OVH confirmando…';});
+      const d=await confirmarWavDirecto(prep.job_id,f);ok++;toast('✓ '+f.name+' → '+d.job_id+' · confirmado en Dropbox');
+    }catch(e){pend++;toast(f.name+': '+(e.message||e),'error');}
+  }
+  fill.style.width='100%'; lab.textContent='FINALIZADO · '+ok+' vinculados en Dropbox · '+pend+' no subidos/revisar'; setTimeout(()=>box.remove(),pend?15000:8000); cargarLista();
+}
+
+/* Menú de acciones (dropdown en desktop, bottom sheet en mobile) */
+function abrirMenuAcciones(idTrabajo, evt){
+  const t = trabajosCache.find(function(x){ return x.idTrabajo===idTrabajo; });
+  if (!t) return;
+  const items = [
+    { label:'Abrir', fn:function(){ abrirEditor(idTrabajo); } },
+    { label:'Copiar letra', fn:function(){ copiarLetraDeTrabajo(idTrabajo); } },
+    { label:'Descargar TXT', fn:function(){ descargarTxtDeTrabajo(idTrabajo); } }
+  ];
+  if (esAdmin()){
+    items.push({ label:'Duplicar trabajo', fn:function(){ accionSimple('duplicarTrabajo', idTrabajo, 'Trabajo duplicado.'); } });
+    items.push({ label:'—divider—' });
+    items.push({ label:'Mover a papelera', danger:true, fn:function(){
+      confirmar('Mover a papelera', 'Se moverán a la papelera el audio, la letra y sus backups.', function(){
+        llamar('moverTrabajoPapelera', idTrabajo, SESSION_TOKEN).then(function(){ toast('Movido a papelera.'); cargarLista(); }).catch(mostrarErrorAmigable);
+      });
+    }});
+  }
+
+  if (window.innerWidth <= 880){
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = items.map(function(it, i){
+      if (it.label === '—divider—') return '<hr>';
+      return '<div class="ditem'+(it.danger?' danger':'')+'" data-i="'+i+'">'+it.label+'</div>';
+    }).join('');
+    sheet.style.display = 'block';
+    document.getElementById('sheetOverlay').classList.add('open');
+    sheet.querySelectorAll('.ditem').forEach(function(el){
+      el.addEventListener('click', function(){ cerrarSheet(); items[Number(el.dataset.i)].fn(); });
+    });
+  } else {
+    document.querySelectorAll('.dropdown').forEach(function(d){ d.remove(); });
+    const dd = document.createElement('div');
+    dd.className = 'dropdown';
+    dd.style.top = (evt.clientY+6)+'px';
+    dd.style.left = Math.min(evt.clientX, window.innerWidth-210)+'px';
+    dd.innerHTML = items.map(function(it, i){
+      if (it.label === '—divider—') return '<hr>';
+      return '<div class="ditem'+(it.danger?' danger':'')+'" data-i="'+i+'">'+it.label+'</div>';
+    }).join('');
+    document.body.appendChild(dd);
+    dd.querySelectorAll('.ditem').forEach(function(el){
+      el.addEventListener('click', function(){ dd.remove(); items[Number(el.dataset.i)].fn(); });
+    });
+    setTimeout(function(){
+      document.addEventListener('click', function h(){ dd.remove(); document.removeEventListener('click', h); });
+    }, 0);
+  }
+}
+document.getElementById('sheetOverlay').addEventListener('click', cerrarSheet);
+function cerrarSheet(){
+  document.getElementById('sheet').style.display = 'none';
+  document.getElementById('sheetOverlay').classList.remove('open');
+}
+
+function accionSimple(fn, idTrabajo, msgOk){
+  llamar(fn, idTrabajo, SESSION_TOKEN).then(function(){ toast(msgOk); cargarLista(); }).catch(mostrarErrorAmigable);
+}
+
+/**
+ * Convierte números escritos en dígitos a su forma hablada en español.
+ * Ej: "Armonia 10" -> "Armonia diez". Cubre 0-999999, suficiente para letras de canciones.
+ */
+function numeroATextoEs(nStr){
+  const n = parseInt(nStr, 10);
+  if (isNaN(n)) return nStr;
+  if (n < 0) return 'menos ' + numeroATextoEs(String(-n));
+  if (n === 0) return 'cero';
+
+  const UNIDADES = ['', 'uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve'];
+  const ESPECIALES = {
+    10:'diez',11:'once',12:'doce',13:'trece',14:'catorce',15:'quince',
+    16:'dieciséis',17:'diecisiete',18:'dieciocho',19:'diecinueve',
+    20:'veinte',21:'veintiuno',22:'veintidós',23:'veintitrés',24:'veinticuatro',
+    25:'veinticinco',26:'veintiséis',27:'veintisiete',28:'veintiocho',29:'veintinueve'
+  };
+  const DECENAS = {30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'};
+  const CENTENAS = {100:'cien',200:'doscientos',300:'trescientos',400:'cuatrocientos',500:'quinientos',
+    600:'seiscientos',700:'setecientos',800:'ochocientos',900:'novecientos'};
+
+  function bloqueMenorMil(num){
+    if (num === 0) return '';
+    if (ESPECIALES[num]) return ESPECIALES[num];
+    if (num < 10) return UNIDADES[num];
+    if (num < 100){
+      const d = Math.floor(num/10)*10, u = num % 10;
+      return u === 0 ? DECENAS[d] : DECENAS[d] + ' y ' + UNIDADES[u];
+    }
+    if (num === 100) return 'cien';
+    const c = Math.floor(num/100)*100, resto = num % 100;
+    return CENTENAS[c] + (resto ? ' ' + bloqueMenorMil(resto) : '');
+  }
+
+  if (n < 1000) return bloqueMenorMil(n);
+  if (n < 1000000){
+    const miles = Math.floor(n/1000), resto = n % 1000;
+    const textoMiles = miles === 1 ? 'mil' : bloqueMenorMil(miles) + ' mil';
+    return textoMiles + (resto ? ' ' + bloqueMenorMil(resto) : '');
+  }
+  return nStr; // números de 7+ cifras: se dejan tal cual, no ocurre en letras de canciones
+}
+
+/**
+ * NUEVO: convierte SOLO los números sueltos de un texto a su forma escrita,
+ * sin tocar espacios, saltos de línea ni nada más (a diferencia de limpiarLetra,
+ * que además recorta espacios extra). Se usa en el botón manual "Números a texto"
+ * del editor, para que Valeria vea el cambio al toque en el textarea, sin
+ * necesidad de copiar ni de guardar.
+ */
+function convertirNumerosVisual(texto){
+  const original = String(texto || '');
+  const letras = original.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ]/g, '');
+  const mayusculasDominan = letras.length > 0 && letras === letras.toUpperCase() && letras !== letras.toLowerCase();
+  return original.replace(/\b\d+\b/g, function(numero){
+    const palabra = numeroATextoEs(numero);
+    return mayusculasDominan ? palabra.toUpperCase() : palabra;
+  });
+}
+
+function limpiarLetra(texto){
+  const original = String(texto || '');
+  const letras = original.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ]/g, '');
+  const mayusculasDominan = letras.length > 0 && letras === letras.toUpperCase() && letras !== letras.toLowerCase();
+
+  let resultado = original
+    .replace(/-?<\|[\d:.]+\|>/g, '')
+    .replace(/\b\d+\b/g, function(numero){
+      const palabra = numeroATextoEs(numero);
+      return mayusculasDominan ? palabra.toUpperCase() : palabra;
+    });
+  resultado = resultado
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ +\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .split('\n').map(function(l){ return l.trim(); }).join('\n')
+    .trim();
+  return resultado;
+}
+
+function copiarLetraDeTrabajo(idTrabajo){
+  llamar('obtenerLetraTrabajo', idTrabajo, SESSION_TOKEN).then(function(t){
+    const letra = limpiarLetra(t.letraCorregida || t.letraMoises);
+    navigator.clipboard.writeText(letra).then(function(){
+      toast('Letra copiada al portapapeles.');
+      llamar('marcarLetraCopiada', idTrabajo, SESSION_TOKEN).then(function(){ cargarLista(); }).catch(function(){ /* no crítico */ });
+    });
+  }).catch(mostrarErrorAmigable);
+}
+
+function descargarTxtDeTrabajo(idTrabajo){
+  llamar('obtenerLetraTrabajo', idTrabajo, SESSION_TOKEN).then(function(t){
+    const letra = t.letraCorregida || t.letraMoises;
+    descargarBlobTxt(letra, idTrabajo+'.txt');
+  }).catch(mostrarErrorAmigable);
+}
+
+function descargarBlobTxt(texto, nombre){
+  const blob = new Blob([texto], { type:'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+}
+
+/* =========================================================
+   CONFIRM GENÉRICO
+   ========================================================= */
+function confirmar(titulo, texto, onOk){
+  document.getElementById('confirmTitulo').textContent = titulo;
+  document.getElementById('confirmTexto').textContent = texto;
+  document.getElementById('modalConfirm').classList.add('open');
+  const btn = document.getElementById('confirmAceptar');
+  const nuevo = btn.cloneNode(true);
+  btn.parentNode.replaceChild(nuevo, btn);
+  nuevo.addEventListener('click', function(){ document.getElementById('modalConfirm').classList.remove('open'); onOk(); });
+}
+document.getElementById('confirmCancelar').addEventListener('click', function(){
+  document.getElementById('modalConfirm').classList.remove('open');
+});
+
+/* =========================================================
+   PAPELERA
+   ========================================================= */
+function cargarPapelera(){
+  llamar('listarPapelera', SESSION_TOKEN).then(function(data){
+    if (!data.length){
+      document.getElementById('papeleraBody').innerHTML = '<div class="empty-state">La papelera está vacía.</div>';
+      return;
+    }
+    document.getElementById('papeleraBody').innerHTML = data.map(function(t){
+      return '<div class="trash-item">'
+        + '<div><div class="mono" style="color:var(--text-3);font-size:12px;">'+t.idTrabajo+'</div>'
+        + '<div style="font-weight:600">'+t.artista+' — '+t.titulo+'</div>'
+        + '<div class="meta">Eliminado '+(t.eliminado||'')+'</div></div>'
+        + '<div style="display:flex;gap:8px;"><button class="btn btn-primary" data-restaurar="'+t.idTrabajo+'">Restaurar</button></div>'
+        + '</div>';
+    }).join('');
+    document.querySelectorAll('[data-restaurar]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        llamar('restaurarTrabajo', btn.dataset.restaurar, SESSION_TOKEN).then(function(){
+          toast('Trabajo restaurado.'); cargarPapelera();
+        }).catch(mostrarErrorAmigable);
+      });
+    });
+  }).catch(function(err){
+    document.getElementById('papeleraBody').innerHTML = '<div class="empty-state">No se pudo cargar la papelera.</div>';
+    mostrarErrorAmigable(err);
+  });
+}
+
+/**
+ * Al pegar texto en un textarea (ej. la letra de Moisés), lo convierte a MAYÚSCULAS
+ * automáticamente, conservando la posición del cursor.
+ */
+function autoMayusculasEnPegado(elId){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.addEventListener('paste', function(){
+    setTimeout(function(){
+      const inicio = el.selectionStart, fin = el.selectionEnd;
+      el.value = el.value.toUpperCase();
+      try { el.setSelectionRange(inicio, fin); } catch (e) {}
+      el.dispatchEvent(new Event('input'));
+    }, 0);
+  });
+}
+
+/* =========================================================
+   DROPBOX · conexión única + carpeta mensual por ID estable
+   ========================================================= */
+async function obtenerEstadoDriveHistorico(){
+  if(!SESSION_TOKEN || !esAdmin()) return {configured:false,online:false,webapp_url:'',error:''};
+  const r=await fetch('/api/drive/status?token='+encodeURIComponent(SESSION_TOKEN));
+  const d=await r.json(); if(!r.ok||d.ok===false) throw new Error(d.error||'No se pudo consultar Drive histórico.');
+  DRIVE_HIST_STATUS=d; return d;
+}
+function pintarEstadoDrive(d){
+  const box=document.getElementById('driveStatusBox'); if(!box)return;
+  const txt=d.online?'✓ Google Drive histórico conectado':d.configured?('⚠ Configurado, pero sin conexión'+(d.error?' · '+d.error:'')):'Aún no conectado · los trabajos ya están indexados, pero el audio se leerá desde Drive al abrirlos.';
+  box.textContent=txt; box.className='dropbox-status '+(d.online?'ok':'bad');
+  const input=document.getElementById('driveWebappUrl'); if(input && d.webapp_url)input.value=d.webapp_url;
+}
+async function abrirDriveHistorico(){
+  document.getElementById('modalDriveHistorico').classList.add('open');
+  try{pintarEstadoDrive(await obtenerEstadoDriveHistorico());}catch(e){pintarEstadoDrive({configured:false,online:false,error:e.message||String(e)});}
+}
+const btnDriveHist=document.getElementById('btnDriveHistorico'); if(btnDriveHist)btnDriveHist.onclick=abrirDriveHistorico;
+document.getElementById('cerrarModalDrive').onclick=()=>document.getElementById('modalDriveHistorico').classList.remove('open');
+document.getElementById('btnCerrarDrive').onclick=()=>document.getElementById('modalDriveHistorico').classList.remove('open');
+document.getElementById('btnGuardarDrive').onclick=async function(){
+  const url=document.getElementById('driveWebappUrl').value.trim(); const btn=this; btn.disabled=true; btn.textContent='Probando…';
+  try{
+    const r=await fetch('/api/drive/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,webapp_url:url})});
+    const d=await r.json(); if(!r.ok||d.ok===false)throw new Error(d.error||'No se pudo conectar Drive.');
+    const st=await obtenerEstadoDriveHistorico(); pintarEstadoDrive(st); toast('✓ Drive histórico conectado. Audios y letras seguirán online.');
+  }catch(e){pintarEstadoDrive({configured:!!url,online:false,webapp_url:url,error:e.message||String(e)});toast(e.message||String(e),'error');}
+  finally{btn.disabled=false;btn.textContent='Guardar y probar';}
+};
+
+async function obtenerEstadoDropbox(){
+  if(!SESSION_TOKEN || !esAdmin()) return {configured:false,connected:false,default_folder:null};
+  const r=await fetch('/api/dropbox/status?token='+encodeURIComponent(SESSION_TOKEN));
+  const d=await r.json(); if(!r.ok||d.ok===false) throw new Error(d.error||'No se pudo consultar Dropbox.');
+  DROPBOX_STATUS=d; return d;
+}
+function pintarEstadoDropbox(d){
+  const line=document.getElementById('dropboxNuevaStatus');
+  const box=document.getElementById('dbxStatusBox');
+  const txt=d.connected ? ('✓ Dropbox conectado'+(d.account_name?' · '+d.account_name:'')+(d.account_email?' · '+d.account_email:''))
+    : d.configured ? 'Dropbox configurado · falta autorizar esta cuenta una sola vez' : 'Dropbox todavía no está conectado';
+  [line,box].forEach(el=>{if(el){el.textContent=txt;el.className='dropbox-status '+(d.connected?'ok':'bad');}});
+  const key=document.getElementById('dbxAppKey'); if(key&&d.app_key) key.value=d.app_key;
+  const only=document.getElementById('btnSoloConectarDropbox'); if(only) only.style.display=(d.configured&&!d.connected)?'inline-flex':'none';
+}
+function aplicarDestinoDropbox(folder){
+  DBX_SELECTED_FOLDER=folder&&folder.id?{
+    id:folder.id,
+    path_display:folder.path_display||folder.display_path||'',
+    path_lower:folder.path_lower||'',
+    name:folder.name||String(folder.path_display||folder.display_path||'').split('/').filter(Boolean).pop()||'Carpeta Dropbox'
+  }:null;
+  const id=document.getElementById('inDropboxFolderId'); if(id) id.value=DBX_SELECTED_FOLDER?DBX_SELECTED_FOLDER.id:'';
+  const n=document.getElementById('dropboxDestName'); if(n) n.textContent=DBX_SELECTED_FOLDER?DBX_SELECTED_FOLDER.name:'Sin carpeta seleccionada';
+  const p=document.getElementById('dropboxDestPath'); if(p) p.textContent=DBX_SELECTED_FOLDER?(DBX_SELECTED_FOLDER.path_display||DBX_SELECTED_FOLDER.path_lower):'Elige la carpeta mensual una vez';
+}
+async function refrescarDropboxUI(){
+  try{ const d=await obtenerEstadoDropbox(); pintarEstadoDropbox(d); return d; }
+  catch(e){ const d={configured:false,connected:false,default_folder:null}; pintarEstadoDropbox(d); return d; }
+}
+async function abrirDropboxSelector(){
+  if(!esAdmin()) return;
+  if(DBX_PICK_MODE!=='bulk') DBX_PICK_MODE='new';
+  document.getElementById('modalDropbox').classList.add('open');
+  const d=await refrescarDropboxUI();
+  document.getElementById('dbxConfigBox').style.display=d.connected?'none':'block';
+  document.getElementById('dbxBrowserBox').style.display=d.connected?'block':'none';
+  if(d.connected){ await cargarCarpetasDropbox((DBX_SELECTED_FOLDER&&DBX_SELECTED_FOLDER.id)||''); }
+}
+async function cargarCarpetasDropbox(ref){
+  const list=document.getElementById('dbxFolderList'); list.innerHTML='<div class="dbx-empty">Cargando carpetas…</div>';
+  try{
+    const r=await fetch('/api/dropbox/folders?token='+encodeURIComponent(SESSION_TOKEN)+'&ref='+encodeURIComponent(ref||''));
+    const d=await r.json(); if(!r.ok||d.ok===false) throw new Error(d.error||'No se pudo leer la carpeta.');
+    DBX_BROWSER_CURRENT=d.current||{id:'',display_path:'/',path_lower:'',parent_ref:''};
+    document.getElementById('dbxCurrentPath').textContent=DBX_BROWSER_CURRENT.display_path||'/';
+    const up=document.getElementById('btnDbxSubir'); up.disabled=!(DBX_BROWSER_CURRENT.parent_ref||DBX_BROWSER_CURRENT.id);
+    if(!d.folders.length){ list.innerHTML='<div class="dbx-empty">Esta carpeta no tiene subcarpetas.</div>'; return; }
+    list.innerHTML=''; d.folders.forEach(f=>{
+      const b=document.createElement('button'); b.type='button'; b.className='dbx-folder';
+      b.innerHTML='<span>'+(f.shared?'🔗':'📁')+'</span><span></span>'; b.querySelector('span:last-child').textContent=f.name;
+      b.title=f.display_path||f.name; b.onclick=()=>cargarCarpetasDropbox(f.id); list.appendChild(b);
+    });
+  }catch(e){ list.innerHTML='<div class="dbx-empty" style="color:var(--danger)">'+String(e.message||e)+'</div>'; }
+}
+document.getElementById('btnElegirDropbox').onclick=()=>{DBX_PICK_MODE='new';abrirDropboxSelector();};
+const btnJalarMasivo=document.getElementById('btnJalarInstrumentalesMasivo');if(btnJalarMasivo)btnJalarMasivo.onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='.wav,audio/wav';i.multiple=true;i.onchange=()=>jalarInstrumentalesMasivo(i.files);i.click();};
+document.getElementById('cerrarModalDropbox').onclick=()=>document.getElementById('modalDropbox').classList.remove('open');
+document.getElementById('btnDbxSubir').onclick=()=>cargarCarpetasDropbox(DBX_BROWSER_CURRENT.parent_ref||'');
+document.getElementById('btnUsarCarpetaDropbox').onclick=async()=>{
+  if(!DBX_BROWSER_CURRENT.id) return toast('Entra a una carpeta concreta y luego pulsa Usar esta carpeta.','error');
+  const btn=document.getElementById('btnUsarCarpetaDropbox'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const r=await fetch('/api/dropbox/default-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,folder_id:DBX_BROWSER_CURRENT.id})});
+    const d=await r.json(); if(!r.ok||d.ok===false) throw new Error(d.error||'No se pudo guardar la carpeta actual.'); aplicarDestinoDropbox(d.folder); DROPBOX_STATUS.default_folder=d.folder;
+    if(DBX_PICK_MODE==='bulk'){
+      const ids=Array.from(seleccionados); const rr=await fetch('/api/jobs/assign-destination',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,job_ids:ids,folder_id:d.folder.id})});
+      const x=await rr.json(); if(!rr.ok||x.ok===false)throw new Error(x.error||'No se pudo asignar el destino.');
+      document.getElementById('modalDropbox').classList.remove('open'); toast('✓ Destino asignado a '+x.count+' trabajo(s): '+(d.folder.path_display||d.folder.name)); DBX_PICK_MODE='new';seleccionados.clear();cargarLista();
+    }else{document.getElementById('modalDropbox').classList.remove('open'); toast('Carpeta Dropbox actual: '+(d.folder.path_display||d.folder.name));}
+  }catch(e){ toast(e.message||String(e),'error'); }
+  finally{btn.disabled=false;btn.textContent='Usar esta carpeta';}
+};
+document.getElementById('btnDbxReconfigurar').onclick=()=>{
+  document.getElementById('dbxBrowserBox').style.display='none'; document.getElementById('dbxConfigBox').style.display='block'; document.getElementById('dbxAppSecret').value='';
+};
+function abrirOAuthDropbox(){
+  DBX_OAUTH_POPUP=window.open('/dropbox/connect?token='+encodeURIComponent(SESSION_TOKEN),'djgabo_dropbox_oauth','width=720,height=760');
+  if(!DBX_OAUTH_POPUP) toast('El navegador bloqueó la ventana de Dropbox. Permite popups para 127.0.0.1.', 'error');
+}
+document.getElementById('btnSoloConectarDropbox').onclick=abrirOAuthDropbox;
+document.getElementById('btnGuardarConectarDropbox').onclick=async function(){
+  const key=document.getElementById('dbxAppKey').value.trim(); const secret=document.getElementById('dbxAppSecret').value.trim();
+  if(!key||!secret) return toast('Pega el App Secret de Dropbox.', 'error');
+  const btn=this; btn.disabled=true; btn.textContent='Guardando…';
+  DBX_OAUTH_POPUP=window.open('about:blank','djgabo_dropbox_oauth','width=720,height=760');
+  try{
+    const r=await fetch('/api/dropbox/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,app_key:key,app_secret:secret})});
+    const d=await r.json(); if(!r.ok||d.ok===false) throw new Error(d.error||'No se pudo guardar la configuración.');
+    document.getElementById('dbxAppSecret').value='';
+    if(DBX_OAUTH_POPUP) DBX_OAUTH_POPUP.location='/dropbox/connect?token='+encodeURIComponent(SESSION_TOKEN); else abrirOAuthDropbox();
+    btn.textContent='Esperando autorización…';
+  }catch(e){ if(DBX_OAUTH_POPUP) try{DBX_OAUTH_POPUP.close()}catch(_){} toast(e.message||String(e),'error'); btn.disabled=false; btn.textContent='Guardar y conectar Dropbox'; }
+};
+window.addEventListener('message',async function(e){
+  if(!e.data)return;
+  if(e.data.type==='dropbox:connected'){
+    const btn=document.getElementById('btnGuardarConectarDropbox'); if(btn){btn.disabled=false;btn.textContent='Guardar y conectar Dropbox';}
+    const d=await refrescarDropboxUI();
+    if(d.connected){ document.getElementById('dbxConfigBox').style.display='none';document.getElementById('dbxBrowserBox').style.display='block'; aplicarDestinoDropbox(d.default_folder||null); await cargarCarpetasDropbox((d.default_folder&&d.default_folder.id)||''); toast('Dropbox conectado. Ya no tendrás que pegar tokens.'); }
+    return;
+  }
+  if(e.data.type==='panel:export-success'){
+    await cargarLista();
+    if(e.data.next_job_id){ setTimeout(()=>abrirEditor(e.data.next_job_id),1400); }
+    else { setTimeout(()=>mostrarVista('lista'),1400); }
+  }
+});
+
+/* =========================================================
+   MODAL NUEVA CANCIÓN
+   ========================================================= */
+function abrirModalNueva(){
+  document.getElementById('inArtista').value = '';
+  document.getElementById('inTitulo').value = '';
+  document.getElementById('inLetra').value = '';
+  document.getElementById('audioInfo').innerHTML = '';
+  document.getElementById('instrumentalInfo').innerHTML = '';
+  document.getElementById('masterInfo').innerHTML = '';
+  document.getElementById('dropzoneInstrumental').classList.remove('master-ready');
+  aplicarDestinoDropbox(null);
+  refrescarDropboxUI().then(function(d){ if(d&&d.connected&&d.default_folder) aplicarDestinoDropbox(d.default_folder); });
+  if(esAdmin()) obtenerEstadoDriveHistorico().then(pintarEstadoDrive).catch(()=>{});
+  document.getElementById('warnBox').innerHTML = '';
+  document.getElementById('dupBox').innerHTML = '';
+  archivoSeleccionado = null;
+  instrumentalSeleccionado = null;
+  document.getElementById('inAudio').value='';
+  document.getElementById('inInstrumental').value='';
+  const up=document.getElementById('uploadProgress'); if(up){up.style.display='none';up.textContent='';}
+  dupEncontrado = null;
+  document.getElementById('modalNueva').classList.add('open');
+}
+document.getElementById('btnNuevaCancion').addEventListener('click', abrirModalNueva);
+document.getElementById('cerrarModalNueva').addEventListener('click', function(){ document.getElementById('modalNueva').classList.remove('open'); });
+document.getElementById('btnCancelarNueva').addEventListener('click', function(){ document.getElementById('modalNueva').classList.remove('open'); });
+
+let dupTimer = null;
+function revisarDuplicado(){
+  clearTimeout(dupTimer);
+  dupTimer = setTimeout(function(){
+    const artista = document.getElementById('inArtista').value.trim();
+    const titulo = document.getElementById('inTitulo').value.trim();
+    if (!artista || !titulo){ document.getElementById('dupBox').innerHTML=''; dupEncontrado=null; return; }
+    llamar('verificarDuplicado', artista, titulo).then(function(dup){
+      dupEncontrado = dup;
+      if (dup && dup.estado !== ESTADOS.ELIMINADO){
+        document.getElementById('dupBox').innerHTML = '<div class="dup-box">Ya existe un trabajo similar: <b>'+dup.idTrabajo+'</b>'
+          + '<button class="btn btn-sm" id="btnAbrirExistente">Abrir existente</button></div>';
+        document.getElementById('btnAbrirExistente').addEventListener('click', function(){
+          document.getElementById('modalNueva').classList.remove('open');
+          abrirEditor(dup.idTrabajo);
+        });
+      } else {
+        document.getElementById('dupBox').innerHTML = '';
+      }
+    });
+  }, 500);
+}
+document.getElementById('inArtista').addEventListener('input', revisarDuplicado);
+document.getElementById('inTitulo').addEventListener('input', revisarDuplicado);
+
+document.getElementById('dropzone').addEventListener('click', function(){ document.getElementById('inAudio').click(); });
+['dragover','dragleave','drop'].forEach(function(evt){
+  document.getElementById('dropzone').addEventListener(evt, function(e){
+    e.preventDefault();
+    document.getElementById('dropzone').classList.toggle('drag', evt==='dragover');
+    if (evt==='drop' && e.dataTransfer.files.length) procesarArchivoAudio(e.dataTransfer.files[0]);
+  });
+});
+document.getElementById('inAudio').addEventListener('change', function(e){
+  if (e.target.files.length) procesarArchivoAudio(e.target.files[0]);
+});
+
+function leerDuracionArchivo(file, callback){
+  const url=URL.createObjectURL(file);
+  const temp=new Audio();
+  let done=false;
+  function finish(d){ if(done)return; done=true; try{URL.revokeObjectURL(url);}catch(_){} callback(Number.isFinite(d)?d:0); }
+  temp.preload='metadata'; temp.src=url;
+  temp.addEventListener('loadedmetadata',()=>finish(temp.duration||0),{once:true});
+  temp.addEventListener('error',()=>finish(0),{once:true});
+  setTimeout(()=>finish(0),7000);
+}
+
+function procesarArchivoAudio(file){
+  document.getElementById('warnBox').innerHTML = '';
+  if(!file || !/\.mp3$/i.test(file.name||'')){
+    archivoSeleccionado=null;
+    document.getElementById('audioInfo').innerHTML='<div class="warn-box">La VOZ debe ser un archivo MP3.</div>';
+    return;
+  }
+  leerDuracionArchivo(file,function(duracion){
+    // Guardamos el File real. NO FileReader, NO Base64.
+    archivoSeleccionado={file:file,nombreAudio:file.name,mimeType:file.type||'audio/mpeg',duracion:duracion||0,tamanoBytes:file.size};
+    document.getElementById('audioInfo').innerHTML='<div class="file-ok">✓ '+file.name+' · '+formatBytes(file.size)+' · '+formatDuracion(duracion)+'</div>';
+  });
+}
+
+
+/* INSTRUMENTAL = FUENTE MAESTRA. Su nombre define Artista + Título del trabajo. */
+document.getElementById('dropzoneInstrumental').addEventListener('click', function(){ document.getElementById('inInstrumental').click(); });
+['dragover','dragleave','drop'].forEach(function(evt){
+  document.getElementById('dropzoneInstrumental').addEventListener(evt, function(e){
+    e.preventDefault();
+    document.getElementById('dropzoneInstrumental').classList.toggle('drag', evt==='dragover');
+    if(evt==='drop' && e.dataTransfer.files.length) procesarArchivoInstrumental(e.dataTransfer.files[0]);
+  });
+});
+document.getElementById('inInstrumental').addEventListener('change', function(e){ if(e.target.files.length) procesarArchivoInstrumental(e.target.files[0]); });
+
+function limpiarTituloInstrumental(t){
+  return String(t||'')
+    .replace(/\s+KARAOKE\b.*$/i,'')
+    .replace(/\s+INSTRUMENTAL\b.*$/i,'')
+    .replace(/\s+PISTA\b.*$/i,'')
+    .replace(/\s*\((?:CORO|COROS|SIN\s+CORO|SIN\s+COROS)\)\s*$/i,'')
+    .trim();
+}
+function identidadDesdeInstrumental(nombreArchivo){
+  const base=String(nombreArchivo||'').replace(/\.[^.]+$/,'').trim();
+  const m=base.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if(!m)return null;
+  const artista=m[1].trim(), titulo=limpiarTituloInstrumental(m[2]);
+  return artista&&titulo?{artista:artista,titulo:titulo}:null;
+}
+function procesarArchivoInstrumental(file){
+  if(!file || !/\.wav$/i.test(file.name||'')){
+    instrumentalSeleccionado=null;
+    document.getElementById('instrumentalInfo').innerHTML='<div class="warn-box">El INSTRUMENTAL debe ser un archivo WAV.</div>';
+    document.getElementById('masterInfo').textContent='';
+    return;
+  }
+  const ident=identidadDesdeInstrumental(file.name);
+  if(!ident){
+    instrumentalSeleccionado=null;
+    document.getElementById('instrumentalInfo').innerHTML='<div class="warn-box">El instrumental debe llamarse: ARTISTA - TÍTULO ...</div>';
+    document.getElementById('masterInfo').textContent='';
+    return;
+  }
+  // El instrumental manda SIEMPRE, incluso si la voz tiene un nombre desordenado.
+  document.getElementById('inArtista').value=ident.artista;
+  document.getElementById('inTitulo').value=ident.titulo;
+  revisarDuplicado();
+  leerDuracionArchivo(file,function(duracion){
+    // Guardamos el File real. NO FileReader, NO Base64, incluso si el WAV pesa cientos de MB.
+    instrumentalSeleccionado={file:file,nombreAudio:file.name,mimeType:file.type||'audio/wav',duracion:duracion||0,tamanoBytes:file.size};
+    document.getElementById('instrumentalInfo').innerHTML='<div class="file-ok">✓ '+file.name+' · '+formatBytes(file.size)+' · '+formatDuracion(duracion)+'</div>';
+    document.getElementById('masterInfo').innerHTML='Nombre maestro detectado: <b>'+ident.artista+' — '+ident.titulo+'</b><br>La voz se guardará automáticamente como <b>'+ident.artista+' - '+ident.titulo+' (Voz).mp3</b>.';
+    document.getElementById('dropzoneInstrumental').classList.add('master-ready');
+  });
+}
+
+/**
+ * Detecta el patrón "Artista - Título" en el nombre del archivo de audio y llena
+ * los campos automáticamente, sin pisar lo que el usuario ya haya escrito a mano.
+ * Ej: "Armonia 10 - Cantinera.wav" -> Artista: "Armonia 10", Título: "Cantinera".
+ */
+function autocompletarArtistaTitulo(nombreArchivo){
+  const sinExtension = String(nombreArchivo || '').replace(/\.[^.]+$/, '').trim();
+  const partes = sinExtension.split(/\s*[-–—]\s*/);
+  if (partes.length < 2) return; // el nombre no trae un separador reconocible
+
+  const artista = partes[0].trim();
+  const titulo = partes.slice(1).join(' - ').trim();
+  if (!artista || !titulo) return;
+
+  const inArtista = document.getElementById('inArtista');
+  const inTitulo = document.getElementById('inTitulo');
+  let cambio = false;
+  if (inArtista && !inArtista.value.trim()){ inArtista.value = artista; cambio = true; }
+  if (inTitulo && !inTitulo.value.trim()){ inTitulo.value = titulo; cambio = true; }
+  if (cambio){
+    toast('Artista y título detectados del nombre del archivo.');
+    revisarDuplicado();
+  }
+}
+
+document.getElementById('btnEnviarNueva').addEventListener('click', async function(){
+  const artista = document.getElementById('inArtista').value.trim();
+  const titulo = document.getElementById('inTitulo').value.trim();
+  const letra = document.getElementById('inLetra').value.trim();
+  if (!artista) return toast('Escribe el nombre del artista.', 'error');
+  if (!titulo) return toast('Escribe el título de la canción.', 'error');
+  if (!letra) return toast('Pega la letra generada por Moisés.', 'error');
+  if (!archivoSeleccionado || !archivoSeleccionado.file) return toast('Selecciona la voz MP3.', 'error');
+  if (!instrumentalSeleccionado || !instrumentalSeleccionado.file) return toast('Selecciona el instrumental WAV. Su nombre será la fuente maestra.', 'error');
+  if (!/\.mp3$/i.test(archivoSeleccionado.file.name)) return toast('La VOZ debe ser MP3.', 'error');
+  if (!/\.wav$/i.test(instrumentalSeleccionado.file.name)) return toast('El INSTRUMENTAL debe ser WAV.', 'error');
+  if (!DROPBOX_STATUS.connected) return toast('Conecta Dropbox una sola vez antes de crear el trabajo.', 'error');
+  if (!DBX_SELECTED_FOLDER || !DBX_SELECTED_FOLDER.id) return toast('Elige la carpeta final de Dropbox.', 'error');
+
+  const btn = document.getElementById('btnEnviarNueva');
+  const prog = document.getElementById('uploadProgress');
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+  prog.style.display='block'; prog.style.color=''; prog.textContent='Preparando archivos…';
+
+  try{
+    prog.textContent='Paso 1/3 · preparando subida directa del WAV a Dropbox…';btn.textContent='Preparando Dropbox…';
+    const prepR=await fetch('/api/instrumentals/prepare-new-direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,filename:instrumentalSeleccionado.file.name,size:instrumentalSeleccionado.file.size,folder_id:DBX_SELECTED_FOLDER.id,folder_display:DBX_SELECTED_FOLDER.path_display||''})});
+    let prep={};try{prep=await prepR.json()}catch(_){};if(!prepR.ok||prep.ok===false)throw new Error(prep.error||'No se pudo preparar Dropbox.');
+    await xhrDropboxDirecto(prep.upload_url,instrumentalSeleccionado.file,(loaded,total)=>{
+      const pct=Math.round(loaded/Math.max(1,total)*100);prog.textContent='Paso 1/3 · WAV directo a Dropbox… '+pct+'% · '+(loaded/1048576).toFixed(1)+'/'+(total/1048576).toFixed(1)+' MB';btn.textContent='Dropbox '+pct+'%';
+    },()=>{prog.textContent='Dropbox recibió el WAV · preparando MP3 para Valeria…';btn.textContent='WAV recibido…';});
+
+    const fd=new FormData();
+    fd.append('session_token',SESSION_TOKEN);
+    fd.append('voice',archivoSeleccionado.file,archivoSeleccionado.file.name);
+    fd.append('instrumental_direct','1');
+    fd.append('instrumental_name',prep.filename||instrumentalSeleccionado.file.name);
+    fd.append('instrumental_size',String(instrumentalSeleccionado.file.size));
+    fd.append('lyrics',letra);
+    fd.append('voice_duration',String(archivoSeleccionado.duracion||0));
+    fd.append('dropbox_folder_id',DBX_SELECTED_FOLDER.id);
+    fd.append('dropbox_folder_display_path',DBX_SELECTED_FOLDER.path_display||'');
+    fd.append('dropbox_folder_path_lower',DBX_SELECTED_FOLDER.path_lower||'');
+    const res=await new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();xhr.open('POST','/api/jobs/create',true);
+      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.max(1,Math.min(99,Math.round(e.loaded/Math.max(1,e.total)*100)));prog.textContent='Paso 2/3 · subiendo sólo la VOZ MP3 a OVH… '+pct+'%';btn.textContent='MP3 '+pct+'%';}};
+      xhr.upload.onload=()=>{prog.textContent='Paso 3/3 · MP3 recibido · guardando acapella original en Google Drive…';btn.textContent='Guardando Drive…';};
+      xhr.onload=()=>{let d={};try{d=JSON.parse(xhr.responseText||'{}')}catch(_){};if(xhr.status>=200&&xhr.status<300&&d.ok!==false)resolve(d);else reject(new Error(d.error||('Error del servidor '+xhr.status)));};
+      xhr.onerror=()=>reject(new Error('Se cortó la subida del MP3. El WAV ya está en Dropbox; puedes reintentar sin duplicarlo.'));
+      xhr.send(fd);
+    });
+    prog.textContent=res.vozDriveEstado==='OK'?'✓ Trabajo creado · WAV en Dropbox · MP3 en Drive y listo para Valeria.':'⚠ Trabajo creado y recuperable · respaldo MP3 en Drive pendiente; usa Reintentar Drive.';
+    if(res.dropboxFolderId){ aplicarDestinoDropbox({id:res.dropboxFolderId,path_display:res.dropboxDisplayPath||res.dropboxPath||'',path_lower:res.dropboxPath||'',name:String(res.dropboxDisplayPath||res.dropboxPath||'').split('/').filter(Boolean).pop()}); }
+    toast('Trabajo '+res.idTrabajo+' creado · WAV en Dropbox · voz Drive '+(res.vozDriveEstado||'PENDIENTE'),res.vozDriveEstado==='OK'?'':'error');
+    setTimeout(function(){ document.getElementById('modalNueva').classList.remove('open'); mostrarVista('lista'); },500);
+  }catch(e){
+    const msg=e&&e.message?e.message:String(e);mostrarErrorAmigable(new Error(msg));prog.textContent='ERROR: '+msg;prog.style.color='var(--danger)';
+  }finally{btn.disabled=false;btn.textContent='Enviar a corrección';}
+});
+
+/* =========================================================
+   EDITOR
+   ========================================================= */
+let progresoInterval = null;
+
+function abrirEditor(idTrabajo){
+  if(!SESSION_TOKEN)return;
+  editor.idTrabajo=idTrabajo;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-editor').classList.add('active');
+  document.getElementById('content').classList.remove('editor-mode');document.getElementById('content').classList.remove('v1-editor-mode');
+  document.getElementById('content').classList.add('v1-editor-mode');
+  document.body.classList.add('v1-editor-open');
+  document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view==='lista'));
+  document.querySelectorAll('.tb-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view==='lista'));
+  const src='/editor-v1?job='+encodeURIComponent(idTrabajo)+'&token='+encodeURIComponent(SESSION_TOKEN)+'&embed=1';
+  document.getElementById('editorBody').innerHTML='<iframe id="editorV1Frame" class="v1-editor-frame" title="Motor CDG V1" src="'+src+'"></iframe>';
+}
+
+
+
+function construirLoaderProgreso(){
+  return '<div style="max-width:420px;margin:60px auto;text-align:center;">'
+    + '<div class="loading-block" style="padding-bottom:6px;justify-content:center;"><span class="spinner"></span> Abriendo trabajo…</div>'
+    + '<div class="progreso-track"><div class="progreso-fill" id="progresoBarra" style="width:0%"></div></div>'
+    + '<div id="progresoTexto" style="color:var(--text-3);font-size:12px;margin-top:8px;">Cargando audio… 0%</div>'
+    + '</div>';
+}
+
+/**
+ * No hay forma de conocer el progreso real de la descarga a través de google.script.run
+ * (Apps Script no expone eventos de progreso), así que se estima el tiempo según el
+ * tamaño del audio ya conocido en la lista de trabajos, y se anima hasta 92% mientras
+ * llega la respuesta real; al llegar, salta a 100% y recién ahí se muestra el editor.
+ */
+function iniciarProgresoFalso(idTrabajo){
+  const item = trabajosCache.find(function(t){ return t.idTrabajo === idTrabajo; });
+  const bytesEstimados = (item && item.tamanoBytes) ? item.tamanoBytes : 8 * 1024 * 1024;
+  const mbEstimados = bytesEstimados / (1024 * 1024);
+  const velocidadEstimadaMBseg = 0.9; // conservador: incluye overhead de Base64 + Apps Script
+  const duracionEstimadaMs = Math.max(1500, (mbEstimados / velocidadEstimadaMBseg) * 1000 * 1.3);
+  const inicio = Date.now();
+
+  clearInterval(progresoInterval);
+  progresoInterval = setInterval(function(){
+    const transcurrido = Date.now() - inicio;
+    const pct = Math.min(92, (transcurrido / duracionEstimadaMs) * 100);
+    actualizarBarraProgreso(pct);
+  }, 120);
+}
+
+function actualizarBarraProgreso(pct){
+  const barra = document.getElementById('progresoBarra');
+  const texto = document.getElementById('progresoTexto');
+  if (barra) barra.style.width = pct + '%';
+  if (texto) texto.textContent = 'Cargando audio… ' + Math.round(pct) + '%';
+}
+
+function completarProgreso(callback){
+  clearInterval(progresoInterval);
+  actualizarBarraProgreso(100);
+  setTimeout(callback, 200);
+}
+
+function renderEditor(t){
+  editor = {
+    idTrabajo: t.idTrabajo, audioBuffer:null, duracion: t.duracionGuardada || 0,
+    selStart:null, selEnd:null, loopActivo:false, guardadoTimer:null, autosaveTimer:null,
+    ultimaLetraGuardada: t.letraCorregida || t.letraMoises || '', versiones: t.versiones || [], audioCargando:true,
+    waveformInicializada:false, waveZoom:1, waveScrollManual:false, waveScrollTimer:null
+  };
+  const letraActual = t.letraCorregida || t.letraMoises || '';
+
+  const html = ''
+    + '<div class="editor-header compact-editor-header">'
+    + '<span class="back" id="btnVolver">← Volver</span>'
+    + '<div class="editor-title-wrap"><h2><span class="mono" style="color:var(--text-3)">'+t.idTrabajo+'</span> · '+escaparHtml(t.artista)+' — '+escaparHtml(t.titulo)+'</h2>'
+    + '<div class="editor-subchips">'+chipEstado(t.estado)+'<span id="chipCopiadaHeader">'+chipCopiada(t.copiada)+'</span></div></div>'
+    + '<button class="btn btn-primary editor-finalize-top" id="btnGuardarCorreccionTop">✓ Finalizar</button>'
+    + '<span class="actions-dot" id="btnAccionesEditor">⋮ Acciones</span>'
+    + '</div>'
+
+    + '<div class="player compact-transcriber" id="playerBox">'
+    + '<div class="compact-player-head"><div><div class="compact-player-label">Escuchar y transcribir</div><div class="compact-player-help">Escucha una frase, pausa, escribe y repítela cuando lo necesites.</div></div></div>'
+    + '<div class="audio-loading" id="audioLoading"><span class="spinner"></span> Preparando audio… Ya puedes comenzar a editar.</div>'
+    + '<div class="wave-head"><div class="wave-time"><span id="tActual">0:00</span> / <span id="tTotal">0:00</span></div>'
+    + '<div class="wave-zoom-tools" aria-label="Zoom de la onda"><button class="zoom-btn" id="btnZoomMenos" title="Alejar onda">−</button><button class="zoom-btn zoom-reset" id="btnZoomReset" title="Ver audio completo">Completa</button><button class="zoom-btn" id="btnZoomMas" title="Acercar onda">＋</button><span class="zoom-level" id="zoomLevel">1x</span></div></div>'
+    + '<div class="wave-viewport" id="waveViewport"><div class="wave-wrap" id="waveWrap" style="opacity:.35;pointer-events:none">'
+    + '<canvas id="waveCanvas"></canvas><div class="sel-region" id="selRegion"></div><div class="playhead" id="playheadLine"></div>'
+    + '<div class="handle" id="handleStart"><div class="handle-grip">⋮</div></div><div class="handle" id="handleEnd"><div class="handle-grip">⋮</div></div><div class="time-tooltip" id="timeTooltip"></div></div></div>'
+    + '<div class="unified-controls"><div class="primary-transport">'
+    + '<button class="transport-main-btn" id="btnAtras10" data-audio-control disabled>−5 s</button>'
+    + '<button class="transport-main-btn play-main" id="btnPlay" data-audio-control disabled>▶</button>'
+    + '<button class="transport-main-btn repeat-main" id="btnRepetir5" data-audio-control disabled>↺ Repetir 5 s</button>'
+    + '<button class="transport-main-btn" id="btnAdelante10" data-audio-control disabled>+5 s</button>'
+    + '</div><div class="compact-audio-tools"><div class="speed-group"><span data-speed="0.5">0.5x</span><span data-speed="0.75">0.75x</span><span data-speed="1" class="active">1x</span><span data-speed="1.25">1.25x</span><span data-speed="1.5">1.5x</span><span data-speed="2">2x</span></div>'
+    + '<div class="loop-actions"><button class="btn btn-sm btn-primary loop-btn" id="btnLoop">🔁 Loop</button></div></div>'
+    + '<div class="compact-save-state"><span class="saved-tag" id="estadoGuardado">Sin cambios</span></div></div>'
+    + '</div>'
+
+    + '<div class="work-grid transcription-grid"><div class="editor-panel transcription-panel">'
+    + '<div class="draft-banner" id="draftBanner">Se recuperó un borrador guardado en este dispositivo.</div>'
+    + '<textarea class="lyric-area" id="areaLetra" spellcheck="false" autocapitalize="characters" placeholder="Escucha el audio y escribe o corrige aquí la letra…">'+escaparHtml(letraActual)+'</textarea>'
+    + '<div class="editor-sticky-actions"><button class="btn btn-primary" id="btnGuardarCorreccion">Guardar corrección</button><button class="btn" id="btnGuardarSiguiente">Guardar y abrir siguiente →</button></div>'
+    + '</div><aside class="editor-sidebar"><section class="lyric-tools-panel"><h4>Herramientas de letra</h4>'
+    + '<div class="editor-actions"><button class="btn" id="btnCopiarLimpia">📋 Copiar letra</button><button class="btn" id="btnDescargarTxt">↓ Descargar TXT</button><button class="btn" id="btnMayusculas">A Mayúsculas</button><button class="btn" id="btnConvertirNumeros">🔢 Números a texto</button></div></section>'
+    + '<details class="metadata-details"><summary>Detalles y versiones</summary><div class="side-panel">'
+    + '<h4>Detalles</h4><div class="kv"><span>Estado</span><b id="detEstado">'+ESTADO_LABEL[t.estado]+'</b></div>'
+    + '<div class="kv"><span>Copiada al programa</span><b id="detCopiada">'+(t.copiada === 'SI' ? 'Sí' : 'No')+'</b></div>'
+    + '<div class="kv"><span>Creado</span><b>'+t.fecha+'</b></div><div class="kv"><span>Versión</span><b>v'+t.version+'</b></div>'
+    + '<div class="kv" style="border-bottom:none"><span>Tamaño audio</span><b>'+formatBytes(t.tamanoBytes)+'</b></div>'
+    + '<h4 style="margin-top:20px">Historial de versiones</h4><div id="listaVersiones"></div></div></details></aside></div>';
+
+  document.getElementById('editorBody').innerHTML = html;
+  document.body.classList.add('editor-active');
+  document.getElementById('btnVolver').addEventListener('click', function(){ liberarEditorActual(); mostrarVista('lista'); });
+  renderVersiones();
+  recuperarBorradorLocal(t);
+  configurarLyricArea();
+  configurarBotonesEditor(t);
+  aplicarRol();
+  montarBarraEditorMovil();
+}
+
+function escaparHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderVersiones(){
+  const cont = document.getElementById('listaVersiones');
+  if (!editor.versiones.length){ cont.innerHTML = '<div style="color:var(--text-3);font-size:12px;">Sin versiones aún.</div>'; return; }
+  cont.innerHTML = editor.versiones.map(function(v){
+    return '<div class="version-item"><div>'
+      + '<div class="vname">v'+v.version+' · '+(v.tipo||'').toLowerCase()+'</div>'
+      + '<div class="vdate">'+v.fecha+'</div></div>'
+      + '<button class="btn btn-sm" data-restaurar-v="'+v.version+'">Restaurar</button></div>';
+  }).join('');
+  cont.querySelectorAll('[data-restaurar-v]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      confirmar('Restaurar versión', 'Se creará una nueva versión con el contenido de v'+btn.dataset.restaurarV+'.', function(){
+        llamar('restaurarVersion', editor.idTrabajo, btn.dataset.restaurarV, SESSION_TOKEN).then(function(res){
+          document.getElementById('areaLetra').value = editor.versiones.find(function(v){return String(v.version)===btn.dataset.restaurarV;}).letra || '';
+          editor.ultimaLetraGuardada = document.getElementById('areaLetra').value;
+          editor.versiones = res.versiones;
+          renderVersiones();
+          toast('Versión restaurada como v'+res.version+'.');
+        }).catch(mostrarErrorAmigable);
+      });
+    });
+  });
+}
+
+/* --- Reproductor + waveform real --- */
+function configurarAudio(audioData, duracionGuardada){
+  const audioEl = document.getElementById('audioPlayer');
+  audioEl.src = audioData;
+  audioEl.playbackRate = 1;
+  document.querySelectorAll('[data-audio-control]').forEach(function(btn){ btn.disabled = false; });
+
+  fetch(audioData).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    return ctx.decodeAudioData(buf);
+  }).then(function(audioBuffer){
+    editor.audioBuffer = audioBuffer;
+    editor.duracion = audioBuffer.duration;
+    document.getElementById('tTotal').textContent = formatDuracion(audioBuffer.duration);
+    inicializarSeleccionPredeterminada();
+    dibujarWaveform(audioBuffer);
+    editor.waveformInicializada = true;
+    configurarZoomWaveform();
+  }).catch(function(){
+    const wrap = document.getElementById('waveWrap');
+    if (wrap) wrap.innerHTML = '<div style="color:var(--text-3);font-size:12px;padding:10px;">La forma de onda no está disponible, pero el audio sí puede reproducirse.</div>';
+  });
+
+  audioEl.addEventListener('loadedmetadata', function(){
+    if (!editor.duracion || !isFinite(editor.duracion)) editor.duracion = audioEl.duration || duracionGuardada || 0;
+    document.getElementById('tTotal').textContent = formatDuracion(editor.duracion);
+  });
+  audioEl.addEventListener('timeupdate', function(){
+    document.getElementById('tActual').textContent = formatDuracion(audioEl.currentTime);
+    actualizarProgresoWaveform(audioEl.currentTime);
+    if (editor.loopActivo && editor.selStart!=null && editor.selEnd!=null && audioEl.currentTime >= editor.selEnd){ audioEl.currentTime = editor.selStart; }
+  });
+  audioEl.addEventListener('play', function(){ document.getElementById('btnPlay').textContent = '⏸'; });
+  audioEl.addEventListener('pause', function(){ document.getElementById('btnPlay').textContent = '▶'; });
+
+  document.getElementById('btnPlay').onclick = function(){ if (audioEl.paused) audioEl.play(); else audioEl.pause(); };
+  document.getElementById('btnAtras10').onclick = function(){ audioEl.currentTime = Math.max(0, audioEl.currentTime - 5); };
+  document.getElementById('btnAdelante10').onclick = function(){ audioEl.currentTime = Math.min(editor.duracion || audioEl.duration || 0, audioEl.currentTime + 5); };
+  document.getElementById('btnRepetir5').onclick = function(){
+    audioEl.currentTime = Math.max(0, audioEl.currentTime - 5);
+    const p = audioEl.play();
+    if (p && p.catch) p.catch(function(){});
+  };
+  document.querySelectorAll('.speed-group span').forEach(function(s){
+    s.addEventListener('click', function(){
+      document.querySelectorAll('.speed-group span').forEach(function(x){ x.classList.remove('active'); });
+      s.classList.add('active'); audioEl.playbackRate = Number(s.dataset.speed);
+    });
+  });
+  document.getElementById('btnLoop').onclick = function(){
+    if (editor.selStart==null || editor.selEnd==null){ toast('La selección todavía no está disponible.', 'error'); return; }
+    editor.loopActivo = !editor.loopActivo; actualizarBotonLoop();
+  };
+}
+
+function actualizarBotonLoop(){
+  const btn = document.getElementById('btnLoop');
+  btn.textContent = editor.loopActivo ? '⏹ Loop' : '🔁 Loop';
+  btn.classList.toggle('active', editor.loopActivo);
+}
+
+let waveCtx = null, waveWidth = 0, waveHeight = 0, peaksData = [], draggingHandle = null, resizeTimer = null;
+const WAVE_ZOOMS = [1,2,4,8,16,32,64];
+
+function inicializarSeleccionPredeterminada(){
+  const fin = Math.min(5, Number(editor.duracion) || 0);
+  if (fin <= 0) return;
+  editor.selStart = 0;
+  editor.selEnd = fin;
+}
+
+function reproducirSeleccionDesdeInicio(){
+  if (editor.selStart == null || editor.selEnd == null || editor.selEnd <= editor.selStart) return;
+  const audioEl = document.getElementById('audioPlayer');
+  audioEl.currentTime = editor.selStart;
+  actualizarProgresoWaveform(editor.selStart);
+  const p = audioEl.play();
+  if (p && p.catch) p.catch(function(){});
+}
+
+function configurarZoomWaveform(){
+  const viewport = document.getElementById('waveViewport');
+  const wrap = document.getElementById('waveWrap');
+  const menos = document.getElementById('btnZoomMenos');
+  const mas = document.getElementById('btnZoomMas');
+  const reset = document.getElementById('btnZoomReset');
+  if (!viewport || !wrap || !menos || !mas || !reset) return;
+  menos.onclick = function(){ cambiarZoomWave(-1); };
+  mas.onclick = function(){ cambiarZoomWave(1); };
+  reset.onclick = function(){ aplicarZoomWave(1); };
+  viewport.addEventListener('scroll', function(){
+    editor.waveScrollManual = true;
+    clearTimeout(editor.waveScrollTimer);
+    editor.waveScrollTimer = setTimeout(function(){ editor.waveScrollManual = false; }, 900);
+  }, {passive:true});
+
+  // PC: la rueda del mouse amplía o aleja la onda alrededor del punto señalado.
+  viewport.addEventListener('wheel', function(e){
+    e.preventDefault();
+    const ahora = Date.now();
+    if (editor.ultimoWheelZoom && ahora - editor.ultimoWheelZoom < 110) return;
+    editor.ultimoWheelZoom = ahora;
+    const rect = viewport.getBoundingClientRect();
+    const xVisible = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
+    const tiempoFoco = editor.duracion
+      ? ((viewport.scrollLeft + xVisible) / Math.max(1, wrap.clientWidth)) * editor.duracion
+      : 0;
+    cambiarZoomWave(e.deltaY < 0 ? 1 : -1, tiempoFoco, xVisible);
+  }, {passive:false});
+
+  // Celular/tablet: pellizcar con dos dedos amplía o aleja sin cambiar la altura.
+  let pellizco = null;
+  function distanciaDedos(touches){
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+  viewport.addEventListener('touchstart', function(e){
+    if (e.touches.length !== 2) return;
+    const rect = viewport.getBoundingClientRect();
+    const centroCliente = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const xVisible = Math.min(rect.width, Math.max(0, centroCliente - rect.left));
+    pellizco = {
+      distancia: distanciaDedos(e.touches),
+      indice: WAVE_ZOOMS.indexOf(editor.waveZoom || 1),
+      tiempo: editor.duracion
+        ? ((viewport.scrollLeft + xVisible) / Math.max(1, wrap.clientWidth)) * editor.duracion
+        : 0,
+      xVisible: xVisible,
+      nivelAplicado: editor.waveZoom || 1
+    };
+  }, {passive:true});
+  viewport.addEventListener('touchmove', function(e){
+    if (!pellizco || e.touches.length !== 2) return;
+    e.preventDefault();
+    const proporcion = distanciaDedos(e.touches) / Math.max(1, pellizco.distancia);
+    const pasos = Math.round(Math.log(proporcion) / Math.log(1.45));
+    const indice = Math.max(0, Math.min(WAVE_ZOOMS.length - 1, pellizco.indice + pasos));
+    const nivel = WAVE_ZOOMS[indice];
+    if (nivel !== pellizco.nivelAplicado){
+      pellizco.nivelAplicado = nivel;
+      aplicarZoomWave(nivel, pellizco.tiempo, pellizco.xVisible);
+    }
+  }, {passive:false});
+  viewport.addEventListener('touchend', function(e){
+    if (e.touches.length < 2) pellizco = null;
+  }, {passive:true});
+
+  aplicarZoomWave(editor.waveZoom || 1);
+}
+
+function cambiarZoomWave(direccion, tiempoFoco, xVisible){
+  const actual = WAVE_ZOOMS.indexOf(editor.waveZoom || 1);
+  const siguiente = Math.max(0, Math.min(WAVE_ZOOMS.length - 1, actual + direccion));
+  aplicarZoomWave(WAVE_ZOOMS[siguiente], tiempoFoco, xVisible);
+}
+
+function aplicarZoomWave(nivel, tiempoFoco, xVisible){
+  const viewport = document.getElementById('waveViewport');
+  const wrap = document.getElementById('waveWrap');
+  if (!viewport || !wrap) return;
+  const puntoVisible = Number.isFinite(xVisible) ? xVisible : viewport.clientWidth / 2;
+  const centroTiempo = Number.isFinite(tiempoFoco)
+    ? tiempoFoco
+    : editor.duracion
+      ? ((viewport.scrollLeft + puntoVisible) / Math.max(1, wrap.clientWidth)) * editor.duracion
+      : 0;
+  editor.waveZoom = WAVE_ZOOMS.includes(nivel) ? nivel : 1;
+  wrap.style.width = Math.max(viewport.clientWidth, viewport.clientWidth * editor.waveZoom) + 'px';
+  redimensionarWaveform();
+  const nuevoCentro = editor.duracion ? (centroTiempo / editor.duracion) * wrap.clientWidth : 0;
+  viewport.scrollLeft = Math.max(0, nuevoCentro - puntoVisible);
+  const level = document.getElementById('zoomLevel');
+  if (level) level.textContent = editor.waveZoom + 'x';
+  const idx = WAVE_ZOOMS.indexOf(editor.waveZoom);
+  document.getElementById('btnZoomMenos').disabled = idx <= 0;
+  document.getElementById('btnZoomMas').disabled = idx >= WAVE_ZOOMS.length - 1;
+}
+
+/**
+ * Dibuja la forma de onda real del audio usando RMS por bloque (no el pico más alto),
+ * con auto-escala sobre el máximo del propio archivo. Usar solo el pico más alto por
+ * bloque hace que pistas normalizadas/comprimidas se vean "todas iguales de altas";
+ * el RMS refleja mucho mejor las partes fuertes y suaves de la voz, como en un editor
+ * de audio real.
+ */
+function calcularPicos(audioBuffer){
+  const data = audioBuffer.getChannelData(0);
+  const wrap = document.getElementById('waveWrap');
+  const buckets = Math.max(300, Math.min(24000, Math.floor(wrap.clientWidth)));
+  const step = Math.floor(data.length / buckets) || 1;
+  const picos = [];
+  let maxRms = 0.0001;
+  for (let i=0;i<buckets;i++){
+    const inicio = i*step, fin = Math.min(data.length, inicio+step);
+    let sumaCuadrados = 0;
+    for (let j=inicio;j<fin;j++){ const v = data[j]; sumaCuadrados += v*v; }
+    const rms = Math.sqrt(sumaCuadrados / Math.max(1, fin-inicio));
+    picos.push(rms);
+    if (rms > maxRms) maxRms = rms;
+  }
+  // Comprime un poco el rango (^0.7) para que las partes suaves también se noten,
+  // sin que la pista entera se vea plana ni completamente saturada.
+  return picos.map(function(v){ return Math.min(1, Math.pow(v / maxRms, 0.7)); });
+}
+
+function dibujarWaveform(audioBuffer){
+  editor.audioBuffer = audioBuffer;
+  redimensionarWaveform();
+  configurarHandlesArrastrables();
+
+  const wrap = document.getElementById('waveWrap');
+  wrap.addEventListener('click', function(e){
+    if (e.target.closest('.handle') || e.target.closest('.sel-region')) return;
+    const rect = wrap.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    document.getElementById('audioPlayer').currentTime = pct * editor.duracion;
+  });
+
+  // Línea de posición + tooltip de tiempo mientras el mouse pasa por la waveform (sin arrastrar).
+  wrap.addEventListener('mousemove', function(e){
+    if (draggingHandle) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
+    const t = (x / rect.width) * editor.duracion;
+    mostrarHoverLine(x, t);
+  });
+  wrap.addEventListener('mouseleave', function(){ ocultarHoverLine(); });
+
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(redimensionarWaveform, 250);
+  });
+}
+
+function redimensionarWaveform(){
+  if (!editor.audioBuffer) return;
+  const wrap = document.getElementById('waveWrap');
+  const canvas = document.getElementById('waveCanvas');
+  if (!wrap || !canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  waveWidth = wrap.clientWidth;
+  waveHeight = wrap.clientHeight;
+  canvas.width = waveWidth * dpr;
+  canvas.height = waveHeight * dpr;
+  waveCtx = canvas.getContext('2d');
+  waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  peaksData = calcularPicos(editor.audioBuffer);
+  redibujarWaveformCanvas();
+  if (editor.actualizarHandlesUI) editor.actualizarHandlesUI();
+}
+
+function mostrarHoverLine(x, t){
+  let linea = document.getElementById('hoverLine');
+  if (!linea){
+    linea = document.createElement('div');
+    linea.id = 'hoverLine';
+    linea.className = 'hover-line';
+    document.getElementById('waveWrap').appendChild(linea);
+  }
+  linea.style.display = 'block';
+  linea.style.left = x + 'px';
+  const m = Math.floor(t/60), s = t%60;
+  mostrarTooltipGlobal(x, m + ':' + s.toFixed(1).padStart(4,'0'));
+}
+function ocultarHoverLine(){
+  const linea = document.getElementById('hoverLine');
+  if (linea) linea.style.display = 'none';
+  if (!draggingHandle) ocultarTooltipGlobal();
+}
+function mostrarTooltipGlobal(x, texto){
+  const tooltip = document.getElementById('timeTooltip');
+  if (!tooltip) return;
+  tooltip.style.display = 'block';
+  tooltip.style.left = x + 'px';
+  tooltip.textContent = texto;
+}
+function ocultarTooltipGlobal(){
+  const tooltip = document.getElementById('timeTooltip');
+  if (tooltip) tooltip.style.display = 'none';
+}
+
+function redibujarWaveformCanvas(){
+  if (!waveCtx || !peaksData.length) return;
+  const w = waveWidth, h = waveHeight, mid = h / 2;
+  waveCtx.clearRect(0, 0, w, h);
+
+  const audioEl = document.getElementById('audioPlayer');
+  const playedX = editor.duracion ? (audioEl.currentTime / editor.duracion) * w : 0;
+  const selStartX = (editor.selStart != null) ? (editor.selStart / editor.duracion) * w : null;
+  const selEndX = (editor.selEnd != null) ? (editor.selEnd / editor.duracion) * w : null;
+
+  const barWidth = w / peaksData.length;
+  for (let i = 0; i < peaksData.length; i++){
+    const x = i * barWidth;
+    const barH = Math.max(2, peaksData[i] * (h - 10));
+    const dentroSel = selStartX != null && selEndX != null && x >= selStartX && x <= selEndX;
+    const yaReproducido = x <= playedX;
+    let color;
+    if (dentroSel) color = yaReproducido ? '#d8c8fb' : '#8B5CF6';
+    else color = yaReproducido ? '#9d86d9' : '#5b4b8a';
+    waveCtx.fillStyle = color;
+    waveCtx.fillRect(x, mid - barH / 2, Math.max(1, barWidth - 0.6), barH);
+  }
+
+  // Regla de tiempo: con zoom alto muestra segundos y décimas con precisión.
+  if (editor.duracion){
+    const pxPorSegundo = w / editor.duracion;
+    let paso = 30;
+    if (pxPorSegundo >= 180) paso = 0.5;
+    else if (pxPorSegundo >= 90) paso = 1;
+    else if (pxPorSegundo >= 45) paso = 2;
+    else if (pxPorSegundo >= 18) paso = 5;
+    else if (pxPorSegundo >= 8) paso = 10;
+    waveCtx.font = "9px 'JetBrains Mono', monospace";
+    waveCtx.textBaseline = 'top';
+    for (let t = 0; t <= editor.duracion; t += paso){
+      const x = (t / editor.duracion) * w;
+      waveCtx.fillStyle = 'rgba(241,239,234,.16)';
+      waveCtx.fillRect(Math.round(x), 0, 1, h);
+      if (w > 700 || editor.waveZoom >= 4){
+        const min = Math.floor(t / 60), sec = t % 60;
+        const etiqueta = paso < 1 ? min + ':' + sec.toFixed(1).padStart(4,'0') : min + ':' + String(Math.floor(sec)).padStart(2,'0');
+        waveCtx.fillStyle = 'rgba(241,239,234,.58)';
+        waveCtx.fillText(etiqueta, Math.min(w - 34, x + 3), 3);
+      }
+    }
+  }
+}
+
+function actualizarProgresoWaveform(currentTime){
+  redibujarWaveformCanvas();
+  const line = document.getElementById('playheadLine');
+  if (line && editor.duracion){
+    const x = (currentTime / editor.duracion) * waveWidth;
+    line.style.left = x + 'px';
+    const viewport = document.getElementById('waveViewport');
+    if (viewport && editor.waveZoom > 1 && !editor.waveScrollManual && !draggingHandle){
+      const margenIzq = viewport.scrollLeft + viewport.clientWidth * .28;
+      const margenDer = viewport.scrollLeft + viewport.clientWidth * .72;
+      if (x < margenIzq || x > margenDer) viewport.scrollLeft = Math.max(0, x - viewport.clientWidth * .5);
+    }
+  }
+}
+
+function redibujarSeleccion(){
+  redibujarWaveformCanvas();
+  if (editor.actualizarHandlesUI) editor.actualizarHandlesUI();
+}
+
+/** Asas arrastrables sobre la waveform, como en un editor de audio real: mover para achicar/agrandar el loop. */
+function configurarHandlesArrastrables(){
+  const wrap = document.getElementById('waveWrap');
+  const hs = document.getElementById('handleStart');
+  const he = document.getElementById('handleEnd');
+  const region = document.getElementById('selRegion');
+  const tooltip = document.getElementById('timeTooltip');
+  let moveOrigen = { x:0, start:0, end:0 };
+  let candidato = null; // clic pendiente de confirmar como arrastre real
+  const UMBRAL_ARRASTRE = 5; // px
+
+  function posDeTiempo(t){ return (t / editor.duracion) * waveWidth; }
+
+  function actualizarHandlesUI(){
+    if (editor.selStart == null || editor.selEnd == null){
+      hs.style.display = 'none'; he.style.display = 'none'; region.style.display = 'none';
+      return;
+    }
+    const xs = posDeTiempo(editor.selStart), xe = posDeTiempo(editor.selEnd);
+    hs.style.display = 'flex'; he.style.display = 'flex'; region.style.display = 'block';
+    hs.style.left = xs + 'px'; he.style.left = xe + 'px';
+    region.style.left = xs + 'px'; region.style.width = Math.max(0, xe - xs) + 'px';
+  }
+  editor.actualizarHandlesUI = actualizarHandlesUI;
+
+  function formatoPreciso(t){
+    const m = Math.floor(t / 60), s = t % 60;
+    return m + ':' + s.toFixed(1).padStart(4, '0');
+  }
+
+  function mostrarTooltip(x, t){
+    tooltip.style.display = 'block';
+    tooltip.style.left = x + 'px';
+    tooltip.textContent = formatoPreciso(t);
+  }
+  function ocultarTooltip(){ tooltip.style.display = 'none'; }
+
+  function mover(clientX){
+    const rect = wrap.getBoundingClientRect();
+    const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+    const t = (x / rect.width) * editor.duracion;
+
+    if (draggingHandle === 'start'){
+      editor.selStart = Math.min(t, (editor.selEnd != null ? editor.selEnd - 0.1 : editor.duracion));
+      mostrarTooltip(x, editor.selStart);
+    } else if (draggingHandle === 'end'){
+      editor.selEnd = Math.max(t, (editor.selStart != null ? editor.selStart + 0.1 : 0));
+      mostrarTooltip(x, editor.selEnd);
+    } else if (draggingHandle === 'move'){
+      const duracionSel = moveOrigen.end - moveOrigen.start;
+      const deltaX = clientX - moveOrigen.x;
+      const deltaT = (deltaX / rect.width) * editor.duracion;
+      let nuevoInicio = moveOrigen.start + deltaT;
+      nuevoInicio = Math.max(0, Math.min(editor.duracion - duracionSel, nuevoInicio));
+      editor.selStart = nuevoInicio;
+      editor.selEnd = nuevoInicio + duracionSel;
+      mostrarTooltip(x, editor.selStart);
+    }
+    actualizarHandlesUI();
+    redibujarWaveformCanvas();
+  }
+
+  function iniciarDrag(cual){
+    return function(e){
+      if (e.touches && e.touches.length > 1){ draggingHandle = null; return; }
+      e.preventDefault(); e.stopPropagation();
+      draggingHandle = cual;
+      document.body.style.userSelect = 'none';
+    };
+  }
+
+  /**
+   * Clic corto dentro de la selección = mover el cursor de reproducción a ese punto,
+   * igual que en cualquier parte de la waveform. Solo si el dedo/mouse se mueve más
+   * de unos pocos píxeles se convierte en "arrastrar todo el fragmento".
+   */
+  function iniciarCandidatoMover(e){
+    if (e.target.closest('.handle')) return; // los bordes tienen su propia lógica
+    if (e.touches && e.touches.length > 1){ candidato = null; return; }
+    e.stopPropagation();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    candidato = { x: clientX, start: editor.selStart, end: editor.selEnd, promovido: false };
+    document.body.style.userSelect = 'none';
+  }
+  hs.addEventListener('mousedown', iniciarDrag('start'));
+  he.addEventListener('mousedown', iniciarDrag('end'));
+  hs.addEventListener('touchstart', iniciarDrag('start'), { passive:false });
+  he.addEventListener('touchstart', iniciarDrag('end'), { passive:false });
+  region.addEventListener('mousedown', iniciarCandidatoMover);
+  region.addEventListener('touchstart', iniciarCandidatoMover, { passive:false });
+
+  window.addEventListener('mousemove', function(e){
+    if (draggingHandle){ mover(e.clientX); return; }
+    if (candidato && !candidato.promovido && Math.abs(e.clientX - candidato.x) > UMBRAL_ARRASTRE){
+      candidato.promovido = true;
+      draggingHandle = 'move';
+      moveOrigen = { x: candidato.x, start: candidato.start, end: candidato.end };
+      mover(e.clientX);
+    }
+  });
+  window.addEventListener('touchmove', function(e){
+    const clientX = e.touches[0].clientX;
+    if (draggingHandle){ mover(clientX); e.preventDefault(); return; }
+    if (candidato && !candidato.promovido && Math.abs(clientX - candidato.x) > UMBRAL_ARRASTRE){
+      candidato.promovido = true;
+      draggingHandle = 'move';
+      moveOrigen = { x: candidato.x, start: candidato.start, end: candidato.end };
+      mover(clientX);
+      e.preventDefault();
+    }
+  }, { passive:false });
+
+  function finalizar(clientX){
+    const huboAjuste = !!draggingHandle;
+    if (draggingHandle){
+      draggingHandle = null;
+      document.body.style.userSelect = '';
+      ocultarTooltip();
+    } else if (candidato && !candidato.promovido){
+      // Fue un clic corto: mover el cursor de reproducción a ese punto exacto.
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+      document.getElementById('audioPlayer').currentTime = (x / rect.width) * editor.duracion;
+      document.body.style.userSelect = '';
+    }
+    candidato = null;
+    if (huboAjuste) reproducirSeleccionDesdeInicio();
+  }
+  window.addEventListener('mouseup', function(e){ finalizar(e.clientX); });
+  window.addEventListener('touchend', function(e){
+    const ultimo = e.changedTouches && e.changedTouches[0];
+    finalizar(ultimo ? ultimo.clientX : candidato ? candidato.x : 0);
+  });
+
+  actualizarHandlesUI();
+}
+
+/* =========================================================
+   MARCAR HABLADO / CANTADO (comillas)
+   ========================================================= */
+let habladoEstado = { pendiente: null };
+
+/**
+ * Recorre el texto tal cual está en el textarea y devuelve:
+ *  - tokens: el texto partido en trozos de "no-espacio" y "espacio" (incluye saltos
+ *    de línea), de forma que unir todos los tokens reconstruye el texto original tal cual.
+ *  - palabras: por cada token que NO es espacio, su posición exacta (inicio/fin) dentro
+ *    del texto completo y si está "marcada" (dentro de un par de comillas rectas), usando
+ *    paridad de comillas desde el inicio del texto — así una palabra en medio de una frase
+ *    hablada de varias palabras también queda marcada, aunque ella misma no tenga comillas.
+ */
+function analizarPalabras(texto){
+  const tokens = String(texto).match(/\S+|\s+/g) || [];
+  let offset = 0;
+  let dentroComillas = false;
+  const palabras = [];
+  tokens.forEach(function(tok, i){
+    const inicio = offset;
+    if (!/^\s+$/.test(tok)){
+      const comillasEnToken = (tok.match(/"/g) || []).length;
+      const marcada = comillasEnToken > 0 ? true : dentroComillas;
+      palabras.push({ tokenIndex: i, texto: tok, inicio: inicio, fin: offset + tok.length, marcada: marcada });
+      if (comillasEnToken % 2 === 1) dentroComillas = !dentroComillas;
+    }
+    offset += tok.length;
+  });
+  return { tokens: tokens, palabras: palabras };
+}
+
+/** Dibuja el panel de palabras tocables (modo móvil), a partir del texto actual del textarea. */
+function renderVistaPalabras(){
+  const area = document.getElementById('areaLetra');
+  const cont = document.getElementById('vistaPalabras');
+  if (!area || !cont) return;
+  const analisis = analizarPalabras(area.value);
+  let html = '';
+  analisis.tokens.forEach(function(tok, i){
+    if (/^\s+$/.test(tok)){
+      const saltos = (tok.match(/\n/g) || []).length;
+      for (let s = 0; s < saltos; s++) html += '<div class="palabra-salto"></div>';
+      return;
+    }
+    const palabra = analisis.palabras.find(function(p){ return p.tokenIndex === i; });
+    if (!palabra) return;
+    const marcada = palabra.marcada;
+    const pendiente = habladoEstado.pendiente === i;
+    const textoVisible = tok.replace(/^"+/, '').replace(/"+$/, '');
+    html += '<span class="palabra-chip'+(marcada?' marcada':'')+(pendiente?' pendiente':'')+'" data-token-index="'+i+'">'+escaparHtml(textoVisible)+'</span>';
+  });
+  cont.innerHTML = html;
+  cont.querySelectorAll('.palabra-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){ onTapPalabra(Number(chip.dataset.tokenIndex)); });
+  });
+}
+
+/**
+ * Tap 1: marca la palabra como "inicio pendiente" (solo visual, no cambia el texto todavía).
+ * Tap 2 (misma palabra u otra más adelante/atrás): aplica el toggle de comillas sobre todo
+ * el rango entre las dos palabras tocadas (incluidas). Si el rango completo ya estaba
+ * marcado como hablado, quita las comillas; si no, las agrega.
+ */
+function onTapPalabra(tokenIndex){
+  const area = document.getElementById('areaLetra');
+  const analisis = analizarPalabras(area.value);
+
+  if (habladoEstado.pendiente === null){
+    habladoEstado.pendiente = tokenIndex;
+    renderVistaPalabras();
+    return;
+  }
+
+  const inicioIdx = Math.min(habladoEstado.pendiente, tokenIndex);
+  const finIdx = Math.max(habladoEstado.pendiente, tokenIndex);
+  habladoEstado.pendiente = null;
+
+  const palabraInicio = analisis.palabras.find(function(p){ return p.tokenIndex === inicioIdx; });
+  const palabraFin = analisis.palabras.find(function(p){ return p.tokenIndex === finIdx; });
+  if (!palabraInicio || !palabraFin){ renderVistaPalabras(); return; }
+
+  const rango = analisis.palabras.filter(function(p){ return p.tokenIndex >= inicioIdx && p.tokenIndex <= finIdx; });
+  const todoMarcado = rango.length > 0 && rango.every(function(p){ return p.marcada; });
+
+  let texto = area.value;
+  if (todoMarcado){
+    if (texto[palabraFin.fin] === '"') texto = texto.slice(0, palabraFin.fin) + texto.slice(palabraFin.fin + 1);
+    if (texto[palabraInicio.inicio - 1] === '"') texto = texto.slice(0, palabraInicio.inicio - 1) + texto.slice(palabraInicio.inicio);
+    toast('Comillas quitadas (ya no es hablado).');
+  } else {
+    texto = texto.slice(0, palabraFin.fin) + '"' + texto.slice(palabraFin.fin);
+    texto = texto.slice(0, palabraInicio.inicio) + '"' + texto.slice(palabraInicio.inicio);
+    toast('Marcado como hablado.');
+  }
+
+  area.value = texto;
+  area.dispatchEvent(new Event('input'));
+  renderVistaPalabras();
+}
+
+/**
+ * Modo escritorio: toma la selección actual del textarea (mouse), recorta espacios
+ * en los bordes, y envuelve exactamente ese texto en comillas rectas. Si la selección
+ * ya está exactamente rodeada de comillas, las quita (toggle). No guarda nada por sí
+ * solo — dispara el mismo evento 'input' que ya usa el autoguardado silencioso.
+ */
+function togglearHabladoSeleccion(){
+  const area = document.getElementById('areaLetra');
+  let inicio = area.selectionStart;
+  let fin = area.selectionEnd;
+  if (inicio === fin){ toast('Selecciona primero el texto hablado.', 'error'); return; }
+
+  const original = area.value;
+  while (inicio < fin && /\s/.test(original[inicio])) inicio++;
+  while (fin > inicio && /\s/.test(original[fin - 1])) fin--;
+  if (inicio >= fin){ toast('La selección está vacía.', 'error'); return; }
+
+  let selInicio = inicio, selFin = fin;
+  if (original[selInicio] === '"' && original[selFin - 1] === '"' && selFin - selInicio >= 2){
+    selInicio++; selFin--;
+  }
+
+  const yaMarcado = original[selInicio - 1] === '"' && original[selFin] === '"';
+  let texto = original;
+  let nuevoInicioCursor, nuevoFinCursor;
+
+  if (yaMarcado){
+    texto = texto.slice(0, selFin) + texto.slice(selFin + 1);
+    texto = texto.slice(0, selInicio - 1) + texto.slice(selInicio);
+    nuevoInicioCursor = selInicio - 1;
+    nuevoFinCursor = selFin - 1;
+    toast('Comillas quitadas (ya no es hablado).');
+  } else {
+    texto = texto.slice(0, selFin) + '"' + texto.slice(selFin);
+    texto = texto.slice(0, selInicio) + '"' + texto.slice(selInicio);
+    nuevoInicioCursor = selInicio;
+    nuevoFinCursor = selFin + 2;
+    toast('Marcado como hablado.');
+  }
+
+  area.value = texto;
+  area.focus();
+  try { area.setSelectionRange(nuevoInicioCursor, nuevoFinCursor); } catch (e) {}
+  area.dispatchEvent(new Event('input'));
+}
+
+/** Decide qué barra de herramientas mostrar (selección+botón en compu, palabras clickeables en celular). */
+function configurarHabladoTools(){
+  const esMobile = window.innerWidth <= 880;
+  const toolbarDesktop = document.getElementById('habladoToolbarDesktop');
+  const toolbarMobile = document.getElementById('habladoToolbarMobile');
+  if (toolbarDesktop) toolbarDesktop.style.display = esMobile ? 'none' : 'flex';
+  if (toolbarMobile) toolbarMobile.style.display = esMobile ? 'flex' : 'none';
+
+  const btnDesktop = document.getElementById('btnMarcarHabladoDesktop');
+  if (btnDesktop) btnDesktop.onclick = togglearHabladoSeleccion;
+
+  const area = document.getElementById('areaLetra');
+  if (area){
+    area.addEventListener('keydown', function(e){
+      if (e.ctrlKey && e.key.toLowerCase() === 'q'){
+        e.preventDefault();
+        togglearHabladoSeleccion();
+      }
+    });
+  }
+
+  let modoPalabrasActivo = false;
+  const btnModoPalabras = document.getElementById('btnModoPalabras');
+  const vistaPalabras = document.getElementById('vistaPalabras');
+  if (btnModoPalabras){
+    btnModoPalabras.onclick = function(){
+      modoPalabrasActivo = !modoPalabrasActivo;
+      if (modoPalabrasActivo){
+        habladoEstado.pendiente = null;
+        renderVistaPalabras();
+        area.style.display = 'none';
+        vistaPalabras.style.display = 'flex';
+        btnModoPalabras.textContent = '✓ Volver a editar texto';
+      } else {
+        vistaPalabras.style.display = 'none';
+        area.style.display = 'block';
+        btnModoPalabras.textContent = '🗣️ Marcar hablado (por palabras)';
+      }
+    };
+  }
+}
+
+/* --- Editor de letra: autoguardado + guardado definitivo --- */
+function configurarLyricArea(){
+  const area=document.getElementById('areaLetra');let cambioPendiente=false;autoMayusculasEnPegado('areaLetra');
+  area.addEventListener('input',function(){
+    cambioPendiente=true;cambiosPendientesGlobal=true;setEstadoGuardado(navigator.onLine?'Cambios sin guardar':'Guardado localmente · sin conexión','dirty');
+    guardarBorradorLocal(editor.idTrabajo,area.value);clearTimeout(editor.autosaveTimer);
+    if(!navigator.onLine)return;
+    editor.autosaveTimer=setTimeout(function(){if(!cambioPendiente)return;setEstadoGuardado('Guardando…','dirty');llamar('autoguardarLetra',editor.idTrabajo,area.value,SESSION_TOKEN).then(function(res){cambioPendiente=false;setEstadoGuardado('Guardado hace unos segundos');iniciarContadorGuardado();}).catch(function(){setEstadoGuardado('Sin conexión · borrador local seguro','error');});},2500);
+  });
+}
+
+
+
+let contadorGuardadoInterval = null;
+function iniciarContadorGuardado(){
+  let segundos = 0;
+  clearInterval(contadorGuardadoInterval);
+  contadorGuardadoInterval = setInterval(function(){
+    segundos++;
+    const el = document.getElementById('estadoGuardado');
+    if (el && !el.classList.contains('dirty') && !el.classList.contains('error')){
+      el.textContent = '✓ Guardado hace ' + segundos + 's';
+    } else {
+      clearInterval(contadorGuardadoInterval);
+    }
+  }, 1000);
+}
+
+function setEstadoGuardado(texto, tipo){
+  const el = document.getElementById('estadoGuardado');
+  if (!el) return;
+  el.textContent = (tipo ? '' : '✓ ') + texto;
+  el.className = 'saved-tag' + (tipo ? ' '+tipo : '');
+}
+
+function configurarBotonesEditor(t){
+  const audioTools = document.getElementById('audioToolsDetails');
+  if (audioTools){
+    audioTools.open = false;
+    audioTools.addEventListener('toggle', function(){
+      if (!audioTools.open || !editor.audioBuffer) return;
+      setTimeout(function(){
+        if (!editor.waveformInicializada){ dibujarWaveform(editor.audioBuffer); editor.waveformInicializada = true; }
+        else redimensionarWaveform();
+      }, 60);
+    });
+  }
+  const btnToggle = document.getElementById('btnTogglePlayer');
+  if (btnToggle){
+    btnToggle.addEventListener('click', function(){
+      document.getElementById('playerBox').classList.toggle('expanded');
+      setTimeout(redimensionarWaveform, 160);
+    });
+  }
+
+  function ejecutarGuardado(abrirSiguiente){
+    const letra=document.getElementById('areaLetra').value,btn=document.getElementById(abrirSiguiente?'btnGuardarSiguiente':'btnGuardarCorreccion');
+    const btnTop=document.getElementById('btnGuardarCorreccionTop');
+    btn.disabled=true;if(btnTop&&!abrirSiguiente)btnTop.disabled=true;
+    llamar('guardarLetraCorregida',editor.idTrabajo,letra,SESSION_TOKEN).then(function(res){
+      editor.versiones=res.versiones;editor.ultimaLetraGuardada=letra;cambiosPendientesGlobal=false;localStorage.removeItem(claveBorrador(editor.idTrabajo));renderVersiones();
+      document.getElementById('detEstado').textContent=ESTADO_LABEL[res.estado]||res.estado;setEstadoGuardado('Guardado hace unos segundos');iniciarContadorGuardado();toast(res.sinCambios?'Corrección confirmada.':'Corrección guardada como v'+res.version+'.');
+      if(abrirSiguiente)return llamar('obtenerSiguienteTrabajo',editor.idTrabajo,SESSION_TOKEN).then(function(sig){if(sig){const anterior=editor.idTrabajo;liberarEditorActual();abrirEditor(sig.idTrabajo);}else toast('No quedan trabajos pendientes.');});
+    }).catch(mostrarErrorAmigable).finally(function(){btn.disabled=false;if(btnTop)btnTop.disabled=false;});
+  }
+  document.getElementById('btnGuardarCorreccion').onclick=function(){ejecutarGuardado(false);};
+  document.getElementById('btnGuardarSiguiente').onclick=function(){ejecutarGuardado(true);};
+  const btnTop=document.getElementById('btnGuardarCorreccionTop');if(btnTop)btnTop.onclick=function(){ejecutarGuardado(false);};
+
+  document.getElementById('btnCopiarLimpia').onclick = function(){
+    const limpia = limpiarLetra(document.getElementById('areaLetra').value);
+    navigator.clipboard.writeText(limpia).then(function(){
+      toast('Copiado.');
+      llamar('marcarLetraCopiada', editor.idTrabajo, SESSION_TOKEN).then(function(){
+        const detCopiada = document.getElementById('detCopiada');
+        if (detCopiada) detCopiada.textContent = 'Sí';
+        const chipHeader = document.getElementById('chipCopiadaHeader');
+        if (chipHeader) chipHeader.innerHTML = chipCopiada('SI');
+      }).catch(function(){ /* no crítico */ });
+    });
+  };
+
+  document.getElementById('btnDescargarTxt').onclick = function(){
+    descargarBlobTxt(document.getElementById('areaLetra').value, editor.idTrabajo+'.txt');
+  };
+
+  document.getElementById('btnMayusculas').onclick = function(){
+    const area = document.getElementById('areaLetra');
+    area.value = area.value.toUpperCase();
+    area.dispatchEvent(new Event('input'));
+    toast('Letra convertida a mayúsculas.');
+  };
+
+  /**
+   * NUEVO: botón manual "Números a texto". Convierte SOLO los números sueltos
+   * (ej. "2000" -> "DOS MIL") directamente en el textarea, al toque, sin
+   * necesidad de darle a Guardar. Aparte de la conversión automática que ya
+   * ocurre al presionar "Guardar corrección" (esa sigue intacta y sin cambios).
+   * Dispara el evento 'input' para que el autoguardado normal (silencioso, sin
+   * promover estado) haga su trabajo de fondo, igual que "A Mayúsculas".
+   */
+  document.getElementById('btnConvertirNumeros').onclick = function(){
+    const area = document.getElementById('areaLetra');
+    const convertido = convertirNumerosVisual(area.value);
+    if (convertido === area.value){
+      toast('No se encontraron números para convertir.');
+      return;
+    }
+    area.value = convertido;
+    area.dispatchEvent(new Event('input'));
+    toast('Números convertidos a texto en el editor.');
+  };
+
+  document.getElementById('btnAccionesEditor').onclick = function(evt){
+    const items = [];
+    if (esAdmin()){
+      items.push({ label:'Reemplazar audio', fn:function(){ abrirSelectorReemplazoAudio(); } });
+      items.push({ label:'Duplicar trabajo', fn:function(){ llamar('duplicarTrabajo', editor.idTrabajo, SESSION_TOKEN).then(function(r){ toast('Duplicado como '+r.idTrabajo+'.'); }).catch(mostrarErrorAmigable); } });
+      if (t.terminado === 'SI'){
+        items.push({ label:'Revertir terminado', fn:function(){
+          llamar('revertirTrabajoTerminado', editor.idTrabajo, SESSION_TOKEN).then(function(r){
+            document.getElementById('detEstado').textContent = ESTADO_LABEL[r.estado];
+            t.terminado = 'NO';
+            toast('Se revirtió el estado de terminado.');
+          }).catch(mostrarErrorAmigable);
+        }});
+      } else {
+        items.push({ label:'Marcar terminado', fn:function(){
+          llamar('marcarKaraokeTerminado', editor.idTrabajo, SESSION_TOKEN).then(function(r){
+            document.getElementById('detEstado').textContent = ESTADO_LABEL[r.estado];
+            t.terminado = 'SI';
+            toast('Marcado como terminado.');
+          }).catch(mostrarErrorAmigable);
+        }});
+      }
+      items.push({ label:'—divider—' });
+      items.push({ label:'Mover a papelera', danger:true, fn:function(){
+        confirmar('Mover a papelera', 'Se moverán a la papelera el audio, la letra y sus backups.', function(){
+          llamar('moverTrabajoPapelera', editor.idTrabajo, SESSION_TOKEN).then(function(){ toast('Movido a papelera.'); mostrarVista('lista'); }).catch(mostrarErrorAmigable);
+        });
+      }});
+    } else {
+      items.push({ label:'Sin acciones adicionales disponibles', fn:function(){} });
+    }
+    mostrarDropdownDesdeEvento(items, evt);
+  };
+}
+
+function mostrarDropdownDesdeEvento(items, evt){
+  if (window.innerWidth <= 880){
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = items.map(function(it, i){
+      if (it.label === '—divider—') return '<hr>';
+      return '<div class="ditem'+(it.danger?' danger':'')+'" data-i="'+i+'">'+it.label+'</div>';
+    }).join('');
+    sheet.style.display = 'block';
+    document.getElementById('sheetOverlay').classList.add('open');
+    sheet.querySelectorAll('.ditem').forEach(function(el){
+      el.addEventListener('click', function(){ cerrarSheet(); items[Number(el.dataset.i)].fn(); });
+    });
+  } else {
+    document.querySelectorAll('.dropdown').forEach(function(d){ d.remove(); });
+    const dd = document.createElement('div');
+    dd.className = 'dropdown';
+    dd.style.top = (evt.clientY+6)+'px';
+    dd.style.left = Math.min(evt.clientX, window.innerWidth-210)+'px';
+    dd.innerHTML = items.map(function(it, i){
+      if (it.label === '—divider—') return '<hr>';
+      return '<div class="ditem'+(it.danger?' danger':'')+'" data-i="'+i+'">'+it.label+'</div>';
+    }).join('');
+    document.body.appendChild(dd);
+    dd.querySelectorAll('.ditem').forEach(function(el){
+      el.addEventListener('click', function(){ dd.remove(); items[Number(el.dataset.i)].fn(); });
+    });
+    setTimeout(function(){
+      document.addEventListener('click', function h(){ dd.remove(); document.removeEventListener('click', h); });
+    }, 0);
+  }
+}
+
+function abrirSelectorReemplazoAudio(){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'audio/*';
+  input.addEventListener('change', function(){
+    if (!input.files.length) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(){
+      const tempAudio = new Audio(); tempAudio.src = reader.result;
+      tempAudio.addEventListener('loadedmetadata', function(){
+        confirmar('Reemplazar audio', 'El audio actual se moverá a la papelera y se reemplazará por '+file.name+'.', function(){
+          llamar('reemplazarAudio', editor.idTrabajo, {
+            audioData: reader.result, nombreAudio: file.name, mimeType: file.type, duracion: tempAudio.duration
+          }, SESSION_TOKEN).then(function(){
+            toast('Audio reemplazado.');
+            abrirEditor(editor.idTrabajo);
+          }).catch(mostrarErrorAmigable);
+        });
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+  input.click();
+}
+
+
+function claveBorrador(id){return 'consola_borrador_'+id;}
+function guardarBorradorLocal(id,texto){try{localStorage.setItem(claveBorrador(id),JSON.stringify({texto:texto,fecha:Date.now()}));}catch(e){}}
+function recuperarBorradorLocal(t){
+  const area=document.getElementById('areaLetra');try{const raw=localStorage.getItem(claveBorrador(t.idTrabajo));if(!raw)return;const b=JSON.parse(raw);if(b.texto&&b.texto!==area.value){area.value=b.texto;document.getElementById('draftBanner').classList.add('show');cambiosPendientesGlobal=true;setEstadoGuardado('Borrador local recuperado','dirty');}}catch(e){}
+}
+function cargarAudioEnSegundoPlano(t){
+  llamar('obtenerAudioTrabajo',t.idTrabajo,SESSION_TOKEN).then(function(a){const load=document.getElementById('audioLoading');if(load)load.remove();const w=document.getElementById('waveWrap');if(w){w.style.opacity='1';w.style.pointerEvents='auto';}configurarAudio(a.audioData,a.duracionGuardada);editor.audioCargando=false;}).catch(function(e){const load=document.getElementById('audioLoading');if(load)load.innerHTML='<span style="color:var(--danger)">No se pudo cargar el audio. Puedes seguir editando la letra.</span>';mostrarErrorAmigable(e);});
+}
+function iniciarHeartbeatBloqueo(){clearInterval(lockHeartbeat);lockHeartbeat=setInterval(function(){if(editor.idTrabajo&&SESSION_TOKEN)llamar('renovarBloqueoEdicion',editor.idTrabajo,SESSION_TOKEN).catch(()=>{});},90000);}
+function liberarEditorActual(){clearInterval(lockHeartbeat);clearTimeout(editor.autosaveTimer);if(editor.idTrabajo&&SESSION_TOKEN)llamar('liberarBloqueoEdicion',editor.idTrabajo,SESSION_TOKEN).catch(()=>{});editor.idTrabajo=null;document.body.classList.remove('editor-active');document.body.classList.remove('v1-editor-open');document.getElementById('content').classList.remove('editor-mode');document.getElementById('content').classList.remove('v1-editor-mode');document.querySelector('.tabs-bottom').classList.remove('editor-open');document.querySelectorAll('.mobile-editor-bar').forEach(e=>e.remove());}
+function montarBarraEditorMovil(){ document.querySelectorAll('.mobile-editor-bar').forEach(function(e){e.remove();}); }
+function configurarEstadoConexion(){
+  function actualizar(){const online=navigator.onLine,d=document.getElementById('sessionDot'),de=document.getElementById('editorSessionDot'),t=document.getElementById('connectionToast');if(d)d.classList.toggle('offline',!online);if(de)de.classList.toggle('offline',!online);if(t)t.style.display=online?'none':'block';if(online&&editor.idTrabajo){const a=document.getElementById('areaLetra');if(a&&cambiosPendientesGlobal)a.dispatchEvent(new Event('input'));}}
+  window.addEventListener('online',actualizar);window.addEventListener('offline',actualizar);actualizar();
+}
+function configurarAtajosGlobales(){
+  document.addEventListener('keydown',function(e){if(!editor.idTrabajo)return;const tag=(e.target.tagName||'').toLowerCase();if(e.ctrlKey&&e.key.toLowerCase()==='s'){e.preventDefault();document.getElementById('btnGuardarCorreccion').click();return;}if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();document.getElementById('btnGuardarSiguiente').click();return;}if(e.altKey&&e.key==='ArrowLeft'){e.preventDefault();document.getElementById('btnAtras10').click();return;}if(e.altKey&&e.key==='ArrowRight'){e.preventDefault();document.getElementById('btnAdelante10').click();return;}if(e.code==='Space'&&tag!=='textarea'&&tag!=='input'){e.preventDefault();document.getElementById('btnPlay').click();}}
+  );
+}
+
+/* =========================================================
+   INICIO
+   ========================================================= */
+autoMayusculasEnPegado('inLetra');
+configurarEstadoConexion();
+configurarAtajosGlobales();
+fetch('/api/public-config').then(r=>r.json()).then(function(cfg){
+  CORRECTORA_PASSWORD_REQUIRED=!!cfg.correctora_password_required;
+  if(CORRECTORA_PASSWORD_REQUIRED)document.getElementById('loginHelp').textContent='Los accesos de Valeria y Augusto están protegidos en el servidor.';
+  if(['production','prod','server','ovh'].includes(String(cfg.environment||'').toLowerCase())){
+    document.querySelectorAll('.local-badge').forEach(el=>el.textContent='SERVER 16.14 · ONLINE CONTROLADO');
+  }
+}).catch(function(){});
+if(SESSION_TOKEN){
+  llamar('validarSesionConsola',SESSION_TOKEN).then(function(s){if(s&&s.ok){ROL=s.rol;document.getElementById('loginGate').classList.add('hidden');aplicarRol();mostrarVista('dashboard');}else{SESSION_TOKEN='';localStorage.removeItem('consola_session_token');}}).catch(function(){});
+}
+window.addEventListener('beforeunload',function(e){if(editor.idTrabajo)llamar('liberarBloqueoEdicion',editor.idTrabajo,SESSION_TOKEN);if(cambiosPendientesGlobal){e.preventDefault();e.returnValue='';}});
+</script>
+</body>
+</html>
