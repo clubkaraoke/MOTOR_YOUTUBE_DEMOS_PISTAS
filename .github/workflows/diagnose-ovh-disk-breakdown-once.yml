@@ -1,0 +1,88 @@
+name: Diagnose OVH disk breakdown once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-ovh-disk-breakdown-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture disk breakdown
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/ovh-disk-breakdown-current.txt <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== FILESYSTEM ==="
+          df -h /
+          echo
+          echo "=== TOP LEVEL ROOT ==="
+          sudo du -xhd1 / 2>/dev/null | sort -h
+          echo
+          echo "=== /VAR ==="
+          sudo du -xhd1 /var 2>/dev/null | sort -h
+          echo
+          echo "=== /ROOT ==="
+          sudo du -xhd1 /root 2>/dev/null | sort -h
+          echo
+          echo "=== /HOME ==="
+          sudo du -xhd1 /home 2>/dev/null | sort -h
+          echo
+          echo "=== DOCKER ROOT ==="
+          sudo docker info --format 'DockerRootDir={{.DockerRootDir}} StorageDriver={{.Driver}}' || true
+          echo
+          echo "=== DOCKER SYSTEM DF ==="
+          sudo docker system df || true
+          echo
+          echo "=== DOCKER SYSTEM DF VERBOSE ==="
+          sudo docker system df -v || true
+          echo
+          echo "=== DOCKER IMAGES ==="
+          sudo docker images --format '{{.Repository}}:{{.Tag}}|{{.ID}}|{{.Size}}' | sort -t'|' -k3 -h || true
+          echo
+          echo "=== JOURNAL ==="
+          sudo journalctl --disk-usage || true
+          echo
+          echo "=== APT CACHE ==="
+          sudo du -sh /var/cache/apt /var/lib/apt/lists 2>/dev/null || true
+          echo
+          echo "=== LARGE FILES >500M ==="
+          sudo find / -xdev -type f -size +500M -printf '%s|%p\n' 2>/dev/null | sort -nr | head -50 || true
+          REMOTE
+
+      - name: Commit diagnostic
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/ovh-disk-breakdown-current.txt
+          git commit -m "diag: snapshot OVH disk breakdown" || exit 0
+          git push origin HEAD:main
