@@ -1,0 +1,70 @@
+TIMESTAMP=2026-09-02T20:04:05+00:00
+=== BEFORE ===
+name=cdg-ai-sync-cpu status=Up 12 hours
+name=cdg-ia-sync-test status=Up 12 hours
+=== STATIC CHECKS ===
+ELEVENLABS_KEY_INSTALLED=no
+=== BUILD WEB LAB ONLY ===
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.01kB done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 268B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 153.87kB done
+#5 DONE 0.0s
+
+#6 [1/6] FROM docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+#6 resolve docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea 0.0s done
+#6 DONE 0.0s
+
+#7 [3/6] COPY requirements.txt .
+#7 CACHED
+
+#8 [2/6] WORKDIR /app
+#8 CACHED
+
+#9 [4/6] RUN pip install --no-cache-dir -r requirements.txt
+#9 CACHED
+
+#10 [5/6] COPY app ./app
+#10 DONE 0.0s
+
+#11 [6/6] COPY static ./static
+#11 DONE 0.0s
+
+#12 exporting to image
+#12 exporting layers 0.0s done
+#12 exporting manifest sha256:1165fa9bbee073141bba49c2a6fdc0b9aab7eedceedd31c0d869f990482529b8 done
+#12 exporting config sha256:5bedd966a5db1b955c5d6295176e98e1eca9750ccd68fba1b30863b02c77a648 done
+#12 exporting attestation manifest sha256:5f693f6e88bf4ff03e45a141d06d476008d2df9238894edf4d2df9eb841f9a58 done
+#12 exporting manifest list sha256:4703c4faa6c88f9edf50ca17744acb7b4a2f2af52b12cf5d4c3a4896f1217eb6 done
+#12 naming to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest done
+#12 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest 0.0s done
+#12 DONE 0.1s
+
+#13 resolving provenance for metadata file
+#13 DONE 0.0s
+=== WAIT HEALTH ===
+{"ok":true,"version":"0.3.0","mvsep_configured":true,"mvsep_api_base":"https://mvsep.com/api","model":"Parakeet v3","sep_type":64,"add_opt1":0,"add_opt2":1,"qwen_configured":false,"qwen_endpoint":null,"elevenlabs_configured":false,"elevenlabs_model":"scribe_v2"}
+{"ok":true,"configured":false,"model":"scribe_v2","api_base":"https://api.elevenlabs.io"}
+=== MAPPER REGRESSION ===
+SCRIBE_MAPPER_TEST=PASS {'master_word_count': 9, 'scribe_word_count': 9, 'mapped_words': 9, 'exact_matches': 9, 'fuzzy_matches': 0, 'grouped_matches': 0, 'interpolated_words': 0, 'ignored_scribe_words': 0, 'coverage_ratio': 1.0}
+=== AFTER ===
+name=cdg-ia-sync-test status=Up 3 seconds
+name=cdg-ai-sync-cpu status=Up 12 hours
+name=cdg-ia-sync-test mem=37.58MiB / 11.4GiB cpu=0.21%
+name=cdg-ai-sync-cpu mem=838.4MiB / 5GiB cpu=0.21%
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       3.8Gi       591Mi       2.8Mi       7.4Gi       7.6Gi
+Swap:             0B          0B          0B
