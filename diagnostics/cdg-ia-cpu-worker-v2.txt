@@ -1,0 +1,235 @@
+TIMESTAMP=2026-09-02T06:56:17+00:00
+=== REBUILD WORKER ===
+#1 [internal] load local bake definitions
+#1 reading from stdin 570B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 726B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 0.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 20.61kB done
+#5 DONE 0.0s
+
+#6 [1/7] FROM docker.io/library/python:3.11-slim@sha256:d1e9ca7c4e78d1e8ecadb5d44bfc8e956e7a65b659a9950f569f243d72b326d0
+#6 resolve docker.io/library/python:3.11-slim@sha256:d1e9ca7c4e78d1e8ecadb5d44bfc8e956e7a65b659a9950f569f243d72b326d0 0.0s done
+#6 DONE 0.0s
+
+#7 [3/7] RUN apt-get update     && apt-get install -y --no-install-recommends ffmpeg libgomp1 curl ca-certificates     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [2/7] WORKDIR /app
+#8 CACHED
+
+#9 [4/7] RUN python -m pip install --upgrade pip     && python -m pip install        torch==2.8.0        torchaudio==2.8.0        --index-url https://download.pytorch.org/whl/cpu
+#9 CACHED
+
+#10 [5/7] COPY requirements.txt .
+#10 DONE 0.0s
+
+#11 [6/7] RUN python -m pip install -r requirements.txt
+#11 1.522 Collecting fastapi==0.116.1 (from -r requirements.txt (line 1))
+#11 1.614   Downloading fastapi-0.116.1-py3-none-any.whl.metadata (28 kB)
+#11 1.697 Collecting uvicorn==0.35.0 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 1.720   Downloading uvicorn-0.35.0-py3-none-any.whl.metadata (6.5 kB)
+#11 1.758 Collecting python-multipart==0.0.20 (from -r requirements.txt (line 3))
+#11 1.780   Downloading python_multipart-0.0.20-py3-none-any.whl.metadata (1.8 kB)
+#11 1.820 Collecting faster-whisper==1.2.0 (from -r requirements.txt (line 4))
+#11 1.846   Downloading faster_whisper-1.2.0-py3-none-any.whl.metadata (16 kB)
+#11 1.914 Collecting requests==2.32.3 (from -r requirements.txt (line 5))
+#11 1.936   Downloading requests-2.32.3-py3-none-any.whl.metadata (4.6 kB)
+#11 2.003 Collecting starlette<0.48.0,>=0.40.0 (from fastapi==0.116.1->-r requirements.txt (line 1))
+#11 2.027   Downloading starlette-0.47.3-py3-none-any.whl.metadata (6.2 kB)
+#11 2.222 Collecting pydantic!=1.8,!=1.8.1,!=2.0.0,!=2.0.1,!=2.1.0,<3.0.0,>=1.7.4 (from fastapi==0.116.1->-r requirements.txt (line 1))
+#11 2.245   Downloading pydantic-2.13.5-py3-none-any.whl.metadata (110 kB)
+#11 2.276 Requirement already satisfied: typing-extensions>=4.8.0 in /usr/local/lib/python3.11/site-packages (from fastapi==0.116.1->-r requirements.txt (line 1)) (4.16.0)
+#11 2.315 Collecting click>=7.0 (from uvicorn==0.35.0->uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 2.337   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+#11 2.373 Collecting h11>=0.8 (from uvicorn==0.35.0->uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 2.395   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#11 2.588 Collecting ctranslate2<5,>=4.0 (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 2.611   Downloading ctranslate2-4.8.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+#11 2.723 Collecting huggingface-hub>=0.13 (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 2.745   Downloading huggingface_hub-1.29.0-py3-none-any.whl.metadata (16 kB)
+#11 2.962 Collecting tokenizers<1,>=0.13 (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 2.984   Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (9.8 kB)
+#11 3.105 Collecting onnxruntime<2,>=1.14 (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 3.127   Downloading onnxruntime-1.29.0-cp311-cp311-manylinux_2_28_x86_64.whl.metadata (5.6 kB)
+#11 3.203 Collecting av>=11 (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 3.225   Downloading av-18.1.0-cp311-abi3-manylinux_2_28_x86_64.whl.metadata (5.0 kB)
+#11 3.308 Collecting tqdm (from faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 3.330   Downloading tqdm-4.70.0-py3-none-any.whl.metadata (57 kB)
+#11 3.560 Collecting charset-normalizer<4,>=2 (from requests==2.32.3->-r requirements.txt (line 5))
+#11 3.583   Downloading charset_normalizer-3.5.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (45 kB)
+#11 3.625 Collecting idna<4,>=2.5 (from requests==2.32.3->-r requirements.txt (line 5))
+#11 3.647   Downloading idna-3.19-py3-none-any.whl.metadata (9.2 kB)
+#11 3.693 Collecting urllib3<3,>=1.21.1 (from requests==2.32.3->-r requirements.txt (line 5))
+#11 3.715   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#11 3.762 Collecting certifi>=2017.4.17 (from requests==2.32.3->-r requirements.txt (line 5))
+#11 3.784   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+#11 3.841 Collecting httptools>=0.6.3 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 3.863   Downloading httptools-0.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+#11 3.903 Collecting python-dotenv>=0.13 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 3.925   Downloading python_dotenv-1.2.3-py3-none-any.whl.metadata (29 kB)
+#11 3.991 Collecting pyyaml>=5.1 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 4.014   Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#11 4.091 Collecting uvloop>=0.15.1 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 4.114   Downloading uvloop-0.22.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.9 kB)
+#11 4.220 Collecting watchfiles>=0.13 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 4.241   Downloading watchfiles-1.2.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+#11 4.457 Collecting websockets>=10.4 (from uvicorn[standard]==0.35.0->-r requirements.txt (line 2))
+#11 4.479   Downloading websockets-17.1-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.3 kB)
+#11 4.751 Collecting numpy (from ctranslate2<5,>=4.0->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 4.773   Downloading numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+#11 4.813 Collecting flatbuffers (from onnxruntime<2,>=1.14->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 4.836   Downloading flatbuffers-25.12.19-py2.py3-none-any.whl.metadata (1.0 kB)
+#11 4.846 Requirement already satisfied: packaging in /usr/local/lib/python3.11/site-packages (from onnxruntime<2,>=1.14->faster-whisper==1.2.0->-r requirements.txt (line 4)) (26.3)
+#11 5.054 Collecting protobuf>=4.25.8 (from onnxruntime<2,>=1.14->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 5.077   Downloading protobuf-7.36.1-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+#11 5.113 Collecting annotated-types>=0.6.0 (from pydantic!=1.8,!=1.8.1,!=2.0.0,!=2.0.1,!=2.1.0,<3.0.0,>=1.7.4->fastapi==0.116.1->-r requirements.txt (line 1))
+#11 5.135   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+#11 6.067 Collecting pydantic-core==2.46.5 (from pydantic!=1.8,!=1.8.1,!=2.0.0,!=2.0.1,!=2.1.0,<3.0.0,>=1.7.4->fastapi==0.116.1->-r requirements.txt (line 1))
+#11 6.090   Downloading pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+#11 6.130 Collecting typing-inspection>=0.4.2 (from pydantic!=1.8,!=1.8.1,!=2.0.0,!=2.0.1,!=2.1.0,<3.0.0,>=1.7.4->fastapi==0.116.1->-r requirements.txt (line 1))
+#11 6.153   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+#11 6.203 Collecting anyio<5,>=3.6.2 (from starlette<0.48.0,>=0.40.0->fastapi==0.116.1->-r requirements.txt (line 1))
+#11 6.234   Downloading anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+#11 6.253 Requirement already satisfied: filelock>=3.10.0 in /usr/local/lib/python3.11/site-packages (from huggingface-hub>=0.13->faster-whisper==1.2.0->-r requirements.txt (line 4)) (3.32.3)
+#11 6.253 Requirement already satisfied: fsspec>=2023.5.0 in /usr/local/lib/python3.11/site-packages (from huggingface-hub>=0.13->faster-whisper==1.2.0->-r requirements.txt (line 4)) (2026.7.0)
+#11 6.318 Collecting hf-xet<2.0.0,>=1.5.2 (from huggingface-hub>=0.13->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 6.340   Downloading hf_xet-1.6.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+#11 6.381 Collecting httpx<1,>=0.23.0 (from huggingface-hub>=0.13->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 6.404   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#11 6.453 Collecting httpcore==1.* (from httpx<1,>=0.23.0->huggingface-hub>=0.13->faster-whisper==1.2.0->-r requirements.txt (line 4))
+#11 6.475   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#11 6.525 Downloading fastapi-0.116.1-py3-none-any.whl (95 kB)
+#11 6.551 Downloading uvicorn-0.35.0-py3-none-any.whl (66 kB)
+#11 6.574 Downloading python_multipart-0.0.20-py3-none-any.whl (24 kB)
+#11 6.597 Downloading faster_whisper-1.2.0-py3-none-any.whl (1.1 MB)
+#11 6.643    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.1/1.1 MB 36.6 MB/s  0:00:00
+#11 6.665 Downloading requests-2.32.3-py3-none-any.whl (64 kB)
+#11 6.687 Downloading charset_normalizer-3.5.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (262 kB)
+#11 6.710 Downloading ctranslate2-4.8.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (39.4 MB)
+#11 6.927    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 39.4/39.4 MB 183.0 MB/s  0:00:00
+#11 6.950 Downloading idna-3.19-py3-none-any.whl (68 kB)
+#11 6.973 Downloading onnxruntime-1.29.0-cp311-cp311-manylinux_2_28_x86_64.whl (23.1 MB)
+#11 7.097    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 23.1/23.1 MB 190.3 MB/s  0:00:00
+#11 7.120 Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+#11 7.144 Downloading pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+#11 7.153    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 315.5 MB/s  0:00:00
+#11 7.176 Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+#11 7.183    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 277.4 MB/s  0:00:00
+#11 7.210 Downloading starlette-0.47.3-py3-none-any.whl (72 kB)
+#11 7.234 Downloading anyio-4.14.2-py3-none-any.whl (125 kB)
+#11 7.259 Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.3 MB)
+#11 7.276    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 263.2 MB/s  0:00:00
+#11 7.300 Downloading huggingface_hub-1.29.0-py3-none-any.whl (795 kB)
+#11 7.308    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 795.8/795.8 kB 216.2 MB/s  0:00:00
+#11 7.333 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+#11 7.357 Downloading hf_xet-1.6.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.5 MB)
+#11 7.383    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 207.1 MB/s  0:00:00
+#11 7.407 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#11 7.430 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#11 7.454 Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+#11 7.479 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#11 7.502 Downloading av-18.1.0-cp311-abi3-manylinux_2_28_x86_64.whl (35.8 MB)
+#11 7.801    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.8/35.8 MB 121.3 MB/s  0:00:00
+#11 7.825 Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+#11 7.849 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#11 7.872 Downloading httptools-0.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (464 kB)
+#11 7.896 Downloading numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.9 MB)
+#11 7.989    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.9/16.9 MB 189.8 MB/s  0:00:00
+#11 8.013 Downloading protobuf-7.36.1-cp310-abi3-manylinux2014_x86_64.whl (343 kB)
+#11 8.039 Downloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+#11 8.063 Downloading tqdm-4.70.0-py3-none-any.whl (80 kB)
+#11 8.088 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#11 8.112 Downloading uvloop-0.22.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.8 MB)
+#11 8.131    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.8/3.8 MB 286.5 MB/s  0:00:00
+#11 8.155 Downloading watchfiles-1.2.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (456 kB)
+#11 8.182 Downloading websockets-17.1-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (224 kB)
+#11 8.207 Downloading flatbuffers-25.12.19-py2.py3-none-any.whl (26 kB)
+#11 9.213 Installing collected packages: flatbuffers, websockets, uvloop, urllib3, typing-inspection, tqdm, pyyaml, python-multipart, python-dotenv, pydantic-core, protobuf, numpy, idna, httptools, hf-xet, h11, click, charset-normalizer, certifi, av, annotated-types, uvicorn, requests, pydantic, onnxruntime, httpcore, ctranslate2, anyio, watchfiles, starlette, httpx, huggingface-hub, fastapi, tokenizers, faster-whisper
+#11 18.27 
+#11 18.27 Successfully installed annotated-types-0.8.0 anyio-4.14.2 av-18.1.0 certifi-2026.7.22 charset-normalizer-3.5.1 click-8.5.0 ctranslate2-4.8.2 fastapi-0.116.1 faster-whisper-1.2.0 flatbuffers-25.12.19 h11-0.16.0 hf-xet-1.6.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 huggingface-hub-1.29.0 idna-3.19 numpy-2.4.6 onnxruntime-1.29.0 protobuf-7.36.1 pydantic-2.13.5 pydantic-core-2.46.5 python-dotenv-1.2.3 python-multipart-0.0.20 pyyaml-6.0.3 requests-2.32.3 starlette-0.47.3 tokenizers-0.23.1 tqdm-4.70.0 typing-inspection-0.4.4 urllib3-2.7.0 uvicorn-0.35.0 uvloop-0.22.1 watchfiles-1.2.0 websockets-17.1
+#11 18.27 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#11 DONE 18.9s
+
+#12 [7/7] COPY app.py .
+#12 DONE 0.1s
+
+#13 exporting to image
+#13 exporting layers
+#13 exporting layers 24.0s done
+#13 exporting manifest sha256:e44fe686d7b72f9cd2bb278e47bde3203d8b8cc70cb8ce8766d2f1d152294c20 done
+#13 exporting config sha256:41e52ee9a84afc8aaf44358695517c0218ee92892c7392ef6729275d52c1c85c done
+#13 exporting attestation manifest sha256:a81a50c359e5753dd4401642c5a223216533f097af2643ac65c17ecce8e1494f 0.0s done
+#13 exporting manifest list sha256:23fcb399e52e584755b1c64fe30af52bf5aef2b3e6647644bc29ca9593091c70 done
+#13 naming to docker.io/library/cdg-ia-sync-test-cdg-ai-sync-cpu:latest done
+#13 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ai-sync-cpu:latest
+#13 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ai-sync-cpu:latest 4.3s done
+#13 DONE 28.4s
+
+#14 resolving provenance for metadata file
+#14 DONE 0.0s
+=== HEALTH ===
+{"ok":true,"engine":"whisperx-style-local","device":"cpu","compute_type":"int8","whisper_model":"small","align_model":"VOXPOPULI_ASR_BASE_10K_ES","threads":4,"model_root":"/models","torch":"2.8.0+cpu","torchaudio":"2.8.0+cpu"}
+memory_limit=5368709120 nano_cpus=4000000000 oom=false restart=0
+ram=173.9MiB / 5GiB cpu=0.24%
+=== WARMUP ===
+warmup_exit=0
+{"ok":true,"elapsed_s":8.027,"phases":{"faster_whisper_s":4.948,"spanish_aligner_s":2.84},"labels_preview":["-","|","e","a","o","s","n","r","i","l","d","c"]}
+	Command being timed: "curl -fsS -X POST --max-time 1200 http://127.0.0.1:8098/warmup -o /tmp/warmup.json"
+	User time (seconds): 0.00
+	System time (seconds): 0.00
+	Percent of CPU this job got: 0%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:08.04
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 11008
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 619
+	Voluntary context switches: 10
+	Involuntary context switches: 2
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+=== AFTER ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   44G   53G  46% /
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       3.6Gi       509Mi       2.8Mi       7.7Gi       7.8Gi
+Swap:             0B          0B          0B
+824M	/data/cdg-ai-models
+4.0K	/data/cdg-ai-models/faster-whisper/.locks/models--Systran--faster-whisper-small
+8.0K	/data/cdg-ai-models/faster-whisper/.locks
+8.0K	/data/cdg-ai-models/faster-whisper/models--Systran--faster-whisper-small/refs
+8.0K	/data/cdg-ai-models/faster-whisper/models--Systran--faster-whisper-small/trees
+12K	/data/cdg-ai-models/faster-whisper/models--Systran--faster-whisper-small/snapshots
+361M	/data/cdg-ai-models/torch
+464M	/data/cdg-ai-models/faster-whisper
+464M	/data/cdg-ai-models/faster-whisper/models--Systran--faster-whisper-small
+464M	/data/cdg-ai-models/faster-whisper/models--Systran--faster-whisper-small/blobs
+824M	/data/cdg-ai-models
+ram=606.9MiB / 5GiB cpu=0.24%
+size=2.58GB
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          18        18        10.51GB   0B (0%)
+Containers      18        18        89.62MB   0B (0%)
+Local Volumes   1         1         30.23MB   0B (0%)
+Build Cache     1174      0         32.04GB   27.13GB
