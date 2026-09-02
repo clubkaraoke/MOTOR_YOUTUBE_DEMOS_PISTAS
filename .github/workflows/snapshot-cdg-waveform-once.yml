@@ -75,12 +75,21 @@ jobs:
           sudo grep -n -C 14 -E 'view:[[:space:]]*\{|S\.view|function t2y|function y2t|const t2y|const y2t' "$f" | head -n 360 || true
           REMOTE
 
+      - name: Capture full live editor HTML
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/editor_v1/index.html' > diagnostics/cdg-editor-live-index.html
+
       - name: Commit snapshot
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-waveform-live.txt
+          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html
           if git diff --cached --quiet; then
             echo "No snapshot changes"
             exit 0
