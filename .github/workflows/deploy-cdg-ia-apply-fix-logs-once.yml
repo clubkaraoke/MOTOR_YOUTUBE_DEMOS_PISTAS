@@ -1,0 +1,104 @@
+name: Deploy CDG IA apply-fix and logs once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-apply-fix-logs-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy web LAB only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-apply-fix-logs-deploy.txt <<'REMOTE'
+          set -euo pipefail
+          TARGET=/opt/cdg-ia-sync-test
+          STAGE=/tmp/cdg-ia-sync-test-main
+          ARCHIVE=/tmp/cdg-ia-sync-test-main.tar.gz
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== BEFORE ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} ram={{.MemUsage}} cpu={{.CPUPerc}}'
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          mkdir -p "$STAGE"
+          curl -fL --retry 3 -o "$ARCHIVE" https://github.com/clubkaraoke/CDG_IA_SYNC_TEST/archive/refs/heads/main.tar.gz
+          tar -xzf "$ARCHIVE" -C "$STAGE" --strip-components=1
+
+          python3 -m py_compile "$STAGE/app/main.py"
+
+          sudo rsync -a --delete \
+            --exclude='.env' \
+            --exclude='/runtime/' \
+            "$STAGE/" "$TARGET/"
+
+          cd "$TARGET"
+          echo "=== BUILD WEB ONLY ==="
+          sudo docker compose -p cdg-ia-sync-test build cdg-ia-sync-test
+          sudo docker compose -p cdg-ia-sync-test up -d --no-deps cdg-ia-sync-test
+
+          echo "=== VERIFY WEB ==="
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8097/ >/tmp/lab.html; then ok=1; break; fi
+            sleep 2
+          done
+          [ "$ok" = 1 ]
+          grep -q 'timingSourceBadge' /tmp/lab.html
+          grep -q 'copyLogBtn' /tmp/lab.html
+          curl -fsS http://127.0.0.1:8097/static/app.js | grep -q 'timings_applied_with_warnings'
+          curl -fsS http://127.0.0.1:8097/api/local/health
+          echo
+
+          echo "=== VERIFY LOG API ==="
+          curl -fsS 'http://127.0.0.1:8097/api/logs?limit=3'
+          echo
+
+          echo "=== AFTER ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} ram={{.MemUsage}} cpu={{.CPUPerc}}'
+          df -h /
+          free -h
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          REMOTE
+
+      - name: Commit result
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-ia-apply-fix-logs-deploy.txt ]; then
+            git add diagnostics/cdg-ia-apply-fix-logs-deploy.txt
+            git commit -m "diag: record CDG IA apply/log deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
