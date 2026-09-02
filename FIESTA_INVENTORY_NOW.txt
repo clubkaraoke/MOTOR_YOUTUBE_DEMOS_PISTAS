@@ -1,0 +1,78 @@
+=== FIESTA INVENTORY ===
+2026-09-02T05:54:39+00:00
+SOURCE=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA
+DEST=KITKARAOKE_APP_DATA/01_FIESTA
+DATASET=01_FIESTA
+BLOCK_PREFIX=FIESTA_
+BLOCK_SIZE=130
+MODE=READ_ONLY_DRIVE
+
+[inventario] 01_FIESTA: metadata rápida, sin hashes, --fast-list.
+[inventario] 5908 MP4 en 12.1s.
+{
+  "block_plan": {
+    "FIESTA_001": 130,
+    "FIESTA_002": 130,
+    "FIESTA_003": 130,
+    "FIESTA_004": 130,
+    "FIESTA_005": 130,
+    "FIESTA_006": 130,
+    "FIESTA_007": 130,
+    "FIESTA_008": 130,
+    "FIESTA_009": 130,
+    "FIESTA_010": 130,
+    "FIESTA_011": 130,
+    "FIESTA_012": 130,
+    "FIESTA_013": 130,
+    "FIESTA_014": 130,
+    "FIESTA_015": 130,
+    "FIESTA_016": 130,
+    "FIESTA_017": 130,
+    "FIESTA_018": 130,
+    "FIESTA_019": 130,
+    "FIESTA_020": 130,
+    "FIESTA_021": 130,
+    "FIESTA_022": 130,
+    "FIESTA_023": 130,
+    "FIESTA_024": 130,
+    "FIESTA_025": 130,
+    "FIESTA_026": 130,
+    "FIESTA_027": 130,
+    "FIESTA_028": 130,
+    "FIESTA_029": 130,
+    "FIESTA_030": 130,
+    "FIESTA_031": 130,
+    "FIESTA_032": 130,
+    "FIESTA_033": 130,
+    "FIESTA_034": 130,
+    "FIESTA_035": 130,
+    "FIESTA_036": 130,
+    "FIESTA_037": 130,
+    "FIESTA_038": 130,
+    "FIESTA_039": 130,
+    "FIESTA_040": 130,
+    "FIESTA_041": 130,
+    "FIESTA_042": 130,
+    "FIESTA_043": 130,
+    "FIESTA_044": 130,
+    "FIESTA_045": 130,
+    "FIESTA_046": 57,
+    "FIESTA_047": 1
+  },
+  "blocks_needed": 47,
+  "changed": 0,
+  "dataset": "01_FIESTA",
+  "drive_modified": false,
+  "fast_list": true,
+  "hashes_requested": false,
+  "inventory_generation": 1,
+  "inventory_persisted": true,
+  "missing": 0,
+  "mp4_found": 5908,
+  "new": 5908,
+  "ok": true,
+  "restored": 0,
+  "scan_seconds": 12.75,
+  "source_scan_performed": true,
+  "warnings": []
+}
