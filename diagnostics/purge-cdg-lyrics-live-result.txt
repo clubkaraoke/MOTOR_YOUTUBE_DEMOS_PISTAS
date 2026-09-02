@@ -1,0 +1,33 @@
+TIMESTAMP=2026-09-02T06:33:01+00:00
+
+=== BEFORE ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   39G   58G  40% /
+1.2M	/opt/djgabo-youtube/lyrics_engine
+516K	/opt/djgabo-youtube/data/cdg_lab
+75:  lyrics:
+
+=== PATCH LIVE COMPOSE ===
+removed_blocks=1
+
+=== REMOVE DEDICATED FILES/DATA ===
+removed /opt/djgabo-youtube/lyrics_engine
+removed /opt/djgabo-youtube/data/cdg_lab
+
+=== VALIDATE WITHOUT RESTART ===
+redis
+web
+worker
+OK: retired CDG lyrics service fully absent
+
+=== AFTER ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   39G   58G  40% /
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       2.8Gi       1.5Gi       2.7Mi       7.4Gi       8.6Gi
+Swap:             0B          0B          0B
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          17        17        8.046GB   0B (0%)
+Containers      17        17        89.45MB   0B (0%)
+Local Volumes   1         1         30.13MB   0B (0%)
+Build Cache     1154      0         28.88GB   23.97GB
