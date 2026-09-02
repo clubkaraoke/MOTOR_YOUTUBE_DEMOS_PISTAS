@@ -1,0 +1,39 @@
+# Copiar a /etc/djgabo-cdg/djgabo-cdg.env y reemplazar TODOS los CHANGE_ME.
+# El archivo final debe pertenecer a root con permisos 600.
+DJGABO_ENV=production
+DJGABO_SKIP_PREV_MIGRATION=1
+DJGABO_PUBLIC_BASE_URL=https://CHANGE_ME.DOMINIO
+DROPBOX_REDIRECT_URI=https://CHANGE_ME.DOMINIO/dropbox/callback
+DJGABO_TRUST_PROXY=1
+
+# Persistencia del servidor. Nunca apuntar estas rutas a /tmp.
+DJGABO_DATA_DIR=/var/lib/djgabo-cdg
+DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg/config
+DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg/voice_cache
+DJGABO_VOICE_CACHE_MAX_GB=8
+DJGABO_VOICE_CACHE_METADATA_TTL_SECONDS=86400
+DJGABO_MIN_FREE_BYTES=1073741824
+
+# Accesos de la aplicación. Usar claves distintas de 16+ caracteres.
+DJGABO_ADMIN_PASSWORD=CHANGE_ME_ADMIN
+DJGABO_CORRECTORA_PASSWORD=CHANGE_ME_VALERIA
+DJGABO_SESSION_TTL_SECONDS=43200
+DJGABO_LOGIN_RATE_MAX=10
+
+# Puente del Google Apps Script ya publicado.
+DJGABO_DRIVE_BRIDGE_URL=https://script.google.com/macros/s/CHANGE_ME/exec
+DJGABO_DRIVE_BRIDGE_KEY=CHANGE_ME_DRIVE_KEY
+
+# Dropbox. El redirect exacto también debe registrarse en Dropbox App Console.
+DROPBOX_APP_KEY=CHANGE_ME_DROPBOX_APP_KEY
+DROPBOX_APP_SECRET=CHANGE_ME_DROPBOX_APP_SECRET
+DROPBOX_REFRESH_TOKEN=CHANGE_ME_DROPBOX_REFRESH_TOKEN
+
+# Render: un proceso simultáneo protege RAM/CPU. Subir sólo después de medir OVH.
+DJGABO_RENDER_CONCURRENCY=1
+DJGABO_RENDER_TIMEOUT_SECONDS=1800
+
+# Para conservar exactamente el diseño actual, copiar Impact.ttf al servidor.
+DJGABO_FONT_IMPACT=/etc/djgabo-cdg/fonts/impact.ttf
+DJGABO_FONT_ARIAL_BOLD=/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf
+DJGABO_FONT_ARIAL=/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf

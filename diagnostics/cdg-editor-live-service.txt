@@ -1,0 +1,27 @@
+[Unit]
+Description=DJGABO Control CDG
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=djgabo-cdg
+Group=djgabo-cdg
+WorkingDirectory=/opt/djgabo-cdg
+EnvironmentFile=/etc/djgabo-cdg/djgabo-cdg.env
+ExecStart=/opt/djgabo-cdg/.venv/bin/gunicorn --config /opt/djgabo-cdg/deploy/gunicorn.conf.py server:app
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=180
+KillSignal=SIGTERM
+KillMode=mixed
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/djgabo-cdg
+
+[Install]
+WantedBy=multi-user.target
