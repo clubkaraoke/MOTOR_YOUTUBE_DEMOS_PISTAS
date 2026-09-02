@@ -1,0 +1,82 @@
+name: Diagnose OVH resources once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-ovh-resources-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture OVH resources
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/ovh-resources-current.txt <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== HOST ==="
+          uname -a
+          nproc
+          echo
+          echo "=== RAM ==="
+          free -h
+          echo
+          echo "=== DISK ROOT ==="
+          df -h /
+          echo
+          echo "=== INODES ==="
+          df -ih /
+          echo
+          echo "=== DOCKER SPACE ==="
+          sudo docker system df || true
+          echo
+          echo "=== TOP CONTAINERS RAM/CPU ==="
+          sudo docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}' || true
+          echo
+          echo "=== LARGE DIRECTORIES /opt ==="
+          sudo du -xhd1 /opt 2>/dev/null | sort -h | tail -25 || true
+          echo
+          echo "=== LARGE DIRECTORIES /var/lib/docker ==="
+          sudo du -xhd1 /var/lib/docker 2>/dev/null | sort -h | tail -20 || true
+          echo
+          echo "=== AI/MODEL CANDIDATE DIRS ==="
+          for d in /root/.cache/huggingface /home/*/.cache/huggingface /opt/djgabo-cdg /opt/cdg-ia-sync-test /opt/cdg-ai-models; do
+            [ -e "$d" ] && sudo du -sh "$d" 2>/dev/null || true
+          done
+          REMOTE
+
+      - name: Commit diagnostic
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/ovh-resources-current.txt
+          git commit -m "diag: snapshot current OVH resources" || exit 0
+          git push origin HEAD:main
