@@ -79,6 +79,7 @@ overrides={
     'DROPBOX_APP_SECRET':'',
     'DROPBOX_REFRESH_TOKEN':'',
     'GUNICORN_CMD_ARGS':'',
+    'HOME':'/var/lib/djgabo-cdg-ia-test',
 }
 out=[]
 seen=set()
