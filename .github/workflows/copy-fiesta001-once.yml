@@ -29,18 +29,15 @@ jobs:
             printf '%s ssh-ed25519 %s\n' "$OVH_HOST" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
             printf '[%s]:%s ssh-ed25519 %s\n' "$OVH_HOST" "$OVH_PORT" 'AAAAC3NzaC1lZDI1NTE5AAAAICvS+PnyRvMbs7D9w+ZRAhtbGtMnlXvZG1eEp+APNR2V'
           } > "$HOME/.ssh/known_hosts"
-      - name: Copy and publish FIESTA_001
+
+      - name: Precheck FIESTA_001
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
-          set -euo pipefail
-          cd /opt/KITKARAOKE_DATA_SYNC
-          echo "=== PRECHECK ==="
-          sudo docker compose run --rm --no-deps \
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps -T \
             -e DATASET_KEY=01_FIESTA \
             -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
             -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
@@ -49,9 +46,16 @@ jobs:
             -e DRY_RUN=true \
             -e AUTO_SYNC=false \
             -e MIN_EXPECTED_SOURCE_COUNT=5000 \
-            kitkaraoke-data-sync python -m app.cli reconcile-block 1
-          echo "=== COPY ==="
-          sudo docker compose run --rm --no-deps \
+            kitkaraoke-data-sync python -m app.cli reconcile-block 1"
+
+      - name: Copy FIESTA_001
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps -T \
             -e DATASET_KEY=01_FIESTA \
             -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
             -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
@@ -60,11 +64,25 @@ jobs:
             -e DRY_RUN=false \
             -e AUTO_SYNC=false \
             -e MIN_EXPECTED_SOURCE_COUNT=5000 \
-            kitkaraoke-data-sync python -m app.cli copy-block 1
-          echo "=== PUBLISH ==="
-          sudo bash scripts/publish_global_catalog.sh
-          echo "=== VERIFY ==="
-          sudo docker compose run --rm --no-deps \
+            kitkaraoke-data-sync python -m app.cli copy-block 1"
+
+      - name: Publish master catalog
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/publish_global_catalog.sh"
+
+      - name: Verify FIESTA_001
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps -T \
             -e DATASET_KEY=01_FIESTA \
             -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
             -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
@@ -73,5 +91,4 @@ jobs:
             -e DRY_RUN=true \
             -e AUTO_SYNC=false \
             -e MIN_EXPECTED_SOURCE_COUNT=5000 \
-            kitkaraoke-data-sync python -m app.cli reconcile-block 1
-          REMOTE
+            kitkaraoke-data-sync python -m app.cli reconcile-block 1"
