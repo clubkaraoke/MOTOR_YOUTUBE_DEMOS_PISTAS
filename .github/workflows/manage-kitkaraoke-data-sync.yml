@@ -16,6 +16,14 @@ on:
           - reconcile_block
           - copy_block
           - status
+      dataset:
+        description: Dataset to operate on
+        required: true
+        type: choice
+        default: ingles
+        options:
+          - ingles
+          - fiesta
       block_number:
         description: Block number for reconcile_block/copy_block
         required: true
@@ -192,10 +200,25 @@ jobs:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
+          DATASET: ${{ inputs.dataset }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/inventory_refresh.sh'
+          if [ "$DATASET" = "fiesta" ]; then
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps \
+              -e DATASET_KEY=01_FIESTA \
+              -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
+              -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
+              -e BLOCK_PREFIX=FIESTA_ \
+              -e BLOCK_SIZE=130 \
+              -e DRY_RUN=true \
+              -e AUTO_SYNC=false \
+              -e MIN_EXPECTED_SOURCE_COUNT=5000 \
+              kitkaraoke-data-sync python -m app.cli inventory-refresh"
+          else
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              'cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/inventory_refresh.sh'
+          fi
 
       - name: Reconcile one existing block only
         if: inputs.operation == 'reconcile_block'
@@ -204,10 +227,27 @@ jobs:
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
           BLOCK_NUMBER: ${{ inputs.block_number }}
+          DATASET: ${{ inputs.dataset }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/reconcile_block.sh '$BLOCK_NUMBER'"
+          if [ "$DATASET" = "fiesta" ]; then
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && \
+              sudo docker compose run --rm --no-deps \
+              -e DATASET_KEY=01_FIESTA \
+              -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
+              -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
+              -e BLOCK_PREFIX=FIESTA_ \
+              -e BLOCK_SIZE=130 \
+              -e DRY_RUN=true \
+              -e AUTO_SYNC=false \
+              -e MIN_EXPECTED_SOURCE_COUNT=5000 \
+              kitkaraoke-data-sync python -m app.cli reconcile-block '$BLOCK_NUMBER' && \
+              sudo bash scripts/publish_global_catalog.sh"
+          else
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/reconcile_block.sh '$BLOCK_NUMBER'"
+          fi
 
       - name: Copy one controlled block only
         if: inputs.operation == 'copy_block'
@@ -216,10 +256,27 @@ jobs:
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
           BLOCK_NUMBER: ${{ inputs.block_number }}
+          DATASET: ${{ inputs.dataset }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block.sh '$BLOCK_NUMBER'"
+          if [ "$DATASET" = "fiesta" ]; then
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && \
+              sudo docker compose run --rm --no-deps \
+              -e DATASET_KEY=01_FIESTA \
+              -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
+              -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
+              -e BLOCK_PREFIX=FIESTA_ \
+              -e BLOCK_SIZE=130 \
+              -e DRY_RUN=false \
+              -e AUTO_SYNC=false \
+              -e MIN_EXPECTED_SOURCE_COUNT=5000 \
+              kitkaraoke-data-sync python -m app.cli copy-block '$BLOCK_NUMBER' && \
+              sudo bash scripts/publish_global_catalog.sh"
+          else
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && sudo bash scripts/copy_block.sh '$BLOCK_NUMBER'"
+          fi
 
       - name: Show local persisted state
         if: inputs.operation == 'inventory_refresh' || inputs.operation == 'reconcile_block' || inputs.operation == 'copy_block' || inputs.operation == 'status'
@@ -227,7 +284,22 @@ jobs:
           OVH_HOST: ${{ secrets.OVH_HOST }}
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
+          DATASET: ${{ inputs.dataset }}
         run: |
           set -euo pipefail
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
-            'cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps kitkaraoke-data-sync python -m app.cli status'
+          if [ "$DATASET" = "fiesta" ]; then
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              "cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps \
+              -e DATASET_KEY=01_FIESTA \
+              -e 'SOURCE_PATH=01.- Pack Karaoke PRO ( 200 GB ) Club Karaoke - Socio/01.- MEGA PACK KARAOKE - FIESTA' \
+              -e DEST_PATH=KITKARAOKE_APP_DATA/01_FIESTA \
+              -e BLOCK_PREFIX=FIESTA_ \
+              -e BLOCK_SIZE=130 \
+              -e DRY_RUN=true \
+              -e AUTO_SYNC=false \
+              -e MIN_EXPECTED_SOURCE_COUNT=5000 \
+              kitkaraoke-data-sync python -m app.cli status"
+          else
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+              'cd /opt/KITKARAOKE_DATA_SYNC && sudo docker compose run --rm --no-deps kitkaraoke-data-sync python -m app.cli status'
+          fi
