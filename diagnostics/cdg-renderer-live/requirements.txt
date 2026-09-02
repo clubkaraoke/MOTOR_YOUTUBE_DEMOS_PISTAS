@@ -1,0 +1,6 @@
+Pillow>=10.0
+attrs>=23.0
+cattrs>=23.0
+pydub>=0.25
+ffmpeg-python>=0.2
+Flask>=3.0
