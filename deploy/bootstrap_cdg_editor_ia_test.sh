@@ -54,6 +54,50 @@ if [ ! -x "$DST/.venv/bin/python" ]; then
 fi
 sudo -u djgabo-cdg "$DST/.venv/bin/pip" install --disable-pip-version-check -q -r "$DST/requirements.txt"
 
+echo "=== CREATE ISOLATED TEST ENV ==="
+sudo mkdir -p /etc/djgabo-cdg-ia-test
+sudo cp /etc/djgabo-cdg/djgabo-cdg.env /etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
+sudo python3 - <<'PY'
+from pathlib import Path
+p=Path('/etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env')
+lines=p.read_text(encoding='utf-8').splitlines()
+overrides={
+    'DJGABO_ENV':'test',
+    'DJGABO_TEST_MODE':'1',
+    'DJGABO_URL_PREFIX':'/cdg-editor-ia',
+    'DJGABO_DATA_DIR':'/var/lib/djgabo-cdg-ia-test',
+    'DJGABO_CONFIG_DIR':'/var/lib/djgabo-cdg-ia-test/config',
+    'DJGABO_DB_PATH':'/var/lib/djgabo-cdg-ia-test/local.db',
+    'DJGABO_JOBS_DIR':'/var/lib/djgabo-cdg-ia-test/jobs',
+    'DJGABO_OUTPUT_DIR':'/var/lib/djgabo-cdg-ia-test/output',
+    'DJGABO_VOICE_CACHE_DIR':'/var/lib/djgabo-cdg-ia-test/voice_cache',
+    'DJGABO_SKIP_PREV_MIGRATION':'1',
+    'DJGABO_BIND':'127.0.0.1:8775',
+    'DJGABO_PUBLIC_BASE_URL':'https://panel.kitkaraoke.com/cdg-editor-ia',
+    'DROPBOX_REDIRECT_URI':'https://panel.kitkaraoke.com/cdg-editor-ia/dropbox/callback',
+    'DROPBOX_APP_KEY':'',
+    'DROPBOX_APP_SECRET':'',
+    'DROPBOX_REFRESH_TOKEN':'',
+    'GUNICORN_CMD_ARGS':'',
+}
+out=[]
+seen=set()
+for line in lines:
+    if '=' in line and not line.lstrip().startswith('#'):
+        key=line.split('=',1)[0].strip()
+        if key in overrides:
+            out.append(key+'='+overrides[key])
+            seen.add(key)
+            continue
+    out.append(line)
+for key,val in overrides.items():
+    if key not in seen:
+        out.append(key+'='+val)
+p.write_text('\n'.join(out).rstrip()+'\n',encoding='utf-8')
+PY
+sudo chown root:root /etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
+sudo chmod 600 /etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
+
 echo "=== SYSTEMD TEST SERVICE ==="
 sudo tee "/etc/systemd/system/${SERVICE}.service" >/dev/null <<'UNIT'
 [Unit]
@@ -66,21 +110,7 @@ Type=simple
 User=djgabo-cdg
 Group=djgabo-cdg
 WorkingDirectory=/opt/djgabo-cdg-ia-test
-EnvironmentFile=/etc/djgabo-cdg/djgabo-cdg.env
-Environment=DJGABO_ENV=test
-Environment=DJGABO_TEST_MODE=1
-Environment=DJGABO_URL_PREFIX=/cdg-editor-ia
-Environment=DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test
-Environment=DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config
-Environment=DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db
-Environment=DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs
-Environment=DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output
-Environment=DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache
-Environment=DJGABO_SKIP_PREV_MIGRATION=1
-Environment=DJGABO_BIND=127.0.0.1:8775
-Environment=DROPBOX_APP_KEY=
-Environment=DROPBOX_APP_SECRET=
-Environment=DROPBOX_REFRESH_TOKEN=
+EnvironmentFile=/etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
 ExecStart=/opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
 Restart=on-failure
 RestartSec=5
