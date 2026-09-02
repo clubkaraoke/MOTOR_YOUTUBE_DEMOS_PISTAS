@@ -1,0 +1,111 @@
+name: Purge retired CDG lyrics live files once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/purge-retired-cdg-lyrics-live-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Purge retired service from live OVH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/purge-cdg-lyrics-live-result.txt <<'REMOTE'
+          set -euo pipefail
+          BASE=/opt/djgabo-youtube
+          COMPOSE="$BASE/docker-compose.prod.yml"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== BEFORE ==="
+          df -h /
+          [ -d "$BASE/lyrics_engine" ] && sudo du -sh "$BASE/lyrics_engine" || echo "lyrics_engine dir absent"
+          [ -d "$BASE/data/cdg_lab" ] && sudo du -sh "$BASE/data/cdg_lab" || echo "cdg_lab data absent"
+          grep -n '^  lyrics:' "$COMPOSE" || true
+
+          echo
+          echo "=== PATCH LIVE COMPOSE ==="
+          sudo cp "$COMPOSE" "$COMPOSE.pre-retire-lyrics.bak"
+          sudo python3 - "$COMPOSE" <<'PY'
+          import re, sys
+          p = sys.argv[1]
+          s = open(p, encoding="utf-8").read()
+          s2, n = re.subn(r'\n  lyrics:\n.*?(?=\nvolumes:\n)', '\n', s, flags=re.S)
+          if n not in (0, 1):
+              raise SystemExit(f"unexpected lyrics blocks: {n}")
+          open(p, "w", encoding="utf-8").write(s2)
+          print(f"removed_blocks={n}")
+          PY
+
+          echo
+          echo "=== REMOVE DEDICATED FILES/DATA ==="
+          if [ -d "$BASE/lyrics_engine" ]; then
+            sudo rm -rf --one-file-system "$BASE/lyrics_engine"
+            echo "removed $BASE/lyrics_engine"
+          fi
+          if [ -d "$BASE/data/cdg_lab" ]; then
+            sudo rm -rf --one-file-system "$BASE/data/cdg_lab"
+            echo "removed $BASE/data/cdg_lab"
+          fi
+
+          echo
+          echo "=== VALIDATE WITHOUT RESTART ==="
+          cd "$BASE"
+          SERVICES="$(sudo docker compose -f docker-compose.prod.yml config --services)"
+          printf '%s\n' "$SERVICES"
+          if printf '%s\n' "$SERVICES" | grep -Fxq lyrics; then
+            echo "ERROR: lyrics still in compose"
+            exit 41
+          fi
+          if sudo docker ps -a --format '{{.Names}}' | grep -Fxq djgabo-cdg-lyrics; then
+            echo "ERROR: lyrics container exists"
+            exit 42
+          fi
+          if sudo docker image inspect djgabo-youtube-lyrics:latest >/dev/null 2>&1; then
+            echo "ERROR: lyrics image exists"
+            exit 43
+          fi
+          echo "OK: retired CDG lyrics service fully absent"
+
+          echo
+          echo "=== AFTER ==="
+          df -h /
+          free -h
+          sudo docker system df
+          REMOTE
+
+      - name: Commit result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/purge-cdg-lyrics-live-result.txt
+          git commit -m "diag: record full CDG lyrics retirement" || exit 0
+          git push origin HEAD:main
