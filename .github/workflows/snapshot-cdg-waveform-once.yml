@@ -125,12 +125,25 @@ jobs:
             ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/renderer/$rel" > "diagnostics/cdg-renderer-live/$rel"
           done
 
+      - name: Capture renderer binary assets for IA clone
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics/cdg-renderer-binary
+          for name in intro.png intro_black.png intro_djgabo_cdg.png intro_djgabo_original.png outro.png
+          do
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo base64 -w0 /opt/djgabo-cdg/renderer/assets/$name" > "diagnostics/cdg-renderer-binary/$name.b64"
+          done
+
       - name: Commit snapshot
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt diagnostics/cdg-editor-live-service.txt diagnostics/cdg-editor-live-env-example.txt diagnostics/cdg-editor-live-gunicorn.py diagnostics/cdg-renderer-live
+          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt diagnostics/cdg-editor-live-service.txt diagnostics/cdg-editor-live-env-example.txt diagnostics/cdg-editor-live-gunicorn.py diagnostics/cdg-renderer-live diagnostics/cdg-renderer-binary
           if git diff --cached --quiet; then
             echo "No snapshot changes"
             exit 0
