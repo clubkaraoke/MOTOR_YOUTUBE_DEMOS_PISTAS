@@ -28,6 +28,68 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519"
           ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
 
+      - name: Fix isolated env and Nginx route
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" deploy/nginx-panel-integrado.conf "$OVH_USER@$OVH_HOST:/tmp/nginx-panel-cdg-editor-ia.conf"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          sudo mkdir -p /etc/djgabo-cdg-ia-test
+          sudo cp /etc/djgabo-cdg/djgabo-cdg.env /etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env')
+          lines=p.read_text(encoding='utf-8').splitlines()
+          overrides={
+              'DJGABO_ENV':'test',
+              'DJGABO_TEST_MODE':'1',
+              'DJGABO_URL_PREFIX':'/cdg-editor-ia',
+              'DJGABO_DATA_DIR':'/var/lib/djgabo-cdg-ia-test',
+              'DJGABO_CONFIG_DIR':'/var/lib/djgabo-cdg-ia-test/config',
+              'DJGABO_DB_PATH':'/var/lib/djgabo-cdg-ia-test/local.db',
+              'DJGABO_JOBS_DIR':'/var/lib/djgabo-cdg-ia-test/jobs',
+              'DJGABO_OUTPUT_DIR':'/var/lib/djgabo-cdg-ia-test/output',
+              'DJGABO_VOICE_CACHE_DIR':'/var/lib/djgabo-cdg-ia-test/voice_cache',
+              'DJGABO_SKIP_PREV_MIGRATION':'1',
+              'DJGABO_BIND':'127.0.0.1:8775',
+              'DJGABO_PUBLIC_BASE_URL':'https://panel.kitkaraoke.com/cdg-editor-ia',
+              'DROPBOX_REDIRECT_URI':'https://panel.kitkaraoke.com/cdg-editor-ia/dropbox/callback',
+              'DROPBOX_APP_KEY':'',
+              'DROPBOX_APP_SECRET':'',
+              'DROPBOX_REFRESH_TOKEN':'',
+              'GUNICORN_CMD_ARGS':'',
+          }
+          out=[]; seen=set()
+          for line in lines:
+              if '=' in line and not line.lstrip().startswith('#'):
+                  key=line.split('=',1)[0].strip()
+                  if key in overrides:
+                      out.append(key+'='+overrides[key]); seen.add(key); continue
+              out.append(line)
+          for key,val in overrides.items():
+              if key not in seen: out.append(key+'='+val)
+          p.write_text('\n'.join(out).rstrip()+'\n',encoding='utf-8')
+          PY
+          sudo chmod 600 /etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env
+          sudo sed -i 's#^EnvironmentFile=.*#EnvironmentFile=/etc/djgabo-cdg-ia-test/djgabo-cdg-ia-test.env#' /etc/systemd/system/djgabo-cdg-ia-test.service
+          sudo sed -i '/^Environment=DJGABO_/d;/^Environment=DROPBOX_/d' /etc/systemd/system/djgabo-cdg-ia-test.service
+          sudo systemctl daemon-reload
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/ia-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          sudo cp /tmp/nginx-panel-cdg-editor-ia.conf /etc/nginx/sites-available/panel.kitkaraoke.com
+          sudo nginx -t
+          sudo systemctl reload nginx
+          REMOTE
+
       - name: Inspect test service
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
