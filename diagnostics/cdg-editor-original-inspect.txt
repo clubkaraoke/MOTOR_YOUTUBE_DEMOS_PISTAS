@@ -1,17 +1,159 @@
-TIMESTAMP=2026-09-02T22:18:52+00:00
-ROOT=/opt/djgabo-cdg/editor_v1
+TIMESTAMP=2026-09-02T22:20:21+00:00
+ROOT=/opt/djgabo-cdg
 
 === EXISTS ===
 ROOT_EXISTS=yes
 
 === DISK ===
-196K	/opt/djgabo-cdg/editor_v1
+57M	/opt/djgabo-cdg
 
 === TOP LEVEL ===
-f index.html 196251 bytes
+d .venv 4096 bytes
+d __pycache__ 4096 bytes
+d deploy 4096 bytes
+d deploy-backups 4096 bytes
+d editor_v1 4096 bytes
+d legacy_seed 4096 bytes
+d renderer 4096 bytes
+d tests 4096 bytes
+f .gitignore 134 bytes
+f AUDITORIA_LIMPIEZA_LOCAL_16.txt 5308 bytes
+f CAMBIOS_LOCAL_05.txt 918 bytes
+f CAMBIOS_LOCAL_06.txt 617 bytes
+f CAMBIOS_LOCAL_10.txt 831 bytes
+f CAMBIOS_LOCAL_11.txt 1613 bytes
+f CAMBIOS_LOCAL_12.txt 705 bytes
+f CAMBIOS_LOCAL_13.txt 762 bytes
+f CAMBIOS_LOCAL_14.txt 1694 bytes
+f CAMBIOS_LOCAL_15.txt 1082 bytes
+f CAMBIOS_LOCAL_16.txt 872 bytes
+f CAMBIOS_LOCAL_16_1.txt 600 bytes
+f CAMBIOS_LOCAL_16_11.txt 2473 bytes
+f CAMBIOS_LOCAL_16_12.txt 4363 bytes
+f CAMBIOS_LOCAL_16_13.txt 2103 bytes
+f CAMBIOS_LOCAL_16_2.txt 744 bytes
+f CAMBIOS_LOCAL_16_3.txt 464 bytes
+f CAMBIOS_LOCAL_16_4.txt 803 bytes
+f CAMBIOS_LOCAL_16_ONLINE.txt 1303 bytes
+f CAMBIOS_SERVER_16_14.txt 1021 bytes
+f CODIGO_GS_COMPLETO_LOCAL16_ONLINE.gs 74978 bytes
+f CODIGO_GS_LOCAL16_2_PUENTE_DRIVE.gs 78527 bytes
+f INICIAR_PANEL.bat 1449 bytes
+f LEEME_PRIMERO.txt 4716 bytes
+f PASO_UNICO_DRIVE_ONLINE.txt 2218 bytes
+f QA_LOCAL_16_13.json 1272 bytes
+f QA_SYNC_PROTEGIDO_16_11.json 1544 bytes
+f README_SERVER_OVH.md 7547 bytes
+f panel.html 173016 bytes
+f requirements.txt 140 bytes
+f server.py 168361 bytes
+f server.py.orig 167093 bytes
+f server.py.pre_dropbox_csp_20260819_0642 139041 bytes
+f server.py.pre_master_name_20260819 139318 bytes
 
 === FILE TREE (NO SECRETS) ===
-index.html|196251 bytes
+.gitignore|134 bytes
+.venv/bin/Activate.ps1|9033 bytes
+.venv/bin/activate.csh|919 bytes
+.venv/bin/activate.fish|2194 bytes
+.venv/bin/activate|2032 bytes
+.venv/bin/flask|173 bytes
+.venv/bin/futurize|180 bytes
+.venv/bin/gunicornc|180 bytes
+.venv/bin/gunicorn|182 bytes
+.venv/bin/idna|172 bytes
+.venv/bin/normalizer|198 bytes
+.venv/bin/pasteurize|182 bytes
+.venv/bin/pip3.12|238 bytes
+.venv/bin/pip3|238 bytes
+.venv/bin/pip|238 bytes
+.venv/bin/wheel|231 bytes
+.venv/pyvenv.cfg|160 bytes
+AUDITORIA_LIMPIEZA_LOCAL_16.txt|5308 bytes
+CAMBIOS_LOCAL_05.txt|918 bytes
+CAMBIOS_LOCAL_06.txt|617 bytes
+CAMBIOS_LOCAL_10.txt|831 bytes
+CAMBIOS_LOCAL_11.txt|1613 bytes
+CAMBIOS_LOCAL_12.txt|705 bytes
+CAMBIOS_LOCAL_13.txt|762 bytes
+CAMBIOS_LOCAL_14.txt|1694 bytes
+CAMBIOS_LOCAL_15.txt|1082 bytes
+CAMBIOS_LOCAL_16.txt|872 bytes
+CAMBIOS_LOCAL_16_1.txt|600 bytes
+CAMBIOS_LOCAL_16_11.txt|2473 bytes
+CAMBIOS_LOCAL_16_12.txt|4363 bytes
+CAMBIOS_LOCAL_16_13.txt|2103 bytes
+CAMBIOS_LOCAL_16_2.txt|744 bytes
+CAMBIOS_LOCAL_16_3.txt|464 bytes
+CAMBIOS_LOCAL_16_4.txt|803 bytes
+CAMBIOS_LOCAL_16_ONLINE.txt|1303 bytes
+CAMBIOS_SERVER_16_14.txt|1021 bytes
+CODIGO_GS_COMPLETO_LOCAL16_ONLINE.gs|74978 bytes
+CODIGO_GS_LOCAL16_2_PUENTE_DRIVE.gs|78527 bytes
+INICIAR_PANEL.bat|1449 bytes
+LEEME_PRIMERO.txt|4716 bytes
+PASO_UNICO_DRIVE_ONLINE.txt|2218 bytes
+QA_LOCAL_16_13.json|1272 bytes
+QA_SYNC_PROTEGIDO_16_11.json|1544 bytes
+README_SERVER_OVH.md|7547 bytes
+__pycache__/server.cpython-312.pyc|269638 bytes
+deploy-backups/20260819-sheet-master-141521/panel.html|170535 bytes
+deploy-backups/20260819-sheet-master-141521/server.py|145759 bytes
+deploy-backups/20260819-sheet-master-141935/panel.html|172357 bytes
+deploy-backups/20260819-sheet-master-141935/server.py|166699 bytes
+deploy-backups/20260819-sheet-master-142455/panel.html|172357 bytes
+deploy-backups/20260819-sheet-master-142455/server.py|166925 bytes
+deploy-backups/20260901-003601-mobile-editor-v2/editor_v1-index.html|169455 bytes
+deploy-backups/20260901-003601-mobile-editor-v2/panel.html|172357 bytes
+deploy-backups/20260901-053545-waveform-zoom-v1/editor_v1-index.html|178643 bytes
+deploy-backups/20260901-055541-waveform-navigator-v1/editor_v1-index.html|187724 bytes
+deploy/__pycache__/preflight.cpython-312.pyc|7405 bytes
+deploy/backup_production.py|2599 bytes
+deploy/djgabo-cdg-backup.service|450 bytes
+deploy/djgabo-cdg-backup.timer|163 bytes
+deploy/djgabo-cdg.service|598 bytes
+deploy/env.production.example|1679 bytes
+deploy/gunicorn.conf.py|782 bytes
+deploy/inspect_sheet_master_status.py|795 bytes
+deploy/install_server.sh|3563 bytes
+deploy/nginx-bootstrap.conf.template|616 bytes
+deploy/nginx-djgabo-cdg.conf.template|1980 bytes
+deploy/preflight.py|4809 bytes
+deploy/reconcile_sheet_master.py|888 bytes
+deploy/smoke_test.py|2789 bytes
+deploy/verify_sheet_bridge.py|1570 bytes
+editor_v1/index.html|196251 bytes
+legacy_seed/legacy_jobs.json|187307 bytes
+panel.html|173016 bytes
+renderer/assets/Antonio-LICENSE.txt|4399 bytes
+renderer/assets/advances-16.json|1612 bytes
+renderer/assets/intro.png|892 bytes
+renderer/assets/intro_black.png|268 bytes
+renderer/assets/intro_djgabo_cdg.png|892 bytes
+renderer/assets/intro_djgabo_original.png|12444 bytes
+renderer/assets/outro.png|331 bytes
+renderer/check_template.py|3517 bytes
+renderer/normalize.py|26623 bytes
+renderer/preview.py|2893 bytes
+renderer/render.py|12318 bytes
+renderer/requirements.txt|80 bytes
+renderer/style.json|1990 bytes
+renderer/vendor/README.md|581 bytes
+renderer/vendor/cdgmaker/LICENSE|1074 bytes
+renderer/vendor/cdgmaker/VENDOR_COMMIT.txt|41 bytes
+renderer/vendor/cdgmaker/__init__.py|0 bytes
+renderer/vendor/cdgmaker/cdg.py|6733 bytes
+renderer/vendor/cdgmaker/composer.py|91949 bytes
+renderer/vendor/cdgmaker/config.py|4125 bytes
+renderer/vendor/cdgmaker/pack.py|15870 bytes
+renderer/vendor/cdgmaker/render.py|12598 bytes
+renderer/vendor/cdgmaker/utils.py|2945 bytes
+requirements.txt|140 bytes
+server.py.orig|167093 bytes
+server.py.pre_dropbox_csp_20260819_0642|139041 bytes
+server.py.pre_master_name_20260819|139318 bytes
+server.py|168361 bytes
+tests/test_server_production.py|5225 bytes
 
 === GIT ===
 IS_GIT=no
