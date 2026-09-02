@@ -1,0 +1,67 @@
+name: Diagnose CDG IA CPU worker crash once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-cdg-ia-cpu-worker-crash-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture worker crash
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-cpu-worker-crash.txt <<'REMOTE'
+          set +e
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== PS ==="
+          sudo docker ps -a --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}} image={{.Image}}'
+          echo
+          echo "=== INSPECT STATE ==="
+          sudo docker inspect cdg-ai-sync-cpu --format 'status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}} oom={{.State.OOMKilled}} restart={{.RestartCount}} memory={{.HostConfig.Memory}} cpus={{.HostConfig.NanoCpus}}'
+          echo
+          echo "=== LOGS ==="
+          sudo docker logs --tail 250 cdg-ai-sync-cpu 2>&1
+          echo
+          echo "=== IMAGE SIZE ==="
+          sudo docker images cdg-ia-sync-test-cdg-ai-sync-cpu --format 'repo={{.Repository}} size={{.Size}} id={{.ID}}'
+          echo
+          echo "=== SERVER ==="
+          df -h /
+          free -h
+          sudo du -sh /data/cdg-ai-models 2>/dev/null
+          REMOTE
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ia-cpu-worker-crash.txt
+          git commit -m "diag: capture CPU worker crash" || exit 0
+          git push origin HEAD:main
