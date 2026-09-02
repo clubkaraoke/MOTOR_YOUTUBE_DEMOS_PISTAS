@@ -1,0 +1,69 @@
+TIMESTAMP=2026-09-02T08:27:57+00:00
+=== BEFORE ===
+name=cdg-ai-sync-cpu mem=892.7MiB / 5GiB cpu=0.23%
+#1 [internal] load local bake definitions
+#1 reading from stdin 570B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 726B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 0.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 42.36kB done
+#5 DONE 0.0s
+
+#6 [1/7] FROM docker.io/library/python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534
+#6 resolve docker.io/library/python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 0.0s done
+#6 DONE 0.0s
+
+#7 [2/7] WORKDIR /app
+#7 CACHED
+
+#8 [4/7] RUN python -m pip install --upgrade pip     && python -m pip install        torch==2.8.0        torchaudio==2.8.0        --index-url https://download.pytorch.org/whl/cpu
+#8 CACHED
+
+#9 [3/7] RUN apt-get update     && apt-get install -y --no-install-recommends ffmpeg libgomp1 curl ca-certificates     && rm -rf /var/lib/apt/lists/*
+#9 CACHED
+
+#10 [5/7] COPY requirements.txt .
+#10 CACHED
+
+#11 [6/7] RUN python -m pip install -r requirements.txt
+#11 CACHED
+
+#12 [7/7] COPY app.py .
+#12 DONE 0.0s
+
+#13 exporting to image
+#13 exporting layers 0.0s done
+#13 exporting manifest sha256:637b056e8d48b2b77bf6b2ee1bf392368200cc71bb8bc3007ee0fa35631b307a done
+#13 exporting config sha256:2c18cdccf553e605e70fd840b88d83369682f74028d14b4b6025b4797702e0ae done
+#13 exporting attestation manifest sha256:baf1009f741c9265e25abd4621afa59a6e50d2155d7ea7e04a75b45e7646ade9 done
+#13 exporting manifest list sha256:18fd53694cb28f9bf8a9ff45b9bf6b5f9242cdbf35edf92dd28b715fba05a1d9 0.0s done
+#13 naming to docker.io/library/cdg-ia-sync-test-cdg-ai-sync-cpu:latest done
+#13 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ai-sync-cpu:latest 0.0s done
+#13 DONE 0.1s
+
+#14 resolving provenance for metadata file
+#14 DONE 0.0s
+{"ok":true,"engine":"whisperx-style-local-base-v2","device":"cpu","compute_type":"int8","whisper_model":"small","align_model":"VOXPOPULI_ASR_BASE_10K_ES","threads":4,"model_root":"/models","torch":"2.8.0+cpu","torchaudio":"2.8.0+cpu"}
+=== PYTORCH INFERENCE TENSOR REGRESSION ===
+INFERENCE_TENSOR_CLONE_TEST=PASS torch.Size([1, 8, 4])
+=== ALIGN_LINE REGRESSION ===
+ALIGN_LINE_RESULT {0: {'start': 0.0, 'end': 0.323, 'confidence': 0.011, 'vocal_support': 1.0}}
+ALIGN_LINE_WARNINGS []
+ALIGN_LINE_REGRESSION=PASS
+=== AFTER ===
+name=cdg-ai-sync-cpu status=Up 13 seconds
+name=cdg-ai-sync-cpu mem=171.6MiB / 5GiB cpu=0.23%
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       3.2Gi       1.5Gi       2.9Mi       7.0Gi       8.2Gi
+Swap:             0B          0B          0B
