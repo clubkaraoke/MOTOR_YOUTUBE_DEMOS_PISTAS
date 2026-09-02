@@ -1,0 +1,95 @@
+name: Inspect original CDG editor once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-editor-original-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect original editor read-only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-editor-original-inspect.txt <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg/editor_v1
+          echo "TIMESTAMP=$(date -Is)"
+          echo "ROOT=$ROOT"
+          echo
+          echo "=== EXISTS ==="
+          sudo test -d "$ROOT" && echo "ROOT_EXISTS=yes" || { echo "ROOT_EXISTS=no"; exit 2; }
+          echo
+          echo "=== DISK ==="
+          sudo du -sh "$ROOT"
+          echo
+          echo "=== TOP LEVEL ==="
+          sudo find "$ROOT" -maxdepth 1 -mindepth 1 -printf '%y %f %s bytes\n' | sort
+          echo
+          echo "=== FILE TREE (NO SECRETS) ==="
+          sudo find "$ROOT" -maxdepth 4 -type f \
+            ! -name '.env' \
+            ! -iname '*secret*' \
+            ! -iname '*token*' \
+            ! -iname '*credential*' \
+            ! -iname '*key*' \
+            -printf '%P|%s bytes\n' | sort
+          echo
+          echo "=== GIT ==="
+          if sudo test -d "$ROOT/.git"; then
+            echo "IS_GIT=yes"
+            sudo git -C "$ROOT" status --short || true
+            sudo git -C "$ROOT" remote -v || true
+            sudo git -C "$ROOT" log -1 --oneline || true
+          else
+            echo "IS_GIT=no"
+          fi
+          echo
+          echo "=== RELATED SERVICES ==="
+          sudo docker ps --format 'name={{.Names}} ports={{.Ports}} status={{.Status}}' | grep -Ei 'cdg|karaoke' || true
+          echo
+          echo "=== PORT 8765 ==="
+          (sudo ss -ltnp 2>/dev/null || true) | grep ':8765' || true
+          echo
+          echo "=== INDEX MARKERS ==="
+          if sudo test -f "$ROOT/index.html"; then
+            sudo wc -l "$ROOT/index.html"
+            sudo grep -nE '<title>|SINCRONIZAR|CREAR CDG|Dropbox|Drive|8765' "$ROOT/index.html" | head -80 || true
+          fi
+          REMOTE
+
+      - name: Commit inspection
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-editor-original-inspect.txt
+          git commit -m "diag: inspect original CDG editor for safe clone" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
