@@ -1,0 +1,109 @@
+name: Verify CDG IA BASE v2 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-cdg-ia-base-v2-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deployed JS syntax from source
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/clubkaraoke/CDG_IA_SYNC_TEST/main/static/app.js -o /tmp/cdg-lab-app.js
+          node --check /tmp/cdg-lab-app.js
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Run synthetic verification
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-base-v2-verify.txt <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== HEALTH ==="
+          curl -fsS http://127.0.0.1:8098/health
+          echo
+
+          echo "=== REPEATED ANCHOR TEST ==="
+          sudo docker exec -i cdg-ai-sync-cpu python - <<'PY'
+          from app import build_line_windows
+          lines=[{"index":0,"source_index":0,"text":"Y AHORA YA TE OLVIDE","word_indices":[0,1,2,3,4]}]
+          master=[{"index":i,"line_index":0,"text":t,"norm":t.lower()} for i,t in enumerate(["Y","AHORA","YA","TE","OLVIDE"])]
+          asr=[
+            {"text":"Y","norm":"y","start":154.21,"end":154.25,"probability":0.90},
+            {"text":"AHORA","norm":"ahora","start":155.291,"end":155.751,"probability":0.90},
+            {"text":"YA","norm":"ya","start":157.392,"end":157.692,"probability":0.80},
+            {"text":"TE","norm":"te","start":171.659,"end":171.719,"probability":0.80},
+            {"text":"OLVIDE","norm":"olvide","start":171.899,"end":172.259,"probability":0.80},
+          ]
+          mapping={0:0,1:1,2:2,3:3,4:4}
+          w=build_line_windows(lines,master,asr,mapping,267.18)[0]
+          print(w)
+          assert w["anchors"] == 3, w
+          assert w["anchors_rejected"] == 2, w
+          assert w["anchor_cluster_count"] == 2, w
+          assert w["end"] < 162.0, w
+          print("REPEATED_ANCHOR_TEST=PASS")
+          PY
+
+          echo "=== RMS MASK TEST ==="
+          sudo docker exec -i cdg-ai-sync-cpu python - <<'PY'
+          import torch
+          from app import build_rms_activity
+          sr=16000
+          silence=torch.zeros(sr)
+          tone=0.25*torch.sin(2*torch.pi*220*torch.arange(sr)/sr)
+          wav=torch.cat([silence,tone,silence]).unsqueeze(0)
+          states,hop,meta=build_rms_activity(wav,sr)
+          print(meta)
+          assert meta["silent_ratio"] > 0.45, meta
+          assert meta["active_ratio"] > 0.15, meta
+          print("RMS_MASK_TEST=PASS")
+          PY
+
+          echo "=== UI VERIFY ==="
+          curl -fsS http://127.0.0.1:8097/ | grep -E 'jobMetricsCard|Métricas automáticas'
+          curl -fsS http://127.0.0.1:8097/static/app.js | grep -E 'renderJobMetrics|qaLabel' | head
+
+          echo "=== CONTAINERS ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} mem={{.MemUsage}} cpu={{.CPUPerc}}'
+          REMOTE
+
+      - name: Commit result
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-ia-base-v2-verify.txt ]; then
+            git add diagnostics/cdg-ia-base-v2-verify.txt
+            git commit -m "diag: verify CDG IA BASE v2" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
