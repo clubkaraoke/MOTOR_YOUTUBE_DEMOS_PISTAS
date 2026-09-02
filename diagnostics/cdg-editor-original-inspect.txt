@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-02T22:20:21+00:00
+TIMESTAMP=2026-09-02T22:27:50+00:00
 ROOT=/opt/djgabo-cdg
 
 === EXISTS ===
@@ -154,6 +154,9 @@ server.py.pre_dropbox_csp_20260819_0642|139041 bytes
 server.py.pre_master_name_20260819|139318 bytes
 server.py|168361 bytes
 tests/test_server_production.py|5225 bytes
+
+=== DATA DIR SIZES ===
+367M	/var/lib/djgabo-cdg
 
 === GIT ===
 IS_GIT=no
