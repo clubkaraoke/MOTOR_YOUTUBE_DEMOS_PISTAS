@@ -1,4 +1,5 @@
 name: Deploy CDG IA ElevenLabs Scribe LAB once
+# trigger-secret-refresh
 
 on:
   workflow_dispatch:
