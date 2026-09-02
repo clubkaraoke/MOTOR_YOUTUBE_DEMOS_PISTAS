@@ -95,12 +95,23 @@ jobs:
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/panel.html' > diagnostics/cdg-editor-live-panel.html
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/requirements.txt' > diagnostics/cdg-editor-live-requirements.txt
 
+      - name: Capture clone-safe deploy metadata
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/deploy/djgabo-cdg.service' > diagnostics/cdg-editor-live-service.txt
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/deploy/env.production.example' > diagnostics/cdg-editor-live-env-example.txt
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/deploy/gunicorn.conf.py' > diagnostics/cdg-editor-live-gunicorn.py
+
       - name: Commit snapshot
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt
+          git add diagnostics/cdg-waveform-live.txt diagnostics/cdg-editor-live-index.html diagnostics/cdg-editor-live-server.py diagnostics/cdg-editor-live-panel.html diagnostics/cdg-editor-live-requirements.txt diagnostics/cdg-editor-live-service.txt diagnostics/cdg-editor-live-env-example.txt diagnostics/cdg-editor-live-gunicorn.py
           if git diff --cached --quiet; then
             echo "No snapshot changes"
             exit 0
