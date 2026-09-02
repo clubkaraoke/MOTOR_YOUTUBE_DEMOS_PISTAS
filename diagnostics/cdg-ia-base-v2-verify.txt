@@ -1,0 +1,22 @@
+TIMESTAMP=2026-09-02T08:18:36+00:00
+=== HEALTH ===
+{"ok":true,"engine":"whisperx-style-local-base-v2","device":"cpu","compute_type":"int8","whisper_model":"small","align_model":"VOXPOPULI_ASR_BASE_10K_ES","threads":4,"model_root":"/models","torch":"2.8.0+cpu","torchaudio":"2.8.0+cpu"}
+=== REPEATED ANCHOR TEST ===
+{'known': True, 'start': 153.66, 'end': 159.802, 'anchors': 3, 'anchors_total': 5, 'anchors_rejected': 2, 'anchor_cluster_count': 2, 'anchor_start': 154.21, 'anchor_end': 157.692, 'anchor_local_first': 0, 'anchor_local_last': 2, 'rejected_anchor_times': [171.659, 171.899], 'anchor_clusters': [{'count': 3, 'first_local_pos': 0, 'last_local_pos': 2, 'start': 154.21, 'end': 157.692, 'span_s': 3.482, 'avg_probability': 0.867, 'score': 11.999}, {'count': 2, 'first_local_pos': 3, 'last_local_pos': 4, 'start': 171.659, 'end': 172.259, 'span_s': 0.6, 'avg_probability': 0.8, 'score': 8.169}], 'window_span_s': 6.142}
+REPEATED_ANCHOR_TEST=PASS
+=== RMS MASK TEST ===
+{'frame_ms': 30, 'hop_ms': 10, 'noise_p20_db': -120.0, 'signal_p90_db': -15.03, 'threshold_db': -45.03, 'ambiguous_threshold_db': -53.03, 'active_ratio': 0.342, 'ambiguous_ratio': 0.0, 'silent_ratio': 0.658}
+RMS_MASK_TEST=PASS
+=== UI VERIFY ===
+        <section id="jobMetricsCard" class="job-metrics hidden">
+              <strong>📊 Métricas automáticas del trabajo</strong>
+function qaLabel(status) {
+function renderJobMetrics(result) {
+      <td><span class="qa-pill${qaClass}"${qaTitle}>${qaLabel(qa)}</span></td>
+    renderJobMetrics(result);
+  renderJobMetrics(state.lastAiResult);
+=== CONTAINERS ===
+name=cdg-ia-sync-test status=Up About a minute
+name=cdg-ai-sync-cpu status=Up About a minute
+name=cdg-ia-sync-test mem=35.62MiB / 11.4GiB cpu=0.16%
+name=cdg-ai-sync-cpu mem=566.4MiB / 5GiB cpu=0.22%
