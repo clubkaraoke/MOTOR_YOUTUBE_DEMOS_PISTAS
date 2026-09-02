@@ -1,0 +1,138 @@
+name: Deploy CDG IA BASE v2 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-base-v2-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy and verify isolated LAB
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-base-v2-deploy.txt <<'REMOTE'
+          set -euo pipefail
+          TARGET=/opt/cdg-ia-sync-test
+          STAGE=/tmp/cdg-ia-sync-test-v2
+          ARCHIVE=/tmp/cdg-ia-sync-test-v2.tar.gz
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== BEFORE ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} mem={{.MemUsage}} cpu={{.CPUPerc}}'
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          mkdir -p "$STAGE"
+          curl -fL --retry 3 -o "$ARCHIVE" https://github.com/clubkaraoke/CDG_IA_SYNC_TEST/archive/refs/heads/main.tar.gz
+          tar -xzf "$ARCHIVE" -C "$STAGE" --strip-components=1
+
+          echo "=== STATIC CHECKS ==="
+          python3 -m py_compile "$STAGE/app/main.py" "$STAGE/cpu_worker/app.py"
+          if command -v node >/dev/null 2>&1; then
+            node --check "$STAGE/static/app.js"
+          else
+            echo "node unavailable on OVH; JS runtime check skipped"
+          fi
+          grep -q 'jobMetricsCard' "$STAGE/static/index.html"
+          grep -q 'adaptive-rms-soft-ctc' "$STAGE/cpu_worker/app.py"
+
+          sudo rsync -a --delete \
+            --exclude='.env' \
+            --exclude='/runtime/' \
+            "$STAGE/" "$TARGET/"
+
+          cd "$TARGET"
+          echo "=== BUILD LAB ONLY ==="
+          sudo docker compose -p cdg-ia-sync-test build cdg-ai-sync-cpu cdg-ia-sync-test
+          sudo docker compose -p cdg-ia-sync-test up -d cdg-ai-sync-cpu cdg-ia-sync-test
+
+          echo "=== WAIT HEALTH ==="
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8098/health >/tmp/worker-health.json \
+              && curl -fsS http://127.0.0.1:8097/ >/tmp/lab.html; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          [ "$ok" = 1 ]
+          cat /tmp/worker-health.json
+          echo
+          grep -q 'whisperx-style-local-base-v2' /tmp/worker-health.json
+          grep -q 'jobMetricsCard' /tmp/lab.html
+          curl -fsS http://127.0.0.1:8097/static/app.js | grep -q 'renderJobMetrics'
+
+          echo "=== SYNTHETIC REPEATED-ANCHOR TEST ==="
+          sudo docker exec cdg-ai-sync-cpu python - <<'PY'
+          from app import build_line_windows
+          lines=[{"index":0,"source_index":0,"text":"Y AHORA YA TE OLVIDE","word_indices":[0,1,2,3,4]}]
+          master=[{"index":i,"line_index":0,"text":t,"norm":t.lower()} for i,t in enumerate(["Y","AHORA","YA","TE","OLVIDE"])]
+          asr=[
+            {"text":"Y","norm":"y","start":154.21,"end":154.25,"probability":0.9},
+            {"text":"AHORA","norm":"ahora","start":155.291,"end":155.751,"probability":0.9},
+            {"text":"YA","norm":"ya","start":157.392,"end":157.692,"probability":0.8},
+            {"text":"TE","norm":"te","start":171.659,"end":171.719,"probability":0.8},
+            {"text":"OLVIDE","norm":"olvide","start":171.899,"end":172.259,"probability":0.8},
+          ]
+          mapping={0:0,1:1,2:2,3:3,4:4}
+          w=build_line_windows(lines,master,asr,mapping,267.18)[0]
+          print(w)
+          assert w["anchors"] == 3, w
+          assert w["anchors_rejected"] == 2, w
+          assert w["anchor_cluster_count"] == 2, w
+          assert w["end"] < 162.0, w
+          print("SYNTHETIC_ANCHOR_TEST=PASS")
+          PY
+
+          echo "=== WARMUP ==="
+          curl -fsS -X POST http://127.0.0.1:8098/warmup
+          echo
+
+          echo "=== AFTER ==="
+          sudo docker ps --filter name=cdg-ia-sync-test --filter name=cdg-ai-sync-cpu --format 'name={{.Names}} status={{.Status}}'
+          sudo docker stats --no-stream cdg-ia-sync-test cdg-ai-sync-cpu --format 'name={{.Name}} mem={{.MemUsage}} cpu={{.CPUPerc}}'
+          free -h
+          df -h /
+
+          rm -rf "$STAGE" "$ARCHIVE"
+          REMOTE
+
+      - name: Commit result
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-ia-base-v2-deploy.txt ]; then
+            git add diagnostics/cdg-ia-base-v2-deploy.txt
+            git commit -m "diag: record CDG IA BASE v2 deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
