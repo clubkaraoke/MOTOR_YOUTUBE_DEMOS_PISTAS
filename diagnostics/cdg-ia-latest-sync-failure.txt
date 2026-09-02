@@ -1,0 +1,57 @@
+TIMESTAMP=2026-09-02T07:12:21+00:00
+
+=== WEB LOGS ===
+2026-09-02T07:00:10.566325235Z INFO:     Started server process [1]
+2026-09-02T07:00:10.566415459Z INFO:     Waiting for application startup.
+2026-09-02T07:00:10.566596726Z INFO:     Application startup complete.
+2026-09-02T07:00:10.571195489Z INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-09-02T07:00:11.623045954Z INFO:     172.26.0.1:41734 - "GET / HTTP/1.1" 200 OK
+2026-09-02T07:00:11.708506786Z INFO:     172.26.0.1:41738 - "GET /api/local/health HTTP/1.1" 200 OK
+2026-09-02T07:01:41.051303552Z INFO:     172.26.0.1:47400 - "GET / HTTP/1.1" 200 OK
+2026-09-02T07:01:41.078635681Z INFO:     172.26.0.1:47402 - "GET /api/local/health HTTP/1.1" 200 OK
+2026-09-02T07:03:39.967082291Z INFO:     172.26.0.1:53608 - "GET /?utm_source=chatgpt.com HTTP/1.0" 200 OK
+2026-09-02T07:03:40.178856106Z INFO:     172.26.0.1:53616 - "GET /static/styles.css HTTP/1.0" 200 OK
+2026-09-02T07:03:40.182356226Z INFO:     172.26.0.1:53620 - "GET /static/app.js HTTP/1.0" 200 OK
+2026-09-02T07:03:40.461452399Z INFO:     172.26.0.1:53632 - "GET /api/local/health HTTP/1.0" 200 OK
+2026-09-02T07:07:15.326393616Z INFO:     172.26.0.1:47622 - "POST /api/local/align HTTP/1.0" 200 OK
+2026-09-02T07:07:15.621278329Z INFO:     172.26.0.1:49406 - "GET /api/local/health HTTP/1.0" 200 OK
+2026-09-02T07:08:47.122486083Z INFO:     172.26.0.1:54874 - "POST /api/local/align HTTP/1.0" 200 OK
+2026-09-02T07:08:47.412610195Z INFO:     172.26.0.1:54792 - "GET /api/local/health HTTP/1.0" 200 OK
+
+=== WORKER LOGS ===
+2026-09-02T06:57:10.952142706Z INFO:     Started server process [1]
+2026-09-02T06:57:10.952268642Z INFO:     Waiting for application startup.
+2026-09-02T06:57:10.952478039Z INFO:     Application startup complete.
+2026-09-02T06:57:10.953284982Z INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-09-02T06:57:11.296956824Z INFO:     172.26.0.1:51880 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T06:57:12.887026432Z Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-09-02T06:57:18.140716230Z Downloading: "https://download.pytorch.org/torchaudio/models/wav2vec2_voxpopuli_base_10k_asr_es.pt" to /models/torch/wav2vec2_voxpopuli_base_10k_asr_es.pt
+2026-09-02T06:57:19.856615827Z   0%|          | 0.00/360M [00:00<?, ?B/s]  6%|▌         | 20.5M/360M [00:00<00:01, 214MB/s] 12%|█▏        | 44.9M/360M [00:00<00:01, 238MB/s] 20%|█▉        | 71.5M/360M [00:00<00:01, 256MB/s] 27%|██▋       | 96.0M/360M [00:00<00:01, 251MB/s] 33%|███▎      | 120M/360M [00:00<00:01, 249MB/s]  40%|███▉      | 144M/360M [00:00<00:00, 248MB/s] 46%|████▋     | 167M/360M [00:00<00:00, 246MB/s] 53%|█████▎    | 191M/360M [00:00<00:00, 246MB/s] 60%|█████▉    | 214M/360M [00:00<00:00, 246MB/s] 66%|██████▌   | 238M/360M [00:01<00:00, 245MB/s] 73%|███████▎  | 262M/360M [00:01<00:00, 242MB/s] 79%|███████▉  | 286M/360M [00:01<00:00, 245MB/s] 86%|████████▌ | 309M/360M [00:01<00:00, 245MB/s] 92%|█████████▏| 333M/360M [00:01<00:00, 243MB/s] 99%|█████████▉| 356M/360M [00:01<00:00, 243MB/s]100%|██████████| 360M/360M [00:01<00:00, 244MB/s]
+2026-09-02T06:57:20.427208302Z INFO:     172.26.0.1:51886 - "POST /warmup HTTP/1.1" 200 OK
+2026-09-02T07:00:11.704600287Z INFO:     172.26.0.3:40028 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T07:01:41.076943687Z INFO:     172.26.0.3:56104 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T07:01:41.089849393Z INFO:     172.26.0.1:33062 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T07:03:40.459480081Z INFO:     172.26.0.3:45570 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T07:06:51.064098645Z /app/app.py:362: UserWarning: torchaudio.functional._alignment.forced_align has been deprecated. This deprecation is part of a large refactoring effort to transition TorchAudio into a maintenance phase. Please see https://github.com/pytorch/audio/issues/3902 for more information. It will be removed from the 2.9 release. 
+2026-09-02T07:06:51.064161800Z   alignment, scores = AF.forced_align(log_probs, targets, blank=0)
+2026-09-02T07:07:15.312823569Z INFO:     172.26.0.3:36548 - "POST /align HTTP/1.1" 200 OK
+2026-09-02T07:07:15.618392804Z INFO:     172.26.0.3:41118 - "GET /health HTTP/1.1" 200 OK
+2026-09-02T07:08:24.540426343Z /app/app.py:362: UserWarning: torchaudio.functional._alignment.forced_align has been deprecated. This deprecation is part of a large refactoring effort to transition TorchAudio into a maintenance phase. Please see https://github.com/pytorch/audio/issues/3902 for more information. It will be removed from the 2.9 release. 
+2026-09-02T07:08:24.540509878Z   alignment, scores = AF.forced_align(log_probs, targets, blank=0)
+2026-09-02T07:08:47.104332216Z INFO:     172.26.0.3:52390 - "POST /align HTTP/1.1" 200 OK
+2026-09-02T07:08:47.411109682Z INFO:     172.26.0.3:41196 - "GET /health HTTP/1.1" 200 OK
+
+=== STATES ===
+web status=running exit=0 oom=false restart=0
+worker status=running exit=0 oom=false restart=0
+
+=== STATS ===
+name=cdg-ia-sync-test ram=41.12MiB / 11.4GiB cpu=0.25%
+name=cdg-ai-sync-cpu ram=1.441GiB / 5GiB cpu=0.24%
+
+=== RESOURCES ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        96G   44G   53G  46% /
+               total        used        free      shared  buff/cache   available
+Mem:            11Gi       4.2Gi       670Mi       2.9Mi       6.9Gi       7.2Gi
+Swap:             0B          0B          0B
