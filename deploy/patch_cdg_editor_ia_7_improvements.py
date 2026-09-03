@@ -634,7 +634,7 @@ def ai_qr_import():
         return jsonify(ok=False,error='No se pudo importar el QR de UVR: '+str(e)),500
 
 
-"""
+'''
     server=replace_once(server,anchor,block+anchor,'server qr endpoint')
     SERVER.write_text(server,encoding='utf-8')
 
