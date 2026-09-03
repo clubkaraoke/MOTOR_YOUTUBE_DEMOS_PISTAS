@@ -1,0 +1,326 @@
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB LET-0079 Laura Leon - Mujeres Engañadas updated 03/09/2026 07:35
+92 'EN' start 94.48 end 94.62 spoken False
+93 'SUS' start 94.7 end 95.02 spoken False
+94 'REDES.' start 95.06 end 96.94 spoken False
+95 'PERO' start 97.28 end 97.7 spoken False
+96 'NO,' start 97.82 end 98.24 spoken False
+97 'YA' start 98.34 end 98.52 spoken False
+98 'NO.' start 98.62 end 99.24 spoken False
+99 'TÚ' start 105.26 end 105.44 spoken False
+100 'ME' start 105.56 end 105.76 spoken False
+101 'DESPRECIASTE,' start 105.82 end 107.52 spoken False
+102 'NO' start 107.76 end 108.04 spoken False
+103 'ME' start 108.12 end 108.24 spoken False
+104 'VALORASTE' start 108.34 end 109.6 spoken False
+105 'Y' start 109.76 end 109.86 spoken False
+106 'HOY' start 109.88 end 110.08 spoken False
+VOICE_GAPS [{"duration": 3.4, "end": 104.4, "kind": "untranscribed_voice", "peak_db": -10.8, "score": 1, "start": 101, "threshold_db": -43.7}, {"duration": 2.6, "end": 173.8, "kind": "untranscribed_voice", "peak_db": -12, "score": 1, "start": 171.2, "threshold_db": -43.7}, {"duration": 3.2, "end": 190.2, "kind": "untranscribed_voice", "peak_db": -12.6, "score": 1, "start": 187, "threshold_db": -43.7}, {"duration": 5, "end": 216.8, "kind": "untranscribed_voice", "peak_db": -17.1, "score": 1, "start": 211.8, "threshold_db": -43.7}]
+=== PREVIEW INSTRUMENTAL ===
+1805-  pvc.width = Math.max(1,Math.round(cssW*dpr*ss));
+1806-  pvc.height = Math.max(1,Math.round(cssH*dpr*ss));
+1807-  pvx.setTransform(dpr*scale*ss, 0, 0, dpr*scale*ss, 0, 0);
+1808-  pvx.imageSmoothingEnabled=true;
+1809-  if("imageSmoothingQuality" in pvx) pvx.imageSmoothingQuality="high";
+1810-}
+1811-
+1812-function pvMergedSpokenIntervals(){
+1813-  const join=PV.cfg.instrumental.spokenJoin ?? .75;
+1814-  const arr=S.words
+1815-    .filter(w=>w.spoken && w.start_time!==null)
+1816-    .map(w=>[w.start_time, w.end_time??(w.start_time+.05)])
+1817-    .sort((a,b)=>a[0]-b[0]);
+1818-  const out=[];
+1819-  for(const it of arr){
+1820-    if(!out.length || it[0]-out[out.length-1][1] > join) out.push(it.slice());
+1821-    else out[out.length-1][1]=Math.max(out[out.length-1][1],it[1]);
+1822-  }
+1823-  return out;
+1824-}
+1825:function pvInstrumentalState(t){
+1826-  const c=PV.cfg.instrumental;
+1827-  const sung=S.words.filter(w=>!w.spoken && w.start_time!==null).sort((a,b)=>a.start_time-b.start_time);
+1828-  if(!sung.length) return null;
+1829-  const spoken=pvMergedSpokenIntervals();
+1830-  for(let i=0;i<sung.length;i++){
+1831-    const next=sung[i], prev=i?sung[i-1]:null;
+1832-    const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);
+1833-    const gap=next.start_time-base;
+1834-    const overlaps=spoken
+1835-      .map(([a,b])=>[Math.max(a,base),Math.min(b,next.start_time)])
+1836-      .filter(([a,b])=>b>a);
+1837-    const hasSpoken=overlaps.length>0;
+1838-    // R11: HABLADO oculta texto. Si el HUECO VISUAL entre canto y canto
+1839-    // dura >= spokenMin, mostramos INSTRUMENTAL aunque el hablado tenga
+1840-    // pausas internas o Scribe lo haya dividido en varios intervalos.
+1841-    const longSpoken=hasSpoken && gap>=(c.spokenMin??6);
+1842-    const regularGap=gap>=c.minGap && !hasSpoken;
+1843-    if(!longSpoken && !regularGap) continue;
+1844-
+1845-    // R11: un hueco visual creado por HABLADO se trata como pausa de canto.
+1846-    // La próxima letra se libera spokenLead segundos antes del siguiente START cantado.
+1847-    const lead=longSpoken?(c.spokenLead??3):c.lead;
+1848-    const hideAt=next.start_time-lead;
+1849-    if(t<base+.2 || t>=hideAt) continue;
+1850-
+1851-    const remain=next.start_time-t;
+1852-    const countdownRemain=hideAt-t;
+1853-    const halfStep=c.span/Math.max(1,c.dots*2);
+1854-    const phase=countdownRemain>=c.span?0:Math.min(c.dots*2,Math.max(0,Math.floor((c.span-countdownRemain)/halfStep+.0001)));
+1855-    return {remain,phase,spoken:longSpoken};
+1856-  }
+1857-  return null;
+1858-}
+1859-function pvDrawInstrumental(state){
+1860-  pvx.fillStyle="#000"; pvx.fillRect(0,0,PV.VW,PV.VH);
+1861-  pvx.textAlign="center"; pvx.textBaseline="middle";
+1862-  pvx.font="28px Impact, Arial Narrow, Arial, sans-serif";
+1863-  pvx.lineWidth=3; pvx.strokeStyle="#111"; pvx.strokeText("INSTRUMENTAL", PV.VW/2, 58);
+1864-  pvx.fillStyle="#fff"; pvx.fillText("INSTRUMENTAL", PV.VW/2, 58);
+1865-
+1866-  const cy = 100, r = 13, gap = 42, sx = PV.VW/2 - gap*1.5;
+1867-  const total = 4;
+1868-  for(let j=0;j<total;j++){
+1869-    const x = sx + j*gap;
+1870-    const order = total - 1 - j;
+1871-    const stage = state.phase - order*2;
+1872-    pvx.save();
+1873-    pvx.beginPath(); pvx.arc(x, cy, r, 0, Math.PI*2); pvx.clip();
+1874-    pvx.fillStyle = "#FFFFFF"; pvx.fillRect(x-r-2, cy-r-2, 2*r+4, 2*r+4);
+1875-    if(stage > 0){
+1876-      const frac = stage >= 2 ? 1 : 0.5;
+1877-      pvx.fillStyle = "#F2B705";
+1878-      pvx.fillRect(x-r-2, cy-r-2, (2*r+4)*frac, 2*r+4);
+1879-    }
+1880-    pvx.restore();
+1881-    pvx.strokeStyle = "#111111";
+1882-    pvx.lineWidth = 2.5;
+1883-    pvx.beginPath(); pvx.arc(x, cy, r, 0, Math.PI*2); pvx.stroke();
+1884-  }
+1885-  pvx.textAlign="left"; pvx.textBaseline="top";
+1886-}
+1887-
+1888-function pvDrawOutlinedText(text,x,y,size,fill="#fff",align="center"){
+1889-  pvx.save(); pvx.font=pvFontCss(size); pvx.textAlign=align; pvx.textBaseline="middle";
+1890-  pvx.lineJoin="round"; pvx.lineWidth=Math.max(2,S.cfg.strokeWidth*2); pvx.strokeStyle="#000"; pvx.fillStyle=fill;
+=== RENDERER INSTRUMENTAL ===
+450-    # reescribir los tiempos ya normalizados en el documento
+451-    by_id = {w["id"]: w for w in words}
+452-    for seg in doc["segments"]:
+453-        for w in seg.get("words", []):
+454-            src = by_id.get(w["id"])
+455-            if src:
+456-                w["start_time"], w["end_time"] = src["start_time"], src["end_time"]
+457-
+458-    spoken_intervals = []
+459-    for seg in doc["segments"]:
+460-        for w in seg.get("words", []):
+461-            if w.get("spoken") and w.get("start_time") is not None:
+462-                st = float(w["start_time"])
+463-                en = float(w.get("end_time") or (st + style["max_word_seconds"]))
+464-                spoken_intervals.append((st, max(st + 0.05, en)))
+465-
+466-    visual = wrap_lines(doc, font, upper)
+467-    visual = smart_page_breaks(visual, float(style.get("smart_page_gap_seconds", 2.0)))
+468-    visual = center_stanza_pages(visual, style["lines_per_page"])
+469:    visual = build_instrumentals(visual, style, spoken_intervals)
+470-    visual = center_last_page(visual, style["lines_per_page"])
+471:    instrumentals: list[dict] = []
+472-
+473-    wipe_spans(visual)
+474-    warns = check_packet_budget(
+475-        visual, font, style["line_tile_height"],
+476-        style["highlight_bandwidth"], style["draw_bandwidth"], upper,
+477-    )
+478-
+479-    # texto y sync en el formato que espera cdgmaker:
+480-    #   - una línea visual por \n, "~" para las líneas vacías
+481-    #   - la lista de sync lleva exactamente un entero por sílaba, en orden
+482-    text_lines, sync, modes = [], [], []
+483-    for li, line in enumerate(visual):
+484-        if not line:
+485-            text_lines.append("~")
+486-            continue
+487-        parts = []
+488-        # Cada palabra normal se separa mediante una sílaba muda `_`. Así el
+489-        # siguiente punto de sync puede ser su END real, no necesariamente el
+490-        # START de la siguiente palabra. El texto visible sigue siendo idéntico.
+491-        if line[0].get("_inst"):
+492-            for w in line:
+493-                t = w["text"].upper() if upper else w["text"]
+494-                parts.append(t.replace(" ", "_"))
+495-                sync.append(int(round(w["start_time"] * 100)))
+496-                modes.append(4 if w.get("_label") else 0)
+497-            body = " ".join(parts)
+498-        else:
+499-            chain = []
+500-            for wi, w in enumerate(line):
+501-                t = (w["text"].upper() if upper else w["text"]).replace(" ", "_")
+502-                chain.append(t)
+503-                sync.append(int(round(w["start_time"] * 100)))
+504-                role = w.get("vocal_role")
+505-                mode = 1 if role == "female" else 2 if role == "male" else 3 if role == "duet" else 0
+506-                modes.append(mode)
+507-                end = w.get("end_time")
+508-                # Un END explícito sólo puede convertirse en sílaba muda si no
+509-                # invade el START siguiente. Si hay solapamiento, la UI ya lo
+510-                # advierte; para "Generar igualmente" dejamos que el siguiente
+511-                # START cierre el barrido en vez de crear sync desordenado.
+512-                next_start = None
+513-                if wi + 1 < len(line):
+514-                    next_start = line[wi + 1]["start_time"]
+515-                else:
+516-                    for nl in visual[li + 1:]:
+517-                        if nl:
+518-                            next_start = nl[0]["start_time"]
+519-                            break
+520-                if (end is not None and end > w["start_time"] and
+521-                    (next_start is None or end <= next_start)):
+522-                    chain.append("_")
+523-                    sync.append(int(round(end * 100)))
+524-                    modes.append(mode)
+525-            body = "/".join(chain)
+526-        if line[0].get("_label"):
+527-            body = "2|" + body
+528-        elif line[0].get("_dotline"):
+529-            body = "3|" + body
+530:        # El rótulo del instrumental va con el cantante 2, cuyos colores activo
+531-        # e inactivo son idénticos: así NO barre. Se dibuja, se queda quieto y
+532-        # se borra. Es lo que pedía "no ejecutar sweep sobre INSTRUMENTAL", y
+533-        # sale gratis: sigue habiendo un solo bloque [[lyrics]], de modo que el
+534-        # presupuesto de paquetes no se reparte.
+535-        text_lines.append(body)
+536-
+537-    # Invariante barata que atrapa cualquier bloque mal colocado: cdgmaker
+538-    # empareja sílabas consecutivas, así que un sync fuera de orden produce
+539-    # barridos de duración negativa y avisos incomprensibles.
+540-    for i in range(1, len(sync)):
+541-        if sync[i] < sync[i - 1]:
+542-            raise NormalizeError(
+543-                f"Puntos de sincronización desordenados en la posición {i}: "
+544-                f"{sync[i-1]} seguido de {sync[i]}. Es un fallo del normalizador, "
+545-                f"no del proyecto."
+546-            )
+547-
+548-    rows_used = style["lines_per_page"] * style["line_tile_height"]
+549-    row = max(1, (CDG_ROWS - rows_used) // 2 + int(style.get("lyric_y_offset", 0)))
+550-    row = max(1, min(CDG_ROWS - rows_used, row))
+551-
+552-    return Normalized(
+553-        title=doc["song"].get("title", "Sin título"),
+554-        artist=doc["song"].get("artist", ""),
+555-        sync=sync,
+556-        syllable_modes=modes,
+557-        text="\n".join(text_lines),
+558-        line_tile_height=style["line_tile_height"],
+559-        lines_per_page=style["lines_per_page"],
+560-        row=row,
+561:        instrumentals=instrumentals,
+562-        duration=doc["song"].get("duration", 0.0),
+563-        warnings=warns,
+564-    )
+565-
+566-
+567-# --------------------------------------------------------------------------
+568-# salida hacia cdgmaker
+569-# --------------------------------------------------------------------------
+570-
+571-def _q(s: str) -> str:
+572-    return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+573-
+574-
+575-def to_toml(n: Normalized, style: dict, audio: Path, outname: str, assets: Path) -> str:
+576-    """cdgmaker se configura por TOML. Lo generamos aquí y no lo tocamos a mano."""
+577-    intro_title = "" if style.get("intro_precomposed") else n.title
+578-    intro_artist = "" if style.get("intro_precomposed") else n.artist
+579-    outro1 = "" if style.get("outro_precomposed") else style["outro_line1"]
+580-    outro2 = "" if style.get("outro_precomposed") else style["outro_line2"]
+581-    L = [
+582-        f"title = {_q(intro_title)}",
+583-        f"artist = {_q(intro_artist)}",
+584-        f"file = {_q(audio)}",
+585-        f"outname = {_q(outname)}",
+586-        f"font = {_q(resolve_font_path(style))}",
+587-        f"font_size = {style['font_size']}",
+588-        f"stroke_width = {style['stroke_width']}",
+589-        f"stroke_type = {_q(style['stroke_type'])}",
+590-        f"clear_mode = {_q(style['clear_mode'])}",
+591-        f"sync_offset = {style['sync_offset']}",
+592-        f"highlight_bandwidth = {style['highlight_bandwidth']}",
+593-        f"draw_bandwidth = {style['draw_bandwidth']}",
+594-        f"background = {_q(style['background'])}",
+595-        f"border = {_q(style['border'])}",
+596-        f"title_screen_background = {_q(assets / style['title_background'])}",
+597-        f"outro_background = {_q(assets / style['outro_background'])}",
+598-        f"title_color = {_q(style['title_color'])}",
+599-        f"artist_color = {_q(style['artist_color'])}",
+600-        f"title_screen_transition = {_q(style['title_transition'])}",
+601-        f"outro_transition = {_q(style['outro_transition'])}",
+602-        f"outro_text_line1 = {_q(outro1)}",
+603-        f"outro_text_line2 = {_q(outro2)}",
+604-        f"intro_duration_seconds = {style['intro_duration_seconds']}",
+605-        # Separación entre título y artista, y desplazamiento vertical del
+606-        # bloque. cdgmaker lo centra en la pantalla, así que con un artista
+607-        # largo (dos líneas) el bloque baja y pisa la marca de la plantilla.
+608-        # Estos dos números lo suben y lo aprietan.
+609-        f"title_artist_gap = {style.get('title_artist_gap', 14)}",
+610-        f"title_top_padding = {style.get('title_top_padding', -12)}",
+611-        f"first_syllable_buffer_seconds = {style['first_syllable_buffer_seconds']}",
+612-        "",
+613-        "[[singers]]",
+614-        f"inactive_fill = {_q(style['text_color'])}",
+615-        f"inactive_stroke = {_q(style['stroke_color'])}",
+616-        f"active_fill = {_q(style.get('highlight_default', style['highlight_color']))}",
+617-        f"active_stroke = {_q(style['stroke_color'])}",
+618-        "",
+619-        "[[singers]]",
+620-        f"inactive_fill = {_q(style['text_color'])}",
+621-        f"inactive_stroke = {_q(style['stroke_color'])}",
+622-        f"active_fill = {_q(style.get('highlight_female', '#FF4FA3'))}",
+623-        f"active_stroke = {_q(style['stroke_color'])}",
+624-        "",
+625-        "[[singers]]",
+626-        f"inactive_fill = {_q(style['text_color'])}",
+627-        f"inactive_stroke = {_q(style['stroke_color'])}",
+628-        f"active_fill = {_q(style.get('highlight_male', '#32B7FF'))}",
+629-        f"active_stroke = {_q(style['stroke_color'])}",
+630-        "",
+631-        "[[singers]]",
+632-        f"inactive_fill = {_q(style['text_color'])}",
+633-        f"inactive_stroke = {_q(style['stroke_color'])}",
+634-        f"active_fill = {_q(style.get('highlight_duet', '#7ED957'))}",
+635-        f"active_stroke = {_q(style['stroke_color'])}",
+636-        "",
+637-    ]
+638:    for inst in n.instrumentals:
+639-        L += [
+640:            "[[instrumentals]]",
+641-            f"sync = {inst['sync']}",
+642-            f"wait = {str(inst['wait']).lower()}",
+643-            f"text = {_q(inst['text'])}",
+644-            f"line_tile_height = {inst['line_tile_height']}",
+645-            f"text_placement = {_q('middle')}",
+646-            f"fill = {_q(style['text_color'])}",
+647-        ]
+648-        if inst.get("image"):
+649-            ip = Path(inst["image"])
+650-            if not ip.is_absolute():
+651-                ip = Path(__file__).parent / ip
+652-            L.append(f"image = {_q(ip)}")
+653-        L.append("")
+654-    L += [
+655-        "[[lyrics]]",
+656-        "singer = 1",
+657-        f"row = {n.row}",
+658-        f"line_tile_height = {n.line_tile_height}",
+659-        f"lines_per_page = {n.lines_per_page}",
+660-        f"sync = [{', '.join(str(s) for s in n.sync)}]",
+661-        f"syllable_modes = [{', '.join(str(m) for m in n.syllable_modes)}]",
+662-        # sin salto final: TOML conservaría una línea vacía de más y cdgmaker
+663-        # la contaría como una línea de letra fantasma
+664-        'text = """',
+665-        n.text + '\\',
+666-        '"""',
+667-        "",
+668-    ]
+669-    return "\n".join(L)
