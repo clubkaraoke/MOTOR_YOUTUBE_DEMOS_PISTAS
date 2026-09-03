@@ -1,0 +1,636 @@
+TIMESTAMP=2026-09-03T07:13:08+00:00
+TEST=active
+PROD=active
+=== LATEST FILES OUTPUT ===
+=== LATEST JOB FILES LET-0078 ===
+2026-09-03 07:10:00.4885007160 | 154624 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/proyecto.timings.json
+2026-09-03 06:13:56.6763287930 | 3179 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/letra_moises.txt
+2026-09-03 06:13:44.5501699510 | 3510 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-061344.txt
+2026-09-03 06:13:44.5501699510 | 169888 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-061344.json
+2026-09-03 05:58:35.4055924500 | 3176 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-055835.txt
+2026-09-03 05:58:35.4045924520 | 149129 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-055835.json
+2026-09-03 05:54:28.8122927750 | 3184 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-055428.txt
+2026-09-03 05:54:28.8122927750 | 150018 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-055428.json
+2026-09-03 05:45:19.6921650930 | 3519 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-054519.txt
+2026-09-03 05:45:19.6921650930 | 163403 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-054519.json
+2026-09-03 02:55:22.1122136620 | 3189 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-025522.txt
+2026-09-03 02:55:22.1122136620 | 143448 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-025522.json
+2026-09-03 02:55:07.2112174210 | 2455 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-025507.txt
+2026-09-03 02:55:07.2112174210 | 111250 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/backup_pre_7_improvements_20260903-025507.json
+2026-09-03 00:34:55.7642783220 | 278 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/trabajo.json
+2026-09-03 00:34:46.7423076690 | 86856780 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/Amor Rebelde - Mix Cuanto te amo KARAOKE (Coro).wav
+2026-09-03 00:34:46.5613082650 | 13789184 | /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/Amor Rebelde - Mix Cuanto te amo (Voz).mp3
+=== DB JOB LET-0078 ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+artist=Amor Rebelde
+canonical_name=Amor Rebelde - Mix Cuanto te amo KARAOKE (Coro)
+cdg_dropbox_id=
+cdg_dropbox_path=
+cdg_local_filename=Amor Rebelde - Mix Cuanto te amo KARAOKE (Coro).cdg
+copied=NO
+created=03/09/2026 00:34
+deleted=0
+dropbox_display_path=
+dropbox_folder_id=
+dropbox_path=/KARAOKES_TERMINADOS
+dropbox_status=CDG_ONLINE_SIN_DESTINO
+duration=492.385125
+id=LET-0078
+instrumental_dropbox_id=
+instrumental_dropbox_path=
+instrumental_filename=Amor Rebelde - Mix Cuanto te amo KARAOKE (Coro).wav
+legacy_audio_drive_id=
+lyrics_moises=Debí saber que al
+amarte yo me perdía.
+Debí saber que tu
+mundo ya no era mío.
+
+¿Cómo has hecho para amarte así?
+¿Cómo has hecho
+que te quiera así?
+¿Cómo has hecho?
+Me mataste, amor.
+¿Cómo has hecho?
+¿Cómo has hecho?
+¡Oh!
+Una bulla para Gian Franco.
+
+Ese es lo nuevo, nuevo.
+El mix.
+Cuando te amo.
+Amor rebelde.
+Es el baby, baby de la cumbia.
+
+¿Y cómo has hecho?
+¿Cómo has hecho para
+amarte así, mi amor?
+
+Y la chelita para arriba,
+para arriba, para arriba,
+para arriba, para arriba.
+¡Salud, salud!
+Báilalo, Perú.
+
+Debí saber que al
+amarte yo me perdía.
+Debí saber que tu
+mundo ya no era mío.
+Es tan lejano aquel día en que
+me decías: «Ya no soy niña,
+no juego con sentimientos».
+¿Cómo has hecho para amarte así?
+¿Cómo has hecho
+que te quiera así?
+¿Cómo has hecho?
+Me mataste, amor.
+¿Cómo has hecho?
+¿Cómo has hecho?
+
+Al saberte ajena a mis
+sentimientos, deseo preguntarte
+qué has hecho en mí.
+
+Oye, Gian Franco, ¿y cómo
+has hecho para enamorarlas?
+Dilo tú.
+
+Muchas gracias a
+mi club de fans.
+
+Y la mancha más alegre con la
+mano para arriba, arriba, arriba,
+arriba las manos, arriba las
+manos, arriba las manos, arriba.
+
+Gózalo, Perú.
+
+Debí saber que al
+amarte yo me perdía.
+Debí saber que tu
+mundo ya no era mío.
+Es tan lejano aquel día en que
+me decías: «Ya no soy niña,
+no juego con sentimientos».
+¿Cómo has hecho para amarte así?
+¿Cómo has hecho
+que te quiera así?
+¿Cómo has hecho?
+Me mataste, amor.
+¿Cómo has hecho?
+¿Cómo has hecho?
+Al saberte ajena a mis
+sentimientos, deseo preguntarte
+qué has hecho en mí.
+
+Y ahora...
+
+¿Y para qué?
+Santeño, ¿y para qué quiero todo
+lo que tengo si no tengo su amor?
+Yo prefiero morir.
+Y todo el mundo con
+la mano para arriba.
+Arriba las manitos.
+Sí, sí, cumbia y sabor.
+Sí, sí, cumbia y sabor.
+Sí, sí, cumbia y sabor.
+Amor rebelde.
+
+Un solo sentimiento.
+¿Y cómo dice?
+
+¿Para qué quiero el
+mundo si pierdo el alma?
+¿Para qué quiero el
+alma si tú no me amas?
+¿Para qué quiero
+todo lo que yo tengo?
+Si no tengo tu amor,
+mejor me muero.
+Cuando te vi sabía que te quería.
+Desde hace mucho
+tiempo sin conocerte.
+Yo sé que si llegaste
+fue por mi mente.
+Te conocí en mis
+sueños antes de verte.
+Cómo te quiero,
+cómo te extraño, cómo quisiera
+decirte siempre cuánto te amo.
+Ojos azules como es el cielo,
+esta mi tierra que tanto
+quiero, que tanto quiero.
+Y la chela para arriba, arriba,
+arriba, arriba la chela, arriba,
+chela arriba, chela arriba.
+Está sonando para ti.
+
+Amor Rebelde.
+
+Cumpay Producciones.
+
+Para qué quiero el
+mundo si pierdo el alma.
+Para qué quiero el
+alma si tú no me amas.
+Para qué quiero
+todo lo que yo tengo.
+Si no tengo tu amor,
+mejor me muero.
+Cuando te vi sabía que te
+quería desde hace mucho
+tiempo sin conocerte.
+Yo sé que si llegaste
+fue por mi mente.
+Te conocí en mis
+sueños antes de verte.
+Cómo te quiero, cómo te
+extraño, cómo quisiera
+decirte siempre cuánto te amo.
+Ojos azules como es el cielo,
+esta mi tierra que tanto
+quiero, que tanto quiero.
+Y arriba la manito,
+arriba la chelita.
+Este es el mix, cuánto te amo.
+
+Pacal Producciones
+y Irving Morales.
+
+¿Dónde está la
+mancha más alegre?
+origin=IA_TEST
+render_error=
+render_progress=100
+render_status=EXPORTADO
+sheet_master_error=
+sheet_master_status=TEST_LOCAL
+size_bytes=13789184
+status=LETRA CORREGIDA
+timings_drive_error=
+timings_drive_id=
+timings_drive_name=
+timings_drive_status=TEST_LOCAL
+title=Mix Cuanto te amo
+updated=03/09/2026 07:10
+version=1
+voice_drive_error=
+voice_drive_id=
+voice_drive_status=TEST_LOCAL
+voice_filename=Amor Rebelde - Mix Cuanto te amo (Voz).mp3
+voice_original_filename=Grupo Amor Rebelde - Mix Cuánto Te Amo (Voz Principal).mp3
+=== EXPORT/RENDER ROUTES ===
+31:OUTPUT=Path(os.getenv('DJGABO_OUTPUT_DIR') or (ROOT/'output' if not IS_PRODUCTION else DATA/'output')).expanduser().resolve()
+33:RENDER=ROOT/'renderer'/'render.py'
+38:GLOBAL_CFG_ROOT=Path(os.getenv('DJGABO_CONFIG_DIR') or os.getenv('LOCALAPPDATA') or (Path.home()/'.djgabo_cdg')).expanduser()/'DJGABO_CONTROL_CDG'
+55:PENDING_CDG_DIR=DATA/'pending'/'cdg'
+87:        if (src_root/'output').is_dir(): shutil.copytree(src_root/'output',OUTPUT,dirs_exist_ok=True)
+188:def _cdg_cache_get(jid):
+196:def _cdg_cache_put(jid,data,name):
+203:def _cdg_cache_pop(jid):
+823:          cdg_dropbox_path TEXT DEFAULT '', cdg_dropbox_id TEXT DEFAULT '', dropbox_status TEXT DEFAULT '',
+826:          cdg_local_filename TEXT DEFAULT '', canonical_name TEXT DEFAULT '',
+839:          'cdg_dropbox_path':"TEXT DEFAULT ''",
+840:          'cdg_dropbox_id':"TEXT DEFAULT ''",
+846:          'cdg_local_filename':"TEXT DEFAULT ''",
+848:          'render_status':"TEXT DEFAULT ''",
+849:          'render_progress':"INTEGER DEFAULT 0",
+850:          'render_error':"TEXT DEFAULT ''",
+866:def recover_interrupted_renders():
+867:    """Un reinicio no debe dejar un trabajo fingiendo que todavía renderiza."""
+869:        c.execute("""UPDATE jobs SET render_status='INTERRUMPIDO',render_progress=0,
+870:                     render_error='El servidor se reinició durante el render. El proyecto está guardado; vuelve a pulsar Exportar.',updated=?
+871:                     WHERE render_status='RENDERIZANDO'""",(now(),))
+873:recover_interrupted_renders()
+1435:def _job_local_cdg(r):
+1437:    name=str(r['cdg_local_filename'] or '') if 'cdg_local_filename' in r.keys() else ''
+1439:    return bool((p and p.is_file()) or r['cdg_dropbox_id'] or r['cdg_dropbox_path'] or _cdg_cache_get(r['id'])[0])
+1449:    return bool(r['dropbox_folder_id'] and r['instrumental_dropbox_id'] and r['cdg_dropbox_id'] and _job_voice_ready(r) and _job_lyrics_ready(r))
+1471:        cdg_ready=bool(r['cdg_dropbox_id'])
+1474:        cdg_ready=_job_local_cdg(r)
+1478:      origen=r['origin'] or 'LOCAL',vozLista=voice_ready,letraLista=lyrics_ready,instrumentalLista=inst_ready,cdgLista=cdg_ready,destinoLista=dest_ready,
+1479:      instrumentalNombre=r['instrumental_filename'] or '',cdgNombre=r['cdg_local_filename'] or '',destinoDropbox=r['dropbox_display_path'] or '',dropboxEstado=r['dropbox_status'] or '',
+1480:      legacyAudioDriveId=r['legacy_audio_drive_id'] or '',renderEstado=r['render_status'] or '',renderProgreso=int(r['render_progress'] or 0),renderError=r['render_error'] or '',exportado=bool(cdg_ready),
+1523:    return jsonify(ok=ok,service='djgabo-cdg',version='16.14-server',environment=ENVIRONMENT,checks=checks),200 if ok else 503
+1553:def style(): return jsonify(json.loads((ROOT/'renderer'/'style.json').read_text(encoding='utf-8')))
+1718:            urgent=[dict(r) for r in rows if r['dropbox_folder_id'] and (not r['instrumental_dropbox_id'] or not r['cdg_dropbox_id'])][:3]
+1818:            t=now(); c.execute('INSERT INTO jobs(id,artist,title,status,created,updated,voice_filename,voice_original_filename,voice_drive_status,instrumental_filename,lyrics_moises,lyrics_corrected,dropbox_path,duration,size_bytes,version,project_json,instrumental_dropbox_path,instrumental_dropbox_id,cdg_dropbox_path,cdg_dropbox_id,dropbox_status,dropbox_folder_id,dropbox_display_path,sheet_master_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+1844:def _local_cdg_path(job):
+1846:    name=str(job.get('cdg_local_filename') or '').strip(); p=OUTPUT/job['id']/name if name else None
+1849:def _rename_local_cdg(job,new_stem):
+1850:    new_name=safe_name(new_stem)+'.cdg'
+1851:    data,old_name=_cdg_cache_get(job['id'])
+1853:        _cdg_cache_put(job['id'],data,new_name); return new_name
+1854:    p=_local_cdg_path(job)
+1857:        data=p.read_bytes(); _cdg_cache_put(job['id'],data,new_name)
+1861:    return new_name if (job.get('cdg_dropbox_id') or job.get('cdg_dropbox_path')) else ''
+1863:def _master_cdg_filename(instrumental_filename):
+1865:    return safe_name(Path(str(instrumental_filename or '')).stem)+'.cdg'
+1867:def _move_remote_cdg_to_master(job,new_filename):
+1875:    old_display=str(job.get('cdg_dropbox_path') or '').strip()
+1876:    old_id=str(job.get('cdg_dropbox_id') or '').strip()
+1904:        temp_name='.__djgabo_'+str(job.get('id') or 'cdg')+'_'+secrets.token_hex(4)+'.cdg'
+1928:def ensure_job_master_cdg_name(jid,job=None):
+1933:    if not instrumental: return {'changed':False,'cdg_name':str(job.get('cdg_local_filename') or '')}
+1934:    desired=_master_cdg_filename(instrumental); _rename_local_cdg(job,Path(desired).stem)
+1936:    old_remote_name=Path(str(job.get('cdg_dropbox_path') or '')).name
+1937:    if (job.get('cdg_dropbox_id') or job.get('cdg_dropbox_path')) and old_remote_name!=desired:
+1938:        remote=_move_remote_cdg_to_master(job,desired)
+1942:        c.execute("""UPDATE jobs SET cdg_local_filename=?,
+1943:                     cdg_dropbox_path=CASE WHEN ?<>'' THEN ? ELSE cdg_dropbox_path END,
+1944:                     cdg_dropbox_id=CASE WHEN ?<>'' THEN ? ELSE cdg_dropbox_id END,
+1948:    return {'changed':bool(remote or str(job.get('cdg_local_filename') or '')!=desired),'cdg_name':desired,'dropbox_path':remote_path,'dropbox_id':remote_id}
+1963:        try: ensure_job_master_cdg_name(jid,job=job)
+1970:    cdg_data,cdg_cache_name=_cdg_cache_get(jid); wav_cache=_wav_cache_get(jid)
+1972:        st='CDG_ONLINE_SIN_DESTINO' if (cdg_data or job.get('cdg_dropbox_id')) else ('WAV_ONLINE_SIN_DESTINO' if (wav_cache or job.get('instrumental_dropbox_id')) else 'SIN_DESTINO')
+1974:        return {'status':st,'uploaded_cdg':False,'uploaded_wav':False,'folder':''}
+1978:        return {'status':st,'uploaded_cdg':False,'uploaded_wav':False,'folder':job.get('dropbox_display_path') or ''}
+1981:    uploaded_cdg=bool(job.get('cdg_dropbox_id') and _norm_dropbox_path(Path(str(job.get('cdg_dropbox_path') or '')).parent)==_norm_dropbox_path(expected))
+1983:    cdg_display=str(job.get('cdg_dropbox_path') or ''); cdg_id=str(job.get('cdg_dropbox_id') or '')
+1995:    if cdg_data:
+1996:        nm=cdg_cache_name or job.get('cdg_local_filename') or (_provisional_master_stem(job)+'.cdg')
+1997:        up=dropbox_upload_bytes(cdg_data,folder_ref,nm,mode='overwrite',expected_display_path=expected)
+1998:        uploaded_cdg=True; cdg_display=up.get('path_display') or nm; cdg_id=up.get('id','')
+1999:    cp=_local_cdg_path(job)
+2000:    if not uploaded_cdg and cp:
+2002:        uploaded_cdg=True; cdg_display=up.get('path_display') or cp.name; cdg_id=up.get('id','')
+2003:    if uploaded_cdg and uploaded_wav: st='COMPLETO'
+2004:    elif uploaded_cdg: st='CDG_SUBIDO_AUDIO_PENDIENTE'
+2010:                     cdg_dropbox_path=CASE WHEN ?<>'' THEN ? ELSE cdg_dropbox_path END,
+2011:                     cdg_dropbox_id=CASE WHEN ?<>'' THEN ? ELSE cdg_dropbox_id END,
+2013:                  (wav_display,wav_display,wav_id,wav_id,cdg_display,cdg_display,cdg_id,cdg_id,st,now(),jid))
+2016:    if cdg_data and uploaded_cdg and cdg_id: _cdg_cache_pop(jid)
+2017:    try: master_sync(jid,'Dropbox: '+st+' · WAV '+('OK' if uploaded_wav else 'PENDIENTE')+' · CDG '+('OK' if uploaded_cdg else 'PENDIENTE'))
+2019:    return {'status':st,'uploaded_cdg':uploaded_cdg,'uploaded_wav':uploaded_wav,'folder':expected,'cdg_path':cdg_display,'wav_path':wav_display}
+2024:    artist,title=master_identity(filestorage.filename); inst_name=safe_name(Path(filestorage.filename).name); master_stem=Path(inst_name).stem; desired_cdg=_master_cdg_filename(inst_name)
+2035:        c.execute("UPDATE jobs SET artist=?,title=?,instrumental_filename=?,canonical_name=?,cdg_local_filename=?, instrumental_dropbox_path=CASE WHEN ?<>'' THEN ? ELSE instrumental_dropbox_path END, instrumental_dropbox_id=CASE WHEN ?<>'' THEN ? ELSE instrumental_dropbox_id END,updated=? WHERE id=?",
+2036:                  (artist,title,inst_name,master_stem,desired_cdg,wav_display,wav_display,wav_id,wav_id,now(),jid))
+2038:    ensure_job_master_cdg_name(jid)
+2044:    return dict(result,job_id=jid,artist=artist,title=title,instrumental=inst_name,cdg_name=fresh.get('cdg_local_filename') or desired_cdg)
+2084:    names_wav=[]; names_cdg=[]
+2087:    cdgn=str(job.get('cdg_local_filename') or '').strip()
+2088:    if cdgn: names_cdg.append(cdgn)
+2091:        wav_alt=safe_name(stem)+'.wav'; cdg_alt=safe_name(stem)+'.cdg'
+2093:        if cdg_alt not in names_cdg: names_cdg.append(cdg_alt)
+2094:    return names_wav,names_cdg
+2141:        names_wav,names_cdg=_dropbox_candidate_names(job)
+2143:        found_cdg=_dropbox_home_meta(_dropbox_pick_remote(entries,names_cdg,'.cdg',job))
+2149:    cdg_path=str((found_cdg or {}).get('path_display') or '')
+2150:    cdg_id=str((found_cdg or {}).get('id') or '')
+2151:    wav_ready=bool(wav_id); cdg_ready=bool(cdg_id)
+2152:    st='COMPLETO' if (wav_ready and cdg_ready) else ('CDG_SUBIDO_AUDIO_PENDIENTE' if cdg_ready else ('WAV_SUBIDO_CDG_PENDIENTE' if wav_ready else 'DESTINO_ASIGNADO'))
+2156:                     cdg_dropbox_path=?,cdg_dropbox_id=?,dropbox_status=?,updated=? WHERE id=?''',
+2157:                  (wav_path,wav_id,cdg_path,cdg_id,st,now(),jid))
+2160:                 str(before.get('cdg_dropbox_id') or '')!=cdg_id or
+2167:    result={'ts':time.time(),'wav':wav_ready,'cdg':cdg_ready,'status':st}
+2274:    artist,title=master_identity(filename); master_stem=Path(filename).stem; desired_cdg=_master_cdg_filename(filename)
+2277:                     cdg_local_filename=?,
+2279:                  (artist,title,filename,master_stem,desired_cdg,actual,file_id,now(),jid))
+2281:    ensure_job_master_cdg_name(jid)
+2285:        st='COMPLETO' if r['cdg_dropbox_id'] else 'WAV_SUBIDO_CDG_PENDIENTE'
+2318:        ],capture_output=True,text=True,timeout=20)
+3635:def _render_set(task_id, **kw):
+3643:            with db() as c: c.execute('UPDATE jobs SET render_status=?,render_progress=?,updated=? WHERE id=?',('RENDERIZANDO',progress,now(),jid))
+3652:def resolve_render_font(family):
+3679:def _render_worker(task_id,jid,token,timings_bytes,opts):
+3681:        role=session(token); _render_set(task_id,status='running',progress=2,message='Preparando proyecto…')
+3683:            job=dict(jobrow(c,jid)); c.execute('UPDATE jobs SET render_status=?,render_progress=?,render_error=?,updated=? WHERE id=?',('RENDERIZANDO',2,'',now(),jid))
+3684:        with tempfile.TemporaryDirectory(prefix='karaoke_cdg_online_') as td0:
+3692:                        _render_set(task_id,progress=pct,message='Preparando audio online…',loaded=loaded,total=total)
+3695:            out=td/'salida'; style=json.loads((ROOT/'renderer'/'style.json').read_text(encoding='utf-8'))
+3699:            fam=str(style.get('font_family','impact')); style['font']=resolve_render_font(fam)
+3702:            _render_set(task_id,progress=28,message='Esperando turno de render…')
+3706:                _render_set(task_id,progress=28,message='Iniciando renderer CDG…')
+3707:                proc=subprocess.Popen(cmd,cwd=str(ROOT/'renderer'),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+3708:                def stop_stuck_render():
+3713:                watchdog=threading.Timer(RENDER_TIMEOUT_SECONDS,stop_stuck_render); watchdog.daemon=True; watchdog.start()
+3718:                            rp=max(0,min(100,int(mm.group(1)))); _render_set(task_id,progress=28+int(rp*.62),message=mm.group(2).strip() or 'Generando CDG…')
+3722:            if timed_out.is_set(): raise ValueError('El render superó el límite de '+str(RENDER_TIMEOUT_SECONDS//60)+' minutos y fue detenido para proteger el servidor.')
+3724:            cdgs=sorted(out.glob('*.cdg'))
+3725:            if not cdgs:
+3729:                            names=[n for n in zf.namelist() if n.lower().endswith('.cdg')]
+3734:            else: data=cdgs[0].read_bytes()
+3735:            if not data: raise ValueError('El renderer terminó pero no produjo el archivo .CDG.')
+3736:            master_stem=_provisional_master_stem(job); cdg_name=safe_name(master_stem)+'.cdg'; _cdg_cache_put(jid,data,cdg_name)
+3739:                c.execute("UPDATE jobs SET status=?,cdg_local_filename=?,canonical_name=CASE WHEN canonical_name='' THEN ? ELSE canonical_name END,render_status=?,render_progress=?,render_error=?,updated=? WHERE id=?",(next_status,cdg_name,master_stem,'CDG_LISTO',94,'',now(),jid)); log(c,jid,'CREAR CDG ONLINE','CDG_LISTO')
+3740:            _render_set(task_id,progress=94,message='CDG generado · publicando online…')
+3742:            except Exception as e: pub={'status':'PENDIENTE_DROPBOX','error':str(e),'uploaded_cdg':False,'uploaded_wav':False,'folder':''}
+3743:            with db() as c: c.execute('UPDATE jobs SET render_status=?,render_progress=?,render_error=?,updated=? WHERE id=?',('EXPORTADO',100,'',now(),jid))
+3745:            _render_set(task_id,status='done',progress=100,message='Exportado con éxito',job_id=jid,cdg_name=cdg_name,dropbox_status=pub.get('status',''),dropbox_folder=pub.get('folder',''),next_job_id=next_id)
+3748:            try: c.execute('UPDATE jobs SET render_status=?,render_error=?,updated=? WHERE id=?',('ERROR',str(e)[:1000],now(),jid))
+3750:        _render_set(task_id,status='error',message='Error al exportar · Reintentar',error=str(e))
+3752:@app.post('/api/render/start')
+3753:def render_start_api():
+3766:    try: opts=json.loads(request.form.get('render_options','{}'))
+3768:    task_id=secrets.token_urlsafe(18); _render_set(task_id,status='queued',progress=1,message='Enviando render al backend…',job_id=jid)
+3769:    threading.Thread(target=_render_worker,args=(task_id,jid,token,timings_bytes,opts),daemon=True,name='render-'+jid).start()
+3770:    return jsonify(ok=True,task_id=task_id,status_url=public_path('/api/render/status/'+task_id)),202
+3816:@app.get('/api/render/status/<task_id>')
+3817:def render_status_api(task_id):
+3823:@app.post('/api/render')
+3824:def render_cdg_compat():
+3825:    return render_start_api()
+3827:@app.post('/api/jobs/<jid>/dropbox/retry-cdg')
+3828:def retry_cdg_dropbox(jid):
+3832:        return jsonify(ok=True,dropbox_folder=pub.get('folder',''),dropbox_status=pub.get('status',''),uploaded_cdg=pub.get('uploaded_cdg'),uploaded_wav=pub.get('uploaded_wav'))
+=== EDITOR EXPORT BUTTON ===
+3541-});
+3542-
+3543-
+3544-/* ---------------- integración PANEL LOCAL ---------------- */
+3545-const PANEL_PARAMS=new URLSearchParams(location.search);
+3546-const PANEL_JOB_ID=PANEL_PARAMS.get('job')||'';
+3547-const PANEL_TOKEN=PANEL_PARAMS.get('token')||'';
+3548-let PANEL_ROLE='';
+3549-if(PANEL_PARAMS.get('embed')==='1') document.body.classList.add('panelEmbed');
+3550-let panelDraftTimer=null;
+3551-async function panelSaveProject(payload){
+3552-  if(!PANEL_JOB_ID||!payload)return;
+3553-  try{
+3554-    await fetch('/cdg-editor-ia/api/jobs/'+encodeURIComponent(PANEL_JOB_ID)+'/project',{
+3555-      method:'POST',headers:{'Content-Type':'application/json'},
+3556-      body:JSON.stringify({token:PANEL_TOKEN,project:payload})
+3557-    });
+3558-  }catch(e){ console.warn('Autoguardado servidor',e); }
+3559-}
+3560-function panelSaveDraft(){
+--
+3780-  window._restore = null;
+3781-
+3782-  S.view = {t0:0, dur: Math.min(30, Math.max(8, S.duration))};
+3783-  $("#songName").innerHTML = '<span class="art">' + esc($("#inArtist").value || "—") + '</span> &nbsp;·&nbsp; ' + esc($("#inTitle").value);
+3784-  $("#setup").hidden = true;
+3785-  $("#btnPreview").style.color = "var(--text)";
+3786-  $("#btnLyrics").style.color = "var(--text)";
+3787-  resize(); pvResize(); paintNow(); paintCounter(); paintLyrics(); draw();
+3788-  try{ PV.plan=pvPlan(); }catch(_){ PV.plan=null; }
+3789-  pvDraw();
+3790-  document.body.classList.remove("lyricEditMode");
+3791-  document.body.classList.add("phase2");
+3792-  setRate(1, true); // R26: sincronización SIEMPRE a velocidad real
+3793-  $("#phase1Step").classList.remove("on","action"); $("#phase1Step").classList.add("disabled");
+3794-  $("#phase2Step").classList.remove("action","disabled"); $("#phase2Step").classList.add("on");
+3795-  $("#phase3Step").classList.remove("disabled"); $("#phase3Step").classList.add("action");
+3796-  btn.textContent = "Continuar a sincronizar →";
+3797-};
+3798-function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+3799-
+3800:/* Flujo beta: CARGAR → SINCRONIZAR (editar + timings en el mismo panel) → CREAR CDG. */
+3801-$("#phase1Step").onclick=()=>{};
+3802-$("#phase1Step").onkeydown=()=>{};
+3803-$("#phase2Step").onclick=()=>{
+3804-  if(!document.body.classList.contains("phase2") && $("#phase2Step").classList.contains("action")) $("#btnStart").click();
+3805-};
+3806-$("#phase2Step").onkeydown=e=>{ if((e.key==="Enter"||e.key===" ") && $("#phase2Step").classList.contains("action")){ e.preventDefault(); $("#phase2Step").click(); } };
+3807-$("#phase3Step").onclick=()=>{ if(document.body.classList.contains("phase2") && !document.body.classList.contains("lyricEditMode") && $("#phase3Step").classList.contains("action")) { const b=$("#btnCdg"); b.dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false); } };
+3808-
+3809-/* botones */
+3810-$("#btnPlay").onclick = toggle;
+3811-$("#btnUndo").onclick = undoMark;
+3812-$("#btnBack").onclick = () => nudge(-2);
+3813-$("#btnFwd").onclick = () => nudge(2);
+3814-$("#btnSave").onclick = guardarProyecto;
+3815-$("#btnCdg").onclick = () => $("#btnCdg").dataset.retryDropbox==="1" ? reintentarDropboxCdg() : crearCdg(false);
+3816-document.querySelectorAll(".rate").forEach(b => b.onclick = () => setRate(+b.dataset.rate));
+3817-document.querySelectorAll(".zq").forEach(b=>b.onclick=()=>{const t=S.audio.currentTime||0,d=+b.dataset.z;S.view.dur=d;S.view.t0=clamp(t-d*.4,-1,Math.max(0,S.duration-d*.4));draw();});
+3818-function syncPvControls(){
+3819-  const map={pvLines:S.cfg.linesPerPage,pvFont:S.cfg.fontFamily,pvFontSize:S.cfg.fontSize,pvStroke:S.cfg.strokeWidth,pvLyricY:S.cfg.lyricYOffset,pvOutro1:S.cfg.outroLine1,pvOutro2:S.cfg.outroLine2,pvOutroSize:S.cfg.outroSize,pvOutroTransition:S.cfg.outroTransition};
+3820-  Object.entries(map).forEach(([id,v])=>{const el=$("#"+id);if(el)el.value=v});
+3821-}
+3822-function pvChanged(){ PV.plan=null; S.dirty=true; scheduleSave(); pvDraw(); }
+3823-[["#pvLines","linesPerPage",v=>Math.max(2,Math.min(8,+v))],["#pvFont","fontFamily",v=>v],["#pvFontSize","fontSize",v=>Math.max(12,Math.min(24,+v))],["#pvStroke","strokeWidth",v=>Math.max(0,Math.min(3,+v))],["#pvLyricY","lyricYOffset",v=>Math.max(-5,Math.min(5,+v))],["#pvOutro1","outroLine1",v=>v],["#pvOutro2","outroLine2",v=>v],["#pvOutroSize","outroSize",v=>+v],["#pvOutroTransition","outroTransition",v=>v]].forEach(([id,key,fn])=>{const el=$(id);if(el)el.oninput=()=>{S.cfg[key]=fn(el.value);if(key==="linesPerPage"){PV.cfg.linesPerPage=S.cfg.linesPerPage;PV.cfg.row=Math.max(1,Math.floor((18-PV.cfg.linesPerPage*PV.cfg.lineTileHeight)/2));$("#setLines").value=S.cfg.linesPerPage;}pvChanged();};});
+3824-document.querySelectorAll(".pvTab").forEach(b=>b.onclick=()=>{PV.mode=b.dataset.pvmode;document.querySelectorAll(".pvTab").forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll(".pvCtlGroup").forEach(g=>g.classList.toggle("on",g.dataset.group===PV.mode));pvDraw();});
+3825-document.querySelectorAll("[data-nudge]").forEach(b=>b.onclick=()=>{const dx=+(b.dataset.dx||0),dy=+(b.dataset.dy||0);S.cfg.outroX+=dx;S.cfg.outroY+=dy;pvChanged();});
+3826-syncPvControls();
+3827-
+3828-if($("#btnRoleNone")) $("#btnRoleNone").onclick=()=>roleButtonPress("none");
+3829-if($("#btnMale")) $("#btnMale").onclick=()=>roleButtonPress("hombre");
+3830-if($("#btnFemale")) $("#btnFemale").onclick=()=>roleButtonPress("mujer");
+3831-if($("#btnDuet")) $("#btnDuet").onclick=()=>roleButtonPress("duo");
+3832-if($("#btnSpoken2")) $("#btnSpoken2").onclick=()=>roleButtonPress("hablado");
+3833-$("#btnAiBlock").onclick=()=>aiAlignSelectedBlock();
+3834-installRoleDelegation();
+3835-if($("#btnResync")) $("#btnResync").onclick = resyncSelected;
+3836-$("#btnLyrics").onclick = () => {
+3837-  const d = $("#lyricsDrawer"); d.classList.toggle("hidden");
+3838-  $("#btnLyrics").style.color = d.classList.contains("hidden") ? "" : "var(--text)";
+3839-  paintLyrics(); requestAnimationFrame(()=>{ resize(); draw(); });
+3840-};
+3841-$("#btnPreview").onclick = pvToggle;
+3842-
+3843-/* divisores arrastrables entre los tres paneles */
+3844-function makeSplit(el, pane, side){
+3845-  el.addEventListener("pointerdown", e => {
+3846-    e.preventDefault();
+3847-    el.setPointerCapture(e.pointerId);
+3848-    el.classList.add("on");
+3849-    const w0 = pane.getBoundingClientRect().width, x0 = e.clientX;
+3850-    const total = $("#workspace").getBoundingClientRect().width;
+3851-    const move = ev => {
+3852-      const d = (ev.clientX - x0) * (side === "left" ? 1 : -1);
+3853-      pane.style.flexBasis = clamp(w0 + d, 190, total - 420) + "px";
+3854-      resize(); draw(); if(PV.on){ pvResize(); pvDraw(); }
+3855-    };
+3856-    const up = () => {
+3857-      el.classList.remove("on");
+3858-      el.removeEventListener("pointermove", move);
+3859-      el.removeEventListener("pointerup", up);
+3860-    };
+3861-    el.addEventListener("pointermove", move);
+3862-    el.addEventListener("pointerup", up);
+3863-  });
+3864-}
+3865-makeSplit($("#splitLeft"), $("#leftPane"), "left");
+3866-makeSplit($("#splitRight"), $("#preview"), "right");
+3867-new ResizeObserver(()=>{ if(PV.on){ pvResize(); pvDraw(); } }).observe($("#pvBox"));
+3868-if($("#btnSettings")) $("#btnSettings").onclick = () => { $("#setLines").value=S.cfg.linesPerPage; syncPvControls(); $("#settings").hidden = false; };
+3869-function closeSettings(){
+3870-  S.cfg.cal = +$("#setCal").value || 0;
+3871-  S.cfg.minGap = +$("#setMinGap").value || 60;
+3872-  S.cfg.maxWord = +$("#setMaxWord").value || 2.5;
+3873-  S.cfg.stall = +$("#setStall").value || 4;
+3874-  S.cfg.introMode="auto"; S.cfg.introDuration=6; S.cfg.introShort=3;
+3875-  S.cfg.linesPerPage = Math.max(2, Math.min(8, +$("#setLines").value || 8));
+3876-  PV.cfg.linesPerPage = S.cfg.linesPerPage;
+3877-  PV.cfg.row = Math.max(1, Math.floor((18 - PV.cfg.linesPerPage*PV.cfg.lineTileHeight)/2));
+3878-  refreshEnds(0); pvInvalidate(); pvDraw(); S.dirty=true; scheduleSave();
+3879-  $("#settings").hidden = true;
+3880-}
+--
+4222-  function sliderValueFromDuration(dur) {
+4223-    const maxDur = maxDuration();
+4224-    const d = clamp(Number(dur) || maxDur, MIN_DUR, maxDur);
+4225-    const den = Math.log(MIN_DUR / maxDur);
+4226-    if (!Number.isFinite(den) || den === 0) return 0;
+4227-    return clamp(Math.round(Math.log(d / maxDur) / den * 1000), 0, 1000);
+4228-  }
+4229-
+4230-  function syncZoomBar(dur) {
+4231-    const out = document.getElementById("waveZoomValue");
+4232-    const range = document.getElementById("waveZoomRange");
+4233-    if (out) out.value = (dur < 10 ? dur.toFixed(dur < 1 ? 2 : 1) : dur.toFixed(0)) + " s";
+4234-    if (range) range.value = sliderValueFromDuration(dur);
+4235-    document.querySelectorAll("#zoomQuick .zq").forEach(btn => {
+4236-      const raw = Number(btn.dataset.z);
+4237-      const z = raw > maxDuration() ? maxDuration() : raw;
+4238-      btn.classList.toggle("on", Math.abs(z - dur) < 0.001);
+4239-    });
+4240-  }
+4241-
+4242:  function renderNavigator(force = false) {
+4243-    const {total, dur, t0} = normalizeView();
+4244-    const r = track.getBoundingClientRect();
+4245-    const h = Math.max(1, r.height);
+4246-    const thumbH = Math.min(h, Math.max(38, h * (dur / total)));
+4247-    const travelPx = Math.max(0, h - thumbH);
+4248-    const travelTime = Math.max(0, total - dur);
+4249-    const y = travelTime > 0 && travelPx > 0 ? (t0 / travelTime) * travelPx : 0;
+4250-    const sig = [Math.round(h), total.toFixed(3), dur.toFixed(4), t0.toFixed(4), Math.round(y), Math.round(thumbH)].join("|");
+4251-    if (force || sig !== lastSig) {
+4252-      lastSig = sig;
+4253-      thumb.style.top = y + "px";
+4254-      thumb.style.height = thumbH + "px";
+4255-      thumb.setAttribute("aria-valuetext", "Vista " + dur.toFixed(dur < 1 ? 2 : 1) + " s");
+4256-      syncZoomBar(dur);
+4257-    }
+4258-  }
+4259-
+4260-  function setViewport(t0, dur) {
+4261-    const total = maxDuration();
+4262-    const d = clamp(Number(dur), MIN_DUR, total);
+4263-    const start = clamp(Number(t0), 0, Math.max(0, total - d));
+4264-    S.view.dur = d;
+4265-    S.view.t0 = start;
+4266-    draw();
+4267:    renderNavigator(true);
+4268-  }
+4269-
+4270-  function beginDrag(kind, e) {
+4271-    if (!S.peaks || maxDuration() <= MIN_DUR) return;
+4272-    e.preventDefault();
+4273-    e.stopPropagation();
+4274-    const v = normalizeView();
+4275-    const tr = track.getBoundingClientRect();
+4276-    const thumbRect = thumb.getBoundingClientRect();
+4277-    drag = {
+4278-      kind,
+4279-      pointerId: e.pointerId,
+4280-      y0: e.clientY,
+4281-      trackH: Math.max(1, tr.height),
+4282-      thumbH: Math.max(1, thumbRect.height),
+4283-      t0: v.t0,
+4284-      dur: v.dur,
+4285-      total: v.total,
+4286-      bottom: v.t0 + v.dur
+4287-    };
+4288-    thumb.classList.add("dragging");
+4289-    try { thumb.setPointerCapture(e.pointerId); } catch (_) {}
+4290-  }
+4291-
+4292-  thumb.addEventListener("pointerdown", e => {
+4293-    if (e.target === topHandle || e.target === bottomHandle) return;
+4294-    beginDrag("move", e);
+4295-  });
+4296-
+4297-  topHandle.addEventListener("pointerdown", e => beginDrag("top", e));
+4298-  bottomHandle.addEventListener("pointerdown", e => beginDrag("bottom", e));
+4299-
+4300-  document.addEventListener("pointermove", e => {
+4301-    if (!drag || e.pointerId !== drag.pointerId) return;
+4302-    e.preventDefault();
+4303-    const dy = e.clientY - drag.y0;
+4304-
+4305-    if (drag.kind === "move") {
+4306-      const travelPx = Math.max(1, drag.trackH - drag.thumbH);
+4307-      const travelTime = Math.max(0, drag.total - drag.dur);
+4308-      const dt = (dy / travelPx) * travelTime;
+4309-      setViewport(drag.t0 + dt, drag.dur);
+4310-      return;
+4311-    }
+4312-
+4313-    const dir = drag.kind === "top" ? -1 : 1;
+4314-    const factor = Math.exp((dy / drag.trackH) * 3.2 * dir);
+4315-    const nextDur = clamp(drag.dur * factor, MIN_DUR, drag.total);
+4316-
+4317-    if (drag.kind === "top") {
+4318-      setViewport(drag.bottom - nextDur, nextDur);
+4319-    } else {
+4320-      setViewport(drag.t0, nextDur);
+4321-    }
+4322-  }, {passive:false});
+4323-
+4324-  function finishDrag(e) {
+4325-    if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pointerId)) return;
+4326-    try {
+4327-      if (thumb.hasPointerCapture && thumb.hasPointerCapture(drag.pointerId)) thumb.releasePointerCapture(drag.pointerId);
+4328-    } catch (_) {}
+4329-    drag = null;
+4330-    thumb.classList.remove("dragging");
+4331:    renderNavigator(true);
+4332-  }
+4333-  document.addEventListener("pointerup", finishDrag, true);
+4334-  document.addEventListener("pointercancel", finishDrag, true);
+4335-
+4336-  track.addEventListener("pointerdown", e => {
+4337-    if (e.target !== track || !S.peaks) return;
+4338-    e.preventDefault();
+4339-    const v = normalizeView();
+4340-    const r = track.getBoundingClientRect();
+4341-    const ratio = clamp((e.clientY - r.top) / Math.max(1, r.height), 0, 1);
+4342-    const center = ratio * v.total;
+4343-    setViewport(center - v.dur / 2, v.dur);
+4344-  });
+4345-
+4346-  // Sincroniza la barra con scroll, zoom, reproducción y cualquier cambio del motor.
+4347-  function navLoop() {
+4348:    renderNavigator(false);
+4349-    requestAnimationFrame(navLoop);
+4350-  }
+4351:  new ResizeObserver(() => renderNavigator(true)).observe(nav);
+4352:  renderNavigator(true);
+4353-  requestAnimationFrame(navLoop);
+4354-})();
+4355-</script>
+4356-
+4357-</body>
+4358-</html>
