@@ -1821,7 +1821,159 @@ function buildRenderPagesDecision(){
   };
 }
 
-/* --- 2. plan de dibujado, PAGINADO BLOQUEADO al preview --- */
+/* DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1
+   UNA sola fuente de verdad visual:
+   - N líneas = capacidad de pantalla, no obligación de borrar por página.
+   - display_at = momento en que la línea FUTURA ya debe estar legible.
+   - sweep_start/end = timings musicales, jamás se mueven aquí.
+   - remove_at = cuándo se libera el slot.
+   - los CLEAR completos sólo ocurren en pausas realmente seguras,
+     instrumentales o antes del ending.
+*/
+function buildRenderPlanDecision(){
+  const lpp=Math.max(2,Math.min(8,Number(PV.cfg.linesPerPage||6)));
+  const readAhead=2.50;
+  const postHold=0.18;
+  const safeClearGap=4.00;
+  const opening=pvOpeningDecision();
+  const ending=pvEndingDecision();
+  const raw=pvWrap();
+  const lines=[];
+
+  for(let li=0;li<raw.length;li++){
+    const line=raw[li]||[];
+    if(!line.length) continue;
+    const timed=line.filter(w=>w.start_time!==null&&w.start_time!==undefined);
+    if(!timed.length) continue;
+    const st=Math.min(...timed.map(w=>Number(w.start_time)));
+    const en=Math.max(...timed.map(w=>Number(w.end_time??w.start_time)));
+    const ids=line.map(w=>w.id);
+    lines.push({
+      line_id:"line:"+ids[0]+":"+ids[ids.length-1],
+      visual_index:li,
+      slot:(li%lpp)+1,
+      word_ids:ids,
+      text:line.map(w=>pvText(w.text)).join(" "),
+      sweep_start:+st.toFixed(3),
+      sweep_end:+en.toFixed(3),
+      preferred_display_at:+Math.max(0,st-readAhead).toFixed(3),
+      display_at:null,
+      remove_at:null,
+      read_ahead_seconds:null,
+      shortfall_seconds:0
+    });
+  }
+
+  const inst=_diagInstrumentalDecisions().filter(x=>x.renderer_inserted);
+  const instIntervals=inst.map((x,i)=>({
+    id:"instrumental:"+i,
+    start:Number(x.preview_show_from_seconds),
+    end:Number(x.hide_at_seconds),
+    next_word_id:x.next?.id||null
+  })).filter(x=>Number.isFinite(x.start)&&Number.isFinite(x.end)&&x.end>x.start);
+
+  const clearEvents=[];
+  const addClear=(at,reason,meta={})=>{
+    at=Number(at);
+    if(!Number.isFinite(at)||at<0)return;
+    if(clearEvents.some(x=>Math.abs(x.at-at)<.035))return;
+    clearEvents.push({at:+at.toFixed(3),reason,...meta});
+  };
+
+  for(const it of instIntervals){
+    addClear(it.start,"INSTRUMENTAL_START",{instrumental_id:it.id});
+    addClear(it.end,"INSTRUMENTAL_END",{instrumental_id:it.id});
+  }
+
+  // Una pausa >=4 s da tiempo para un CLEAR barato y read-ahead.
+  for(let i=1;i<lines.length;i++){
+    const a=lines[i-1],b=lines[i];
+    const gap=Number(b.sweep_start)-Number(a.sweep_end);
+    const overlapsInst=instIntervals.some(x=>x.start<b.sweep_start&&x.end>a.sweep_end);
+    if(gap>=safeClearGap && !overlapsInst){
+      addClear(Number(a.sweep_end)+.20,"SAFE_GAP",{gap_seconds:+gap.toFixed(3)});
+    }
+  }
+
+  if(ending.preview_start>0){
+    const last=lines.length?lines[lines.length-1]:null;
+    if(!last || Number(last.sweep_end)<=Number(ending.preview_start)){
+      addClear(ending.preview_start,"ENDING");
+    }
+  }
+  clearEvents.sort((a,b)=>a.at-b.at);
+
+  const lastBySlot=new Map();
+  for(const ev of lines){
+    let display=Math.max(Number(ev.preferred_display_at),Number(opening.end||0)+.02);
+
+    // Nunca preparamos letra encima de un INSTRUMENTAL.
+    for(const it of instIntervals){
+      if(display>=it.start-.001 && display<it.end){
+        display=it.end+.05;
+      }
+      // Si el clear final del instrumental cae después del display preferido,
+      // la línea debe esperar a ese clear.
+      if(it.end<ev.sweep_start && it.end>display){
+        display=it.end+.05;
+      }
+    }
+
+    // Cualquier CLEAR previo a esta línea invalida dibujos anteriores.
+    const lastClear=clearEvents.filter(x=>x.at<ev.sweep_start-.01).slice(-1)[0];
+    if(lastClear && lastClear.at>display) display=lastClear.at+.05;
+
+    // Overwrite circular: el slot se reutiliza sólo después del END anterior.
+    const prev=lastBySlot.get(ev.slot);
+    if(prev){
+      const cleared=clearEvents.some(x=>x.at>prev.sweep_end-.001 && x.at<=display+.001);
+      if(!cleared) display=Math.max(display,Number(prev.sweep_end)+postHold);
+    }
+
+    ev.display_at=+display.toFixed(3);
+    ev.read_ahead_seconds=+Math.max(0,Number(ev.sweep_start)-display).toFixed(3);
+    ev.shortfall_seconds=+Math.max(0,readAhead-ev.read_ahead_seconds).toFixed(3);
+    ev.remove_at=ending.preview_start>0?+ending.preview_start.toFixed(3):+Math.max(Number(S.duration||0),Number(ev.sweep_end)+2).toFixed(3);
+
+    if(prev) prev.remove_at=Math.min(Number(prev.remove_at),display);
+    lastBySlot.set(ev.slot,ev);
+  }
+
+  // Un CLEAR seguro libera todos los slots ya terminados.
+  for(const ce of clearEvents){
+    for(const ev of lines){
+      if(ev.display_at<ce.at && ev.sweep_end<=ce.at+.001 && ev.remove_at>ce.at){
+        ev.remove_at=ce.at;
+      }
+    }
+  }
+  for(const ev of lines){
+    if(ev.remove_at<=ev.sweep_end) ev.remove_at=+(Number(ev.sweep_end)+postHold).toFixed(3);
+    else ev.remove_at=+Number(ev.remove_at).toFixed(3);
+  }
+
+  return {
+    version:"CDG_RENDER_PLAN_V1",
+    source:"KARAOKE_PREVIEW",
+    mode:"SMART_OVERWRITE",
+    lines_per_screen:lpp,
+    read_ahead_seconds:readAhead,
+    post_sweep_hold_seconds:postHold,
+    safe_clear_gap_seconds:safeClearGap,
+    policy:{
+      musical_word_timings_are_immutable:true,
+      lines_are_capacity_not_page_rule:true,
+      preview_and_renderer_share_plan:true,
+      full_clear_only_when_safe:true,
+      renderer_may_preroll_packets_before_display_at:true
+    },
+    clear_events:clearEvents,
+    instrumental_intervals:instIntervals,
+    lines
+  };
+}
+
+/* --- 2. plan de dibujado, SMART OVERWRITE autoritativo --- */
 function pvPlan(){
   const lpp = PV.cfg.linesPerPage, lth = PV.cfg.lineTileHeight;
   PV.cfg.row = Math.max(1, Math.floor((18 - lpp*lth)/2));
@@ -1861,36 +2013,22 @@ function pvPlan(){
 
   const n = lines.length;
   const draw = new Array(n).fill(0), erase = new Array(n).fill(0);
+  const renderPlan=buildRenderPlanDecision();
+  const byKey=new Map(
+    renderPlan.lines.map(ev=>[(ev.word_ids||[]).join("|"),ev])
+  );
 
-  // PAGE LOCK: la página anterior se limpia completa y la nueva se dibuja
-  // completa. Nunca mezclamos filas de dos páginas.
-  const pageCount=Math.ceil(n/lpp);
-  const pageSyllables=Array.from({length:pageCount},()=>[]);
-  for(const x of syl) pageSyllables[Math.floor(x.li/lpp)].push(x);
-
-  if(pageSyllables[0]&&pageSyllables[0].length){
-    let dt=pageSyllables[0][0].s-900;
-    for(let i=0;i<Math.min(lpp,n);i++){draw[i]=dt;dt+=PV.GAP;}
+  // Preview = plan visual real. No vuelve a inventar páginas ni tiempos.
+  for(let li=0;li<n;li++){
+    const line=lines[li]||[];
+    if(!line.length)continue;
+    const ev=byKey.get(line.map(w=>w.id).join("|"));
+    if(!ev)continue;
+    draw[li]=cs(Number(ev.display_at))*3;
+    erase[li]=cs(Number(ev.remove_at))*3;
   }
 
-  for(let page=1;page<pageCount;page++){
-    const cur=pageSyllables[page]||[];
-    if(!cur.length)continue;
-    const prev=(pageSyllables[page-1]||[]);
-    const first=cur[0];
-    const lastPrev=prev.length?prev[prev.length-1]:null;
-    // 3 s de anticipación cuando cabe; nunca alteramos START/END para fabricar hueco.
-    const pageAt=Math.max(first.s-900,lastPrev?lastPrev.e+12:first.s-900);
-
-    const prevStart=(page-1)*lpp;
-    for(let i=prevStart;i<Math.min(prevStart+lpp,n);i++) erase[i]=pageAt;
-
-    let dt=pageAt;
-    const start=page*lpp;
-    for(let i=start;i<Math.min(start+lpp,n);i++){draw[i]=dt;dt+=PV.GAP;}
-  }
-
-  return {lines, geom, syl, draw, erase, lpp, clearMode:"page"};
+  return {lines, geom, syl, draw, erase, lpp, clearMode:"smart_overwrite",renderPlan};
 }
 
 let pvT;
@@ -2179,7 +2317,7 @@ function buildDiagnosticJsonPayload(){
     ai_original_end:w.ai_original_end??null
   }));
   return {
-    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V6",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V7",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -2199,6 +2337,7 @@ function buildDiagnosticJsonPayload(){
     timeline:pvTimelineDiagnostic(),
     render_timeline:buildRenderTimelineDecision(),
     render_pages:buildRenderPagesDecision(),
+    render_plan:buildRenderPlanDecision(),
     ai_block_alignments:S.doc?.ai?.block_alignments||[],
     repeat_microtiming_repairs:S.doc?.ai?.repeat_microtiming_repairs||[],
     words
@@ -4046,6 +4185,7 @@ function buildExport(){
   out.song.duration = S.duration;
   out.render_timeline = buildRenderTimelineDecision();
   out.render_pages = buildRenderPagesDecision();
+  out.render_plan = buildRenderPlanDecision();
   for(const seg of out.segments){
     if(!seg.words.length){ seg.start_time = null; seg.end_time = null; continue; }
     const timed = seg.words.filter(w => w.start_time !== null);
@@ -4904,5 +5044,6 @@ resize(); loop();
 <!-- DJGABO_AUTHORITATIVE_PAGES_V1 -->
 <!-- DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2 -->
 <!-- DJGABO_REPEAT_MICROTIMING_DIAG_V1 -->
+<!-- DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1 -->
 </body>
 </html>

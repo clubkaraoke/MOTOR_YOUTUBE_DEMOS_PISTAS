@@ -424,6 +424,8 @@ class KaraokeComposer:
         self.logger.info("config settings loaded")
 
         self._set_draw_times()
+        # DJGABO_SMART_OVERWRITE_COMPOSER_V1
+        self.screen_clear_index = 0
 
     @classmethod
     def from_file(
@@ -470,6 +472,24 @@ class KaraokeComposer:
             line_count = len(lyric.lines)
             line_draw: list[int] = [0] * line_count
             line_erase: list[int] = [0] * line_count
+
+            # DJGABO_SMART_OVERWRITE_COMPOSER_V1
+            cfg_lyric = self.config.lyrics[lyric.lyric_index]
+            if getattr(cfg_lyric, "explicit_timeline", False):
+                if len(cfg_lyric.line_draw) != line_count or len(cfg_lyric.line_erase) != line_count:
+                    raise RuntimeError(
+                        f"explicit timeline lyric {lyric.lyric_index}: "
+                        f"{len(cfg_lyric.line_draw)}/{len(cfg_lyric.line_erase)} tiempos "
+                        f"para {line_count} líneas"
+                    )
+                line_draw = [sync_to_cdg(int(x)) for x in cfg_lyric.line_draw]
+                line_erase = [sync_to_cdg(int(x)) for x in cfg_lyric.line_erase]
+                self.logger.info(
+                    "using explicit SMART_OVERWRITE line timeline for lyric %d (%d lines)",
+                    lyric.lyric_index, line_count
+                )
+                self.lyric_times.append(LyricTimes(line_draw=line_draw, line_erase=line_erase))
+                continue
 
             # The first page is drawn 3 seconds before the first
             # syllable
@@ -932,6 +952,33 @@ class KaraokeComposer:
         composer_state: ComposerState,
     ):
         current_time = self.writer.packets_queued - self.sync_offset - self.intro_delay
+
+        # CLEAR completo barato (Memory Preset) sólo cuando el render_plan lo
+        # autorizó: pausa segura, instrumental o ending.
+        clears=getattr(self.config,"screen_clear_sync",[]) or []
+        if self.screen_clear_index < len(clears):
+            clear_time=sync_to_cdg(int(clears[self.screen_clear_index]))
+            if current_time >= clear_time:
+                self.logger.debug("explicit screen clear at %d", clear_time)
+                for st in lyric_states:
+                    st.highlight_queue.clear()
+                    st.draw_queue.clear()
+                packets=[*memory_preset_repeat(self.BACKGROUND),*load_color_table(self.color_table)]
+                if self.config.border is not None:
+                    packets.append(border_preset(self.BORDER))
+                self.lyric_packet_indices.update(
+                    range(self.writer.packets_queued,self.writer.packets_queued+len(packets))
+                )
+                self.writer.queue_packets(packets)
+                # No vuelvas a gastar ancho de banda borrando línea por línea
+                # lo que este Memory Preset ya limpió.
+                for idx,st in enumerate(lyric_states):
+                    tm=self.lyric_times[idx]
+                    while st.line_erase < len(tm.line_erase) and tm.line_erase[st.line_erase] <= clear_time:
+                        st.line_erase += 1
+                self.screen_clear_index += 1
+                composer_state.just_cleared=True
+                return
 
         should_draw_this_line = False
         line_draw_info, line_draw_time = None, None

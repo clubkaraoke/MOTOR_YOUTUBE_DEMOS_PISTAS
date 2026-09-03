@@ -63,6 +63,10 @@ class Normalized:
     duration: float
     render_timeline: dict
     render_pages: dict
+    render_plan: dict
+    line_draw_sync: list[int]
+    line_erase_sync: list[int]
+    screen_clear_sync: list[int]
     warnings: list[Warning_] = field(default_factory=list)
 
 
@@ -333,6 +337,215 @@ def resolve_render_pages(doc: dict, style: dict, font: ImageFont.FreeTypeFont, u
         "authoritative":False,
         "pages":pages,
     }
+
+
+# DJGABO_SMART_OVERWRITE_NORMALIZER_V1
+def _fallback_render_plan(visual: list[list[dict]], style: dict, duration: float) -> dict:
+    """Compatibilidad para proyectos antiguos que todavía no traen render_plan."""
+    lpp=max(2,min(8,int(style.get("lines_per_page",6))))
+    read_ahead=2.5
+    hold=.18
+    lines=[]
+    last_by_slot={}
+    for li,line in enumerate(visual):
+        if not line:
+            continue
+        st=min(float(w["start_time"]) for w in line)
+        en=max(float(w.get("end_time") or w["start_time"]) for w in line)
+        slot=(li%lpp)+1
+        display=max(0.0,st-read_ahead)
+        prev=last_by_slot.get(slot)
+        if prev is not None:
+            display=max(display,float(prev["sweep_end"])+hold)
+            prev["remove_at"]=display
+        ev={
+            "line_id":f"fallback:{line[0].get('id')}:{line[-1].get('id')}",
+            "visual_index":li,"slot":slot,
+            "word_ids":[str(w.get("id")) for w in line],
+            "text":" ".join(str(w.get("text") or "") for w in line),
+            "sweep_start":st,"sweep_end":en,
+            "preferred_display_at":max(0.0,st-read_ahead),
+            "display_at":display,
+            "remove_at":max(duration,en+2.0),
+            "read_ahead_seconds":max(0.0,st-display),
+            "shortfall_seconds":max(0.0,read_ahead-max(0.0,st-display)),
+        }
+        lines.append(ev); last_by_slot[slot]=ev
+    return {
+        "version":"CDG_RENDER_PLAN_V1",
+        "source":"NORMALIZER_FALLBACK",
+        "mode":"SMART_OVERWRITE",
+        "lines_per_screen":lpp,
+        "read_ahead_seconds":read_ahead,
+        "post_sweep_hold_seconds":hold,
+        "safe_clear_gap_seconds":4.0,
+        "policy":{"preview_and_renderer_share_plan":False},
+        "clear_events":[],
+        "instrumental_intervals":[],
+        "lines":lines,
+        "authoritative":False,
+    }
+
+
+def resolve_render_plan(doc: dict, visual: list[list[dict]], style: dict) -> dict:
+    raw=doc.get("render_plan")
+    if not isinstance(raw,dict) or raw.get("version")!="CDG_RENDER_PLAN_V1":
+        return _fallback_render_plan(
+            visual,style,float((doc.get("song") or {}).get("duration") or 0.0)
+        )
+
+    lpp=max(2,min(8,int(style.get("lines_per_page",6))))
+    if int(raw.get("lines_per_screen") or 0)!=lpp:
+        raise NormalizeError(
+            f"render_plan fue calculado para {raw.get('lines_per_screen')} líneas, "
+            f"pero el render pide {lpp}."
+        )
+    events=raw.get("lines")
+    if not isinstance(events,list):
+        raise NormalizeError("render_plan.lines no es una lista.")
+
+    expected=[
+        [str(w.get("id")) for w in line]
+        for line in visual if line
+    ]
+    got=[
+        [str(x) for x in (ev.get("word_ids") or [])]
+        for ev in events if isinstance(ev,dict)
+    ]
+    if got!=expected:
+        raise NormalizeError(
+            "render_plan no coincide con las líneas actuales. "
+            "Recarga el editor para regenerar el plan visual."
+        )
+
+    out=dict(raw)
+    out["authoritative"]=True
+    out["source"]="KARAOKE_PREVIEW"
+    return out
+
+
+def _line_draw_cost_seconds(line: list[dict], font: ImageFont.FreeTypeFont,
+                            line_tile_height: int, draw_bw: int, highlight_bw: int,
+                            uppercase: bool) -> float:
+    if not line:
+        return 0.0
+    txt=" ".join(
+        (str(w.get("text") or "").upper() if uppercase else str(w.get("text") or ""))
+        for w in line
+    )
+    width=max(1.0,text_width(txt,font))
+    tile_cols=max(1,math.ceil(width/6.0))
+    packets=tile_cols*max(1,int(line_tile_height))
+    share=max(1,int(draw_bw))/max(1,int(draw_bw)+int(highlight_bw))
+    throughput=max(1.0,300.0*share)
+    return max(.08,packets/throughput)
+
+
+def materialize_render_plan(visual: list[list[dict]], plan: dict, style: dict,
+                            font: ImageFont.FreeTypeFont, uppercase: bool):
+    """Convierte display/remove del JSON a PRE-ROLL físico para CDG.
+
+    El JSON manda sobre el momento visible. El backend sólo comienza a mandar
+    tiles un poco antes para que la línea esté COMPLETA en display_at.
+    """
+    lpp=max(2,min(8,int(style.get("lines_per_page",6))))
+    event_map={
+        tuple(str(x) for x in (ev.get("word_ids") or [])):dict(ev)
+        for ev in (plan.get("lines") or [])
+        if isinstance(ev,dict)
+    }
+    line_draw=[0]*len(visual)
+    line_erase=[0]*len(visual)
+    enriched=[]
+    record_by_visual={}
+
+    for li,line in enumerate(visual):
+        if not line:
+            continue
+        if line[0].get("_inst"):
+            st=min(float(w["start_time"]) for w in line)
+            en=max(float(w.get("end_time") or w["start_time"]) for w in line)
+            cost=_line_draw_cost_seconds(
+                line,font,style["line_tile_height"],
+                style["draw_bandwidth"],style["highlight_bandwidth"],uppercase
+            )
+            draw=max(0.0,st-cost-.08)
+            erase=max(en+.05,st+.10)
+            rec={
+                "kind":"instrumental","visual_index":li,"slot":(li%lpp)+1,
+                "display_at":st,"cdg_draw_begin_at":draw,"remove_at":erase,
+                "cdg_draw_cost_seconds":cost,
+            }
+        else:
+            key=tuple(str(w.get("id")) for w in line)
+            ev=event_map.get(key)
+            if ev is None:
+                raise NormalizeError(
+                    "No encuentro en render_plan la línea: "+
+                    " ".join(str(w.get("text") or "") for w in line)
+                )
+            display=float(ev["display_at"])
+            remove=float(ev["remove_at"])
+            cost=_line_draw_cost_seconds(
+                line,font,style["line_tile_height"],
+                style["draw_bandwidth"],style["highlight_bandwidth"],uppercase
+            )
+            draw=max(0.0,display-cost)
+            rec=dict(ev)
+            rec.update({
+                "kind":"lyric","visual_index":li,
+                "cdg_draw_begin_at":draw,
+                "cdg_draw_cost_seconds":cost,
+            })
+            erase=remove
+        line_draw[li]=int(round(draw*100))
+        line_erase[li]=int(round(erase*100))
+        enriched.append(rec)
+        record_by_visual[li]=rec
+
+    # Para overwrite, el borrado del ocupante anterior debe terminar ANTES
+    # de que empiece el pre-roll de la línea nueva en el mismo slot.
+    last_by_slot={}
+    for li in sorted(record_by_visual):
+        rec=record_by_visual[li]
+        slot=int(rec["slot"])
+        prev_li=last_by_slot.get(slot)
+        if prev_li is not None:
+            prev=record_by_visual[prev_li]
+            erase_cost=_line_draw_cost_seconds(
+                visual[prev_li],font,style["line_tile_height"],
+                style["draw_bandwidth"],style["highlight_bandwidth"],uppercase
+            )
+            replace_begin=float(rec["cdg_draw_begin_at"])
+            desired=max(float(prev.get("sweep_end") or 0.0)+.02,replace_begin-erase_cost)
+            line_erase[prev_li]=min(line_erase[prev_li],int(round(max(0.0,desired)*100)))
+            prev["cdg_erase_begin_at"]=line_erase[prev_li]/100.0
+        last_by_slot[slot]=li
+
+    clear_sync=[]
+    for ce in (plan.get("clear_events") or []):
+        if not isinstance(ce,dict): continue
+        try: at=max(0.0,float(ce.get("at")))
+        except Exception: continue
+        clear_sync.append(int(round(at*100)))
+    clear_sync=sorted(set(clear_sync))
+
+    # Las líneas que el plan dice que mueren en un CLEAR se dejan exactamente
+    # en ese punto; el compositor hará memory preset y saltará sus erases.
+    clear_set=set(clear_sync)
+    for li,rec in record_by_visual.items():
+        rm=int(round(float(rec.get("remove_at") or 0)*100))
+        if rm in clear_set:
+            line_erase[li]=rm
+            rec["cdg_erase_begin_at"]=rm/100.0
+        else:
+            rec.setdefault("cdg_erase_begin_at",line_erase[li]/100.0)
+
+    out=dict(plan)
+    out["renderer_mode"]="EXPLICIT_SMART_OVERWRITE"
+    out["renderer_lines"]=enriched
+    out["screen_clear_sync"]=clear_sync
+    return line_draw,line_erase,clear_sync,out
 
 
 def wipe_spans(visual: list[list[dict]], tail: float = 0.45) -> None:
@@ -701,11 +914,15 @@ def normalize(doc: dict, style: dict) -> Normalized:
     # reagrupar por pausas de 2 s: esa era la causa de que Preview y CDG
     # mostraran distintas combinaciones de líneas.
     visual, render_pages = resolve_render_pages(doc, style, font, upper)
+    render_plan = resolve_render_plan(doc, visual, style)
     visual = build_instrumentals(visual, style, spoken_intervals, voice_gaps)
     visual = center_last_page(visual, style["lines_per_page"])
     instrumentals: list[dict] = []
 
     wipe_spans(visual)
+    line_draw_sync,line_erase_sync,screen_clear_sync,render_plan = materialize_render_plan(
+        visual,render_plan,style,font,upper
+    )
     warns = check_packet_budget(
         visual, font, style["line_tile_height"],
         style["highlight_bandwidth"], style["draw_bandwidth"], upper,
@@ -797,6 +1014,10 @@ def normalize(doc: dict, style: dict) -> Normalized:
         duration=doc["song"].get("duration", 0.0),
         render_timeline=render_timeline,
         render_pages=render_pages,
+        render_plan=render_plan,
+        line_draw_sync=line_draw_sync,
+        line_erase_sync=line_erase_sync,
+        screen_clear_sync=screen_clear_sync,
         warnings=warns,
     )
 
@@ -828,6 +1049,7 @@ def to_toml(n: Normalized, style: dict, audio: Path, outname: str, assets: Path)
         f"sync_offset = {style['sync_offset']}",
         f"highlight_bandwidth = {style['highlight_bandwidth']}",
         f"draw_bandwidth = {style['draw_bandwidth']}",
+        f"screen_clear_sync = [{', '.join(str(x) for x in n.screen_clear_sync)}]",
         f"background = {_q(style['background'])}",
         f"border = {_q(style['border'])}",
         f"title_screen_background = {_q(assets / style['title_background'])}",
@@ -894,6 +1116,9 @@ def to_toml(n: Normalized, style: dict, audio: Path, outname: str, assets: Path)
         f"row = {n.row}",
         f"line_tile_height = {n.line_tile_height}",
         f"lines_per_page = {n.lines_per_page}",
+        "explicit_timeline = true",
+        f"line_draw = [{', '.join(str(x) for x in n.line_draw_sync)}]",
+        f"line_erase = [{', '.join(str(x) for x in n.line_erase_sync)}]",
         f"sync = [{', '.join(str(s) for s in n.sync)}]",
         f"syllable_modes = [{', '.join(str(m) for m in n.syllable_modes)}]",
         # sin salto final: TOML conservaría una línea vacía de más y cdgmaker

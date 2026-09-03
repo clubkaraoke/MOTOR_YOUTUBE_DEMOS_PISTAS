@@ -241,9 +241,10 @@ def main() -> int:
         style_run = dict(style)
         style_run["intro_duration_seconds"] = float(norm.render_timeline["opening"]["duration_seconds"])
         style_run["intro_mode"] = "always" if style_run["intro_duration_seconds"] > 0 else "never"
-        # DJGABO_AUTHORITATIVE_PAGES_RENDERER_V1
-        # No mezclar filas de página anterior/nueva: el compositor limpia por página.
-        style_run["clear_mode"] = "page"
+        # DJGABO_SMART_OVERWRITE_RENDERER_V1
+        # El JSON trae display/remove por línea. "delayed" desactiva el CLEAR
+        # automático por página; cdgmaker usa los tiempos explícitos.
+        style_run["clear_mode"] = "delayed"
         log.info(
             "render timeline: first_real_voice=%s · opening=%ss · rule=%s · intro_delay=0",
             norm.render_timeline.get("first_real_voice_seconds"),
@@ -299,6 +300,7 @@ def main() -> int:
         "composer_warnings": catcher.items,
         "render_timeline": norm.render_timeline,
         "render_pages": norm.render_pages,
+        "render_plan": norm.render_plan,
     }
     (args.out / f"{outname}.avisos.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
