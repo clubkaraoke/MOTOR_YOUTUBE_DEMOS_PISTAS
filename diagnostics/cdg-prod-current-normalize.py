@@ -61,6 +61,7 @@ class Normalized:
     row: int
     instrumentals: list[dict]
     duration: float
+    render_timeline: dict
     warnings: list[Warning_] = field(default_factory=list)
 
 
@@ -309,8 +310,18 @@ def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals:
             out.append([])
             continue
         start = line[0]["start_time"]
-        gap = start if prev_end is None else start - prev_end
-        base = prev_end or 0.0
+        # PROD_FINAL_CDG_PREVIEW_V1
+        # El primer bloque INSTRUMENTAL comparte la MISMA timeline absoluta
+        # que el opening. Nunca puede empezar en t=0 y quedar en cola detras
+        # del opening: eso obliga a cdgmaker a "ponerse al dia" despues de
+        # los 6 s y desplaza visualmente los circulos/letras en el CDG final.
+        # Esta base coincide exactamente con pvInstrumentalState() del editor.
+        if prev_end is None:
+            base = max(0.0, float(style.get("intro_duration_seconds", 0.0) or 0.0) + 0.25)
+            gap = start - base
+        else:
+            base = prev_end
+            gap = start - prev_end
 
         # R11: si HABLADO crea un hueco visual >= spoken_min, no exportamos
         # ese texto y mostramos INSTRUMENTAL. La próxima página cantada queda
@@ -417,34 +428,137 @@ def check_packet_budget(visual: list[list[dict]], font: ImageFont.FreeTypeFont,
     return warns
 
 
-def decide_intro(doc: dict, style: dict) -> float:
-    """Duración de la portada según cuándo entra la primera voz.
+# DJGABO_RENDER_TIMELINE_NORMALIZER_V1
+def _first_real_voice(doc: dict) -> float | None:
+    vals = [
+        float(w["start_time"])
+        for seg in doc.get("segments", [])
+        for w in seg.get("words", [])
+        if w.get("start_time") is not None
+    ]
+    return min(vals) if vals else None
 
-    `intro_mode`: auto | always | never. En automático la regla es simple: si
-    el cantante entra enseguida no hay sitio para una portada, y meterla a la
-    fuerza retrasaría el audio.
-    """
-    mode = style.get("intro_mode", "auto")
-    if mode == "never":
-        return 0.0
-    normal = float(style.get("intro_duration_seconds", 4.0))
-    corta = float(style.get("intro_short_duration_seconds", 2.0))
-    if mode == "always":
-        return normal
-    primera = min(
-        (w["start_time"] for seg in doc["segments"] for w in seg.get("words", [])
-         if w.get("start_time") is not None), default=99.0)
-    if primera < float(style.get("intro_auto_skip_before_seconds", 3.0)):
-        return 0.0
-    if primera < float(style.get("intro_auto_short_before_seconds", 6.0)):
-        return corta
-    return normal
+
+def _first_sung_voice(doc: dict) -> float | None:
+    vals = [
+        float(w["start_time"])
+        for seg in doc.get("segments", [])
+        for w in seg.get("words", [])
+        if not w.get("spoken") and w.get("start_time") is not None
+    ]
+    return min(vals) if vals else None
+
+
+def _computed_render_timeline(doc: dict, style: dict) -> dict:
+    first_real = _first_real_voice(doc)
+    first_sung = _first_sung_voice(doc)
+    normal = float(style.get("intro_duration_seconds", 6.0))
+    short = float(style.get("intro_short_duration_seconds", 3.0))
+    buffer_s = float(style.get("first_syllable_buffer_seconds", 3.0))
+    short_needs = short + buffer_s
+    normal_needs = normal + buffer_s
+
+    if first_real is None:
+        duration, rule = normal, "SIN_VOZ_REAL"
+    elif first_real < short_needs:
+        duration, rule = 0.0, "AUTO_SKIP_NO_CABE"
+    elif first_real < normal_needs:
+        duration, rule = short, "AUTO_SHORT_FITS"
+    else:
+        duration, rule = normal, "AUTO_NORMAL_FITS"
+
+    return {
+        "version": "CDG_RENDER_TIMELINE_V1",
+        "clock_origin_seconds": 0.0,
+        "first_real_voice_seconds": first_real,
+        "first_sung_vocal_seconds": first_sung,
+        "opening": {
+            "enabled": duration > 0,
+            "render_screen": duration > 0,
+            "start_seconds": 0.0,
+            "duration_seconds": duration,
+            "end_seconds": duration,
+            "rule": rule,
+            "first_syllable_buffer_seconds": buffer_s,
+        },
+        "policy": {
+            "json_is_source_of_truth": False,
+            "synthetic_events_affect_opening": False,
+            "composer_intro_delay_seconds": 0.0,
+            "preserve_original_audio_clock": True,
+        },
+    }
+
+
+def resolve_render_timeline(doc: dict, style: dict) -> dict:
+    """El JSON del editor manda. Sólo calculamos fallback para proyectos antiguos."""
+    raw = doc.get("render_timeline")
+    if not isinstance(raw, dict) or not isinstance(raw.get("opening"), dict):
+        return _computed_render_timeline(doc, style)
+
+    opening = dict(raw["opening"])
+    try:
+        duration = max(0.0, float(opening.get("duration_seconds", 0.0)))
+    except (TypeError, ValueError):
+        raise NormalizeError("render_timeline.opening.duration_seconds no es numérico.")
+
+    first_real = raw.get("first_real_voice_seconds")
+    if first_real is None:
+        first_real = _first_real_voice(doc)
+    else:
+        first_real = float(first_real)
+    first_sung = raw.get("first_sung_vocal_seconds")
+    if first_sung is None:
+        first_sung = _first_sung_voice(doc)
+    else:
+        first_sung = float(first_sung)
+
+    buffer_s = float(opening.get(
+        "first_syllable_buffer_seconds",
+        style.get("first_syllable_buffer_seconds", 3.0),
+    ))
+    # Si el editor dice que hay opening, verificamos que realmente quepa antes
+    # de la zona de preparación de la primera voz. No inventamos retrasos.
+    if first_real is not None and duration > 0 and duration + buffer_s > first_real + 1e-6:
+        raise NormalizeError(
+            "El JSON de render pide un Opening que invade la primera voz real: "
+            f"opening={duration:.3f}s + buffer={buffer_s:.3f}s > voz={first_real:.3f}s."
+        )
+
+    timeline = {
+        "version": str(raw.get("version") or "CDG_RENDER_TIMELINE_V1"),
+        "clock_origin_seconds": 0.0,
+        "first_real_voice_seconds": first_real,
+        "first_sung_vocal_seconds": first_sung,
+        "opening": {
+            "enabled": bool(opening.get("enabled", duration > 0)) and duration > 0,
+            "render_screen": bool(opening.get("render_screen", duration > 0)) and duration > 0,
+            "start_seconds": 0.0,
+            "duration_seconds": duration,
+            "end_seconds": duration,
+            "rule": str(opening.get("rule") or "JSON_EXPLICITO"),
+            "first_syllable_buffer_seconds": buffer_s,
+        },
+        "policy": {
+            "json_is_source_of_truth": True,
+            "synthetic_events_affect_opening": False,
+            "composer_intro_delay_seconds": 0.0,
+            "preserve_original_audio_clock": True,
+        },
+    }
+    return timeline
+
+
+def decide_intro(doc: dict, style: dict) -> float:
+    """Compatibilidad: devuelve la decisión final, ya resuelta por el JSON."""
+    return float(resolve_render_timeline(doc, style)["opening"]["duration_seconds"])
 
 
 def normalize(doc: dict, style: dict) -> Normalized:
     check_complete(doc)
     style = dict(style)
-    style["intro_duration_seconds"] = decide_intro(doc, style)
+    render_timeline = resolve_render_timeline(doc, style)
+    style["intro_duration_seconds"] = float(render_timeline["opening"]["duration_seconds"])
 
     font_path = resolve_font_path(style)
     font = ImageFont.truetype(str(font_path), style["font_size"])
@@ -577,6 +691,7 @@ def normalize(doc: dict, style: dict) -> Normalized:
         row=row,
         instrumentals=instrumentals,
         duration=doc["song"].get("duration", 0.0),
+        render_timeline=render_timeline,
         warnings=warns,
     )
 

@@ -790,9 +790,10 @@ class KaraokeComposer:
             self.lyric_packet_indices: set[int] = set()
             self.instrumental_times: list[int] = []
 
+            # DJGABO_NO_INTRO_DELAY_V1
+            # El reloj del CDG es el reloj del audio original. El opening puede
+            # existir o no, pero nunca desplaza audio/letra.
             self.intro_delay = 0
-            # Compose the intro
-            # NOTE This also sets the intro delay for later.
             self._compose_intro()
 
             lyric_states: list[LyricState] = []
@@ -872,13 +873,11 @@ class KaraokeComposer:
                         composer_state=composer_state,
                     )
 
-            # Add audio padding to intro
-            self.logger.debug("padding intro of audio file")
-            intro_silence: AudioSegment = AudioSegment.silent(
-                self.intro_delay * 1000 // CDG_FPS,
-                frame_rate=song.frame_rate,
-            )
-            self.audio = intro_silence + song
+            # El audio conserva 0:00 absoluto; jamás se inserta silencio
+            # para acomodar la portada.
+            self.logger.debug("preserving original audio clock; intro padding disabled")
+            self.intro_delay = 0
+            self.audio = song
 
             # NOTE If video padding is not added to the end of the song, the
             # outro (or next instrumental section) begins immediately after
@@ -1541,6 +1540,13 @@ class KaraokeComposer:
             raise
 
     def _compose_intro(self):
+        # DJGABO_NO_INTRO_DELAY_V1: si el JSON decidió omitir Opening, no
+        # generamos ni un solo paquete de portada.
+        if float(self.config.intro_duration_seconds) <= 0:
+            self.intro_delay = 0
+            self.logger.info("Opening disabled by render timeline; no intro packets queued.")
+            return
+
         # TODO Make it so the intro screen is not hardcoded
         self.logger.debug("composing intro")
         self.writer.queue_packets(
@@ -1630,30 +1636,16 @@ class KaraokeComposer:
         for coord in self._gradient_to_tile_positions(transition):
             self.writer.queue_packets(packets.get(coord, []))
 
-        # Replace hardcoded values with configured ones
+        # El JSON ya decidió la duración. Sólo mantenemos la portada exactamente
+        # ese tiempo; no inspeccionamos sílabas (reales ni sintéticas).
         INTRO_DURATION = int(self.config.intro_duration_seconds * CDG_FPS)
-        FIRST_SYLLABLE_BUFFER = int(self.config.first_syllable_buffer_seconds * CDG_FPS)
-
-        # Queue the intro screen for 5 seconds
         end_time = INTRO_DURATION
-        self.writer.queue_packets([no_instruction()] * (end_time - self.writer.packets_queued))
-
-        first_syllable_start_offset = min(
-            syllable.start_offset for lyric in self.lyrics for line in lyric.lines for syllable in line.syllables
+        if self.writer.packets_queued < end_time:
+            self.writer.queue_packets([no_instruction()] * (end_time - self.writer.packets_queued))
+        self.intro_delay = 0
+        self.logger.info(
+            f"Opening composed for {self.config.intro_duration_seconds:.3f}s; intro_delay forced to 0."
         )
-        self.logger.debug(f"first syllable starts at {first_syllable_start_offset}")
-
-        MINIMUM_FIRST_SYLLABLE_TIME_FOR_NO_SILENCE = INTRO_DURATION + FIRST_SYLLABLE_BUFFER
-        # If the first syllable is within buffer+intro time, add silence
-        # Otherwise, don't add any silence
-        if first_syllable_start_offset < MINIMUM_FIRST_SYLLABLE_TIME_FOR_NO_SILENCE:
-            self.intro_delay = MINIMUM_FIRST_SYLLABLE_TIME_FOR_NO_SILENCE
-            self.logger.info(
-                f"First syllable within {self.config.intro_duration_seconds + self.config.first_syllable_buffer_seconds} seconds. Adding {self.intro_delay} frames of silence."
-            )
-        else:
-            self.intro_delay = 0
-            self.logger.info("First syllable after buffer period. No additional silence needed.")
 
     def _compose_outro(self, end: int):
         # TODO Make it so the outro screen is not hardcoded

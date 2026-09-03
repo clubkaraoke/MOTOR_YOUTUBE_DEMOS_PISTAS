@@ -1989,24 +1989,57 @@ function _diagInstrumentalDecisions(){
    La pestaña Karaoke representa TODO el timeline que debería terminar en CDG:
    OPENING -> INSTRUMENTAL -> KARAOKE -> ENDING. El JSON expone además el
    posible intro_delay interno de cdgmaker para detectar desplazamientos. */
+/* DJGABO_RENDER_TIMELINE_V1
+   Una sola fuente de verdad: primero se detecta VOZ REAL, luego se decide
+   cuánto opening cabe antes de que cdgmaker necesite dibujar la primera letra.
+   Los eventos sintéticos (INSTRUMENTAL/círculos) jamás participan. */
 function pvOpeningDecision(){
   const allTimed=(S.words||[]).filter(w=>w.start_time!==null).slice().sort((a,b)=>Number(a.start_time)-Number(b.start_time));
   const sung=(S.words||[]).filter(w=>!w.spoken&&w.start_time!==null).slice().sort((a,b)=>Number(a.start_time)-Number(b.start_time));
-  const firstTimed=allTimed.length?Number(allTimed[0].start_time):null;
+  const firstReal=allTimed.length?Number(allTimed[0].start_time):null;
   const firstSung=sung.length?Number(sung[0].start_time):null;
   const normal=Number(S.cfg.introDuration||6);
   const short=Number(S.cfg.introShort||3);
-  const skipBefore=3, shortBefore=6;
-  let duration=normal, rule="AUTO_NORMAL";
-  if(firstTimed===null){ duration=normal; rule="SIN_PRIMER_TIMING"; }
-  else if(firstTimed<skipBefore){ duration=0; rule="AUTO_SKIP_<3S"; }
-  else if(firstTimed<shortBefore){ duration=short; rule="AUTO_SHORT_3_6S"; }
+  const buffer=3;
+  const shortNeeds=short+buffer;   // 3 s opening + 3 s para preparar letra = 6 s
+  const normalNeeds=normal+buffer; // 6 s opening + 3 s para preparar letra = 9 s
+  let duration=normal, rule="AUTO_NORMAL_FITS";
+  if(firstReal===null){ duration=normal; rule="SIN_VOZ_REAL"; }
+  else if(firstReal<shortNeeds){ duration=0; rule="AUTO_SKIP_NO_CABE"; }
+  else if(firstReal<normalNeeds){ duration=short; rule="AUTO_SHORT_FITS"; }
   return {
-    start:0,end:duration,duration,rule,
-    first_timed_word_seconds:firstTimed,
+    start:0,end:duration,duration,enabled:duration>0,rule,
+    first_real_voice_seconds:firstReal,
+    first_timed_word_seconds:firstReal,
     first_sung_word_seconds:firstSung,
-    normal_seconds:normal,short_seconds:short,
-    skip_before_seconds:skipBefore,short_before_seconds:shortBefore
+    first_syllable_buffer_seconds:buffer,
+    short_requires_seconds:shortNeeds,
+    normal_requires_seconds:normalNeeds,
+    normal_seconds:normal,short_seconds:short
+  };
+}
+function buildRenderTimelineDecision(){
+  const o=pvOpeningDecision();
+  return {
+    version:"CDG_RENDER_TIMELINE_V1",
+    clock_origin_seconds:0,
+    first_real_voice_seconds:o.first_real_voice_seconds,
+    first_sung_vocal_seconds:o.first_sung_word_seconds,
+    opening:{
+      enabled:o.enabled,
+      render_screen:o.enabled,
+      start_seconds:0,
+      duration_seconds:o.duration,
+      end_seconds:o.end,
+      rule:o.rule,
+      first_syllable_buffer_seconds:o.first_syllable_buffer_seconds
+    },
+    policy:{
+      json_is_source_of_truth:true,
+      synthetic_events_affect_opening:false,
+      composer_intro_delay_seconds:0,
+      preserve_original_audio_clock:true
+    }
   };
 }
 function pvEndingDecision(){
@@ -2027,11 +2060,11 @@ function pvTimelineDiagnostic(){
   const allTimed=(S.words||[]).filter(w=>w.start_time!==null).map(w=>Number(w.start_time)).filter(Number.isFinite);
   const firstActual=allTimed.length?Math.min(...allTimed):null;
   const firstSynthetic=inserted.length?Math.min(...inserted.map(x=>Number(x.renderer_first_synthetic_sync_seconds))):null;
-  const candidates=[firstActual,firstSynthetic].filter(v=>v!==null&&Number.isFinite(v));
-  const firstComposerSync=candidates.length?Math.min(...candidates):null;
-  const firstBuffer=3;
-  const threshold=opening.duration+firstBuffer;
-  const predictedIntroDelay=(firstComposerSync!==null&&firstComposerSync<threshold)?threshold:0;
+  const legacyCandidates=[firstActual,firstSynthetic].filter(v=>v!==null&&Number.isFinite(v));
+  const legacyFirstSync=legacyCandidates.length?Math.min(...legacyCandidates):null;
+  const firstBuffer=opening.first_syllable_buffer_seconds;
+  const legacyThreshold=opening.duration+firstBuffer;
+  const legacyDelay=(legacyFirstSync!==null&&legacyFirstSync<legacyThreshold)?legacyThreshold:0;
   const ending=pvEndingDecision();
   const now=Number(S.audio?.currentTime||0);
   let phase="KARAOKE";
@@ -2044,17 +2077,21 @@ function pvTimelineDiagnostic(){
     opening,
     instrumental_events:instrumentals,
     ending,
+    render_timeline:buildRenderTimelineDecision(),
     composer_probe:{
       first_syllable_buffer_seconds:firstBuffer,
       first_actual_timed_word_seconds:firstActual,
       first_synthetic_instrumental_sync_seconds:firstSynthetic,
-      first_sync_seen_by_composer_seconds:firstComposerSync,
-      intro_plus_buffer_threshold_seconds:+threshold.toFixed(3),
-      predicted_intro_delay_seconds:+predictedIntroDelay.toFixed(3),
-      predicted_external_audio_cdg_shift_seconds:+predictedIntroDelay.toFixed(3),
-      warning:predictedIntroDelay>0
-        ?"RIESGO: cdgmaker agregaría intro_delay porque el primer sync (posiblemente INSTRUMENTAL sintético) cae antes de OPENING+BUFFER. Con audio externo/original, el CDG puede quedar desplazado."
-        :"Sin intro_delay predicho por esta regla."
+      legacy_first_sync_seen_by_composer_seconds:legacyFirstSync,
+      legacy_intro_plus_buffer_threshold_seconds:+legacyThreshold.toFixed(3),
+      legacy_predicted_intro_delay_seconds:+legacyDelay.toFixed(3),
+      synthetic_events_affect_opening:false,
+      renderer_intro_delay_seconds:0,
+      predicted_intro_delay_seconds:0,
+      predicted_external_audio_cdg_shift_seconds:0,
+      warning:legacyDelay>0
+        ?"CORREGIDO: el motor antiguo habría agregado "+legacyDelay.toFixed(2)+" s. El renderer actual conserva intro_delay=0 y obedece el JSON."
+        :"OK: renderer actual conserva intro_delay=0 y obedece el JSON."
     }
   };
 }
@@ -2086,7 +2123,7 @@ function buildDiagnosticJsonPayload(){
     ai_end_extension_seconds:w.ai_end_extension_seconds??null
   }));
   return {
-    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V2",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V3",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -2103,6 +2140,7 @@ function buildDiagnosticJsonPayload(){
     instrumental_config:PV.cfg.instrumental,
     instrumental_decisions:_diagInstrumentalDecisions(),
     timeline:pvTimelineDiagnostic(),
+    render_timeline:buildRenderTimelineDecision(),
     ai_block_alignments:S.doc?.ai?.block_alignments||[],
     words
   };
@@ -3947,6 +3985,7 @@ function buildExport(){
     font_family:S.cfg.fontFamily,font_size:S.cfg.fontSize,stroke_width:S.cfg.strokeWidth,lyric_y_offset:S.cfg.lyricYOffset,
     outro_line1:S.cfg.outroLine1,outro_line2:S.cfg.outroLine2,outro_size:S.cfg.outroSize,outro_x:S.cfg.outroX,outro_y:S.cfg.outroY,outro_transition:S.cfg.outroTransition};
   out.song.duration = S.duration;
+  out.render_timeline = buildRenderTimelineDecision();
   for(const seg of out.segments){
     if(!seg.words.length){ seg.start_time = null; seg.end_time = null; continue; }
     const timed = seg.words.filter(w => w.start_time !== null);
@@ -4801,5 +4840,6 @@ resize(); loop();
 <script src="/api/vendor/cdg-final-preview.js"></script>
 <!-- DJGABO_KARAOKE_TOTAL_TIMELINE_V1 -->
 <!-- DJGABO_POST_EXPORT_CHOICE_V1 -->
+<!-- DJGABO_RENDER_TIMELINE_V1 -->
 </body>
 </html>

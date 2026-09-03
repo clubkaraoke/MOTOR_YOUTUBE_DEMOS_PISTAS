@@ -235,7 +235,18 @@ def main() -> int:
 
         # La portada se compone aquí, en cajas seguras, para evitar que cdgmaker
         # vuelva a centrar el título/artista encima del logo DJGABO.
+        # DJGABO_RENDER_TIMELINE_RENDERER_V1
+        # La decisión ya viene resuelta por el JSON/normalizador. No se vuelve
+        # a interpretar la primera sílaba ni se deja que un sintético cambie el reloj.
         style_run = dict(style)
+        style_run["intro_duration_seconds"] = float(norm.render_timeline["opening"]["duration_seconds"])
+        style_run["intro_mode"] = "always" if style_run["intro_duration_seconds"] > 0 else "never"
+        log.info(
+            "render timeline: first_real_voice=%s · opening=%ss · rule=%s · intro_delay=0",
+            norm.render_timeline.get("first_real_voice_seconds"),
+            style_run["intro_duration_seconds"],
+            norm.render_timeline["opening"].get("rule"),
+        )
         try:
             intro = compose_intro_background(style_run, norm.title, norm.artist, tmp)
             style_run["title_background"] = str(intro)
@@ -283,6 +294,7 @@ def main() -> int:
         "visual_lines": n_lines,
         "pre_render_warnings": [vars(w) for w in norm.warnings],
         "composer_warnings": catcher.items,
+        "render_timeline": norm.render_timeline,
     }
     (args.out / f"{outname}.avisos.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
