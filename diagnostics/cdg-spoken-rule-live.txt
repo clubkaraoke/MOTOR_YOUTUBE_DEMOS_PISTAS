@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-03T05:49:47+00:00
+TIMESTAMP=2026-09-03T05:50:52+00:00
 TEST_SERVICE=active
 PROD_SERVICE=active
 
@@ -14,6 +14,81 @@ PROD_SERVICE=active
 3884:    if(st.spoken_instrumental_min_seconds!=null) PV.cfg.instrumental.spokenMin=+st.spoken_instrumental_min_seconds;
 3885:    if(st.spoken_instrumental_lead_seconds!=null) PV.cfg.instrumental.spokenLead=+st.spoken_instrumental_lead_seconds;
 3886:    if(st.spoken_block_join_seconds!=null) PV.cfg.instrumental.spokenJoin=+st.spoken_block_join_seconds;
+
+=== LIVE EDITOR FUNCTION BODY ===
+/* --- 3. dibujado --- */
+const pvc = $("#pv"), pvx = pvc.getContext("2d");
+function pvResize(){
+  const box = $("#pvBox").getBoundingClientRect();
+  const scale = Math.max(1, Math.min(3, Math.floor(Math.min(box.width / PV.VW, box.height / PV.VH) * 2) / 2));
+  const cssW=PV.VW*scale, cssH=PV.VH*scale;
+  pvc.style.width = cssW + "px";
+  pvc.style.height = cssH + "px";
+  const dpr = window.devicePixelRatio || 1;
+  const ss = 2;
+  pvc.width = Math.max(1,Math.round(cssW*dpr*ss));
+  pvc.height = Math.max(1,Math.round(cssH*dpr*ss));
+  pvx.setTransform(dpr*scale*ss, 0, 0, dpr*scale*ss, 0, 0);
+  pvx.imageSmoothingEnabled=true;
+  if("imageSmoothingQuality" in pvx) pvx.imageSmoothingQuality="high";
+}
+
+function pvMergedSpokenIntervals(){
+  const join=PV.cfg.instrumental.spokenJoin ?? .75;
+  const arr=S.words
+    .filter(w=>w.spoken && w.start_time!==null)
+    .map(w=>[w.start_time, w.end_time??(w.start_time+.05)])
+    .sort((a,b)=>a[0]-b[0]);
+  const out=[];
+  for(const it of arr){
+    if(!out.length || it[0]-out[out.length-1][1] > join) out.push(it.slice());
+    else out[out.length-1][1]=Math.max(out[out.length-1][1],it[1]);
+  }
+  return out;
+}
+function pvInstrumentalState(t){
+  const c=PV.cfg.instrumental;
+  const sung=S.words.filter(w=>!w.spoken && w.start_time!==null).sort((a,b)=>a.start_time-b.start_time);
+  if(!sung.length) return null;
+  const spoken=pvMergedSpokenIntervals();
+  for(let i=0;i<sung.length;i++){
+    const next=sung[i], prev=i?sung[i-1]:null;
+    const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);
+    const gap=next.start_time-base;
+    const overlaps=spoken
+      .map(([a,b])=>[Math.max(a,base),Math.min(b,next.start_time)])
+      .filter(([a,b])=>b>a);
+    const hasSpoken=overlaps.length>0;
+    const longSpoken=overlaps.some(([a,b])=>(b-a)>=(c.spokenMin??4));
+    const regularGap=gap>=c.minGap && !hasSpoken;
+    if(!longSpoken && !regularGap) continue;
+
+    // R28: un bloque HABLADO largo se trata visualmente como pausa de canto,
+    // pero la próxima letra se libera 3 s antes del siguiente START cantado.
+    const lead=longSpoken?(c.spokenLead??3):c.lead;
+    const hideAt=next.start_time-lead;
+    if(t<base+.2 || t>=hideAt) continue;
+
+    const remain=next.start_time-t;
+    const countdownRemain=hideAt-t;
+    const halfStep=c.span/Math.max(1,c.dots*2);
+    const phase=countdownRemain>=c.span?0:Math.min(c.dots*2,Math.max(0,Math.floor((c.span-countdownRemain)/halfStep+.0001)));
+    return {remain,phase,spoken:longSpoken};
+  }
+  return null;
+}
+function pvDrawInstrumental(state){
+  pvx.fillStyle="#000"; pvx.fillRect(0,0,PV.VW,PV.VH);
+  pvx.textAlign="center"; pvx.textBaseline="middle";
+  pvx.font="28px Impact, Arial Narrow, Arial, sans-serif";
+  pvx.lineWidth=3; pvx.strokeStyle="#111"; pvx.strokeText("INSTRUMENTAL", PV.VW/2, 58);
+  pvx.fillStyle="#fff"; pvx.fillText("INSTRUMENTAL", PV.VW/2, 58);
+
+  const cy = 100, r = 13, gap = 42, sx = PV.VW/2 - gap*1.5;
+  const total = 4;
+  for(let j=0;j<total;j++){
+    const x = sx + j*gap;
+    const order = total - 1 - j;
 
 === LIVE RENDERER SPOKEN LOGIC ===
 89:            if w.get("spoken"):
@@ -41,6 +116,94 @@ PROD_SERVICE=active
 458:            if w.get("spoken") and w.get("start_time") is not None:
 461:                spoken_intervals.append((st, max(st + 0.05, en)))
 466:    visual = build_instrumentals(visual, style, spoken_intervals)
+
+=== LIVE RENDERER FUNCTION BODY ===
+            end = w["start_time"] + tail
+            nxt = next((visual[l][i]["start_time"] for l, i in flat[k + 1:]), None)
+            if nxt is not None:
+                end = min(end, nxt)
+        w["_wipe"] = max(0.01, end - w["start_time"])
+
+
+def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals: list[tuple[float, float]] | None = None) -> list[list[dict]]:
+    """Inserta INSTRUMENTAL como una PÁGINA visual propia y centrada.
+
+    El bloque siempre ocupa una página completa: se rellena con líneas vacías
+    arriba/abajo para que `INSTRUMENTAL` y los cuatro círculos queden en el
+    centro independientemente de cuántas líneas por pantalla haya elegido la
+    operadora. El rótulo usa cantante 2 (sin sweep); los círculos conservan la
+    cuenta temporal.
+    """
+    label = style.get("instrumental_label", "INSTRUMENTAL")
+    dot = "§"  # glifo especial: el renderer lo dibuja como círculo real
+    n_dots = int(style.get("instrumental_dots", 4))
+    span = float(style.get("instrumental_span_seconds", 6.0))
+    lead = float(style.get("instrumental_lead_seconds", 4.0))
+    min_gap = float(style.get("instrumental_min_gap", 6.0))
+    spoken_min = float(style.get("spoken_instrumental_min_seconds", 6.0))
+    spoken_lead = float(style.get("spoken_instrumental_lead_seconds", 4.0))
+    spoken_join = float(style.get("spoken_block_join_seconds", 0.75))
+    lpp = max(2, min(8, int(style.get("lines_per_page", 8))))
+    spoken_intervals = spoken_intervals or []
+
+    # Un bloque HABLADO puede estar compuesto por muchas palabras cortas.
+    # Se unen intervalos contiguos para medir la duración REAL del bloque, no
+    # la duración individual de cada palabra.
+    merged_spoken: list[list[float]] = []
+    for sa, sb in sorted(spoken_intervals):
+        if not merged_spoken or sa - merged_spoken[-1][1] > spoken_join:
+            merged_spoken.append([sa, sb])
+        else:
+            merged_spoken[-1][1] = max(merged_spoken[-1][1], sb)
+
+    out: list[list[dict]] = []
+    prev_end: float | None = None
+    n = 0
+
+    def pad_to_page() -> None:
+        while len(out) % lpp:
+            out.append([])
+
+    for line in visual:
+        if not line:
+            out.append([])
+            continue
+        start = line[0]["start_time"]
+        gap = start if prev_end is None else start - prev_end
+        base = prev_end or 0.0
+
+        # R28: HABLADO largo (>4 s por defecto) se comporta visualmente como
+        # una pausa de canto: no exportamos ese texto y mostramos INSTRUMENTAL.
+        # La próxima página cantada queda libre `spoken_lead` segundos antes.
+        overlaps = [
+            (max(sa, base), min(sb, start))
+            for sa, sb in merged_spoken
+            if sa < start and sb > base
+        ]
+        overlaps = [(sa, sb) for sa, sb in overlaps if sb > sa]
+        has_spoken = bool(overlaps)
+        long_spoken = any((sb - sa) >= spoken_min for sa, sb in overlaps)
+        regular_gap = gap >= min_gap and not has_spoken
+
+        if label and n_dots > 0 and (long_spoken or regular_gap):
+            use_lead = spoken_lead if long_spoken else lead
+            LABEL_SLOT = 0.55
+            avail = (start - use_lead) - (base + 0.4)
+            use_label = avail >= 1.0 + LABEL_SLOT
+            use_span = min(span, avail - (LABEL_SLOT if use_label else 0.0))
+            # Con HABLADO de apenas >4 s quedan ~1 s antes de liberar la próxima
+            # letra. Permitimos un contador compacto sin exigir los 6 s completos.
+            min_span = 0.6 if long_spoken else 1.0
+            if use_span >= min_span:
+                dots_end = start - use_lead
+                step = use_span / n_dots
+                dots_start = dots_end - use_span
+                spacer_at = base + 0.3
+                label_at = dots_start - LABEL_SLOT
+
+                # Fuerza página independiente para que nunca quede arriba/abajo.
+                # El rótulo puede ir algo por encima, pero la fila de círculos
+                # debe quedar en el centro visual real.
 
 === LIVE STYLE ===
 instrumental_dot='●'
