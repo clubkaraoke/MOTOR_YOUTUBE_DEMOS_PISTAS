@@ -1,0 +1,11 @@
+TIMESTAMP=2026-09-03T07:02:43+00:00
+PROD_BEFORE=active
+TEST_BEFORE=active
+/tmp/patch_cdg_rolebar_armed_visual.py:10: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+ROLEBAR_ARMED_VISUAL=FIXED
+ROLEBAR_VISUAL_CHECK=PASS
+TEST_AFTER=active
+PROD_AFTER=active
+PROD_HTTP=200
+DEPLOY_ROLEBAR_VISUAL=OK
