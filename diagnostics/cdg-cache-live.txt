@@ -1,0 +1,41 @@
+    payload,meta=_pending_paths(folder,jid)
+    try:
+        cfg=_read_json_cfg(meta)
+        if not payload.is_file() or payload.stat().st_size!=int(cfg.get('size') or -1): return None
+        return {'data':payload.read_bytes(),'name':str(cfg.get('name') or payload.name),'used':time.time()}
+    except Exception:
+        return None
+
+def _pending_disk_pop(folder,jid):
+    for path in _pending_paths(folder,jid):
+        try: path.unlink(missing_ok=True)
+        except Exception: pass
+
+def _cdg_cache_get(jid):
+    with _CDG_CACHE_LOCK:
+        x=_CDG_ONLINE_CACHE.get(str(jid))
+        if not x:
+            x=_pending_disk_get(PENDING_CDG_DIR,jid)
+            if x: _CDG_ONLINE_CACHE[str(jid)]=x
+        return (x.get('data'),x.get('name')) if x else (None,'')
+
+def _cdg_cache_put(jid,data,name):
+    with _CDG_CACHE_LOCK:
+        _pending_disk_put(PENDING_CDG_DIR,jid,data,name)
+        _CDG_ONLINE_CACHE[str(jid)]={'data':bytes(data),'name':str(name),'used':time.time()}
+        while len(_CDG_ONLINE_CACHE)>8:
+            k=min(_CDG_ONLINE_CACHE,key=lambda x:_CDG_ONLINE_CACHE[x].get('used',0)); _CDG_ONLINE_CACHE.pop(k,None)
+
+def _cdg_cache_pop(jid):
+    with _CDG_CACHE_LOCK:
+        value=_CDG_ONLINE_CACHE.pop(str(jid),None)
+        _pending_disk_pop(PENDING_CDG_DIR,jid)
+        return value
+
+def _wav_cache_get(jid):
+    with _WAV_CACHE_LOCK:
+        x=_WAV_ONLINE_CACHE.get(str(jid))
+        if not x:
+            x=_pending_disk_get(PENDING_WAV_DIR,jid)
+            if x: _WAV_ONLINE_CACHE[str(jid)]=x
+        return x
