@@ -1,0 +1,179 @@
+name: Deploy IA timings lines HD preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_editor_ia_timings_lines_hd.py"
+      - ".github/workflows/deploy-cdg-editor-ia-timings-lines-hd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Upload patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_timings_lines_hd.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_timings_lines_hd.py"
+
+      - name: Patch clone and resync current IA job
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE' 2>&1 | tee diagnostics/cdg-editor-ia-timings-lines-hd.txt
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+
+          sudo python3 /tmp/patch_cdg_editor_ia_timings_lines_hd.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
+          sudo systemctl restart djgabo-cdg-ia-test
+
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/ia-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "TEST_HEALTH=OK"
+
+          echo "=== RESYNC LATEST IA TEST JOB IF NEEDED ==="
+          cd /opt/djgabo-cdg-ia-test
+          sudo -u djgabo-cdg env \
+            HOME=/var/lib/djgabo-cdg-ia-test \
+            DJGABO_ENV=test \
+            DJGABO_TEST_MODE=1 \
+            DJGABO_URL_PREFIX=/cdg-editor-ia \
+            DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test \
+            DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config \
+            DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db \
+            DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs \
+            DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output \
+            DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache \
+            DJGABO_SKIP_PREV_MIGRATION=1 \
+            /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import json,time
+          from pathlib import Path
+          import requests
+          import server
+
+          with server.db() as c:
+              r=c.execute("select * from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+              if not r:
+                  print('RESYNC_CURRENT=NO_IA_JOB'); raise SystemExit
+              row=dict(r)
+          try:
+              old=json.loads(row.get('project_json') or '{}')
+          except Exception:
+              old={}
+          old_words=[w for s in (old.get('segments') or []) for w in (s.get('words') or [])]
+          old_timed=sum(1 for w in old_words if w.get('start_time') is not None)
+          print('CURRENT_JOB='+row['id'])
+          print('CURRENT_WORDS='+str(len(old_words)))
+          print('CURRENT_TIMED='+str(old_timed))
+          if old_timed and old_timed==len(old_words):
+              print('RESYNC_CURRENT=SKIP_ALREADY_TIMED'); raise SystemExit
+
+          lyrics=str(row.get('lyrics_corrected') or row.get('lyrics_moises') or '').strip()
+          voice=Path(server.JOBS)/row['id']/row['voice_filename']
+          if not lyrics or not voice.is_file():
+              print('RESYNC_CURRENT=SKIP_MISSING_INPUT'); raise SystemExit
+
+          started=time.monotonic()
+          with voice.open('rb') as fh:
+              rr=requests.post('http://127.0.0.1:8097/api/elevenlabs/transcribe',
+                  files={'audio':(voice.name,fh,'audio/mpeg')},
+                  data={'lyrics':lyrics,'language_code':'spa'},timeout=(30,1200))
+          rr.raise_for_status()
+          payload=rr.json()
+          words=payload.get('words') or []
+          project=server._ai_project_from_words(
+              row['artist'],row['title'],row['voice_filename'],row.get('duration') or 0,
+              lyrics,words,'compare_master',jid=row['id'])
+          timed=sum(1 for s in project.get('segments',[]) for w in s.get('words',[]) if w.get('start_time') is not None)
+          total=sum(len(s.get('words',[])) for s in project.get('segments',[]))
+          with server.db() as c:
+              c.execute("update jobs set project_json=?,lyrics_corrected=?,updated=? where id=?",
+                  (json.dumps(project,ensure_ascii=False),lyrics,server.now(),row['id']))
+              server.log(c,row['id'],'SCRIBE V2 · REPARAR TIMINGS IA','compare_master')
+          print('RESYNC_CURRENT=OK')
+          print('RESYNC_WORDS='+str(total))
+          print('RESYNC_TIMED='+str(timed))
+          print('RESYNC_ELAPSED='+str(round(time.monotonic()-started,3)))
+          print('RESYNC_FLAGGED='+str(sum(1 for w in words if str(w.get('qa_status') or '')!='green')))
+          PY
+
+          echo "=== VERIFY CURRENT DB ==="
+          sudo -u djgabo-cdg python3 - <<'PY'
+          import sqlite3,json
+          db=sqlite3.connect('/var/lib/djgabo-cdg-ia-test/local.db'); db.row_factory=sqlite3.Row
+          r=db.execute("select id,project_json from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          p=json.loads(r['project_json'] or '{}')
+          words=[w for s in p.get('segments',[]) for w in s.get('words',[])]
+          timed=sum(1 for w in words if w.get('start_time') is not None)
+          print('VERIFY_JOB='+r['id'])
+          print('VERIFY_TOTAL='+str(len(words)))
+          print('VERIFY_TIMED='+str(timed))
+          print('VERIFY_AUDIO_SHA1='+str((p.get('song') or {}).get('audio_sha1')))
+          print('VERIFY_AI='+json.dumps(p.get('ai') or {},ensure_ascii=False))
+          assert words and timed==len(words)
+          assert (p.get('song') or {}).get('audio_sha1')=='online-'+r['id']
+          PY
+
+          curl -fsS http://127.0.0.1:8775/editor-v1?embed=1 >/tmp/editor-ia.html
+          grep -q 'const ss = 2' /tmp/editor-ia.html
+          grep -q 'restoreOnline' /tmp/editor-ia.html
+          grep -q 'Preview HD nítido' /tmp/editor-ia.html
+          echo "HD_PREVIEW_CODE=OK"
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+
+      - name: Verify public route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-editor-ia/ || true)"
+          echo "PUBLIC_HTTP=$code" | tee -a diagnostics/cdg-editor-ia-timings-lines-hd.txt
+          case "$code" in 200|301|302|303|307|308) ;; *) exit 1 ;; esac
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-editor-ia-timings-lines-hd.txt ]; then
+            git add diagnostics/cdg-editor-ia-timings-lines-hd.txt
+            git commit -m "diag: verify IA timings lines HD preview" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
