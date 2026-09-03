@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR LAB · CDG IA TEST</title>
+<style>
+body{font-family:Arial,sans-serif;background:#11141a;color:#f3f4f6;margin:0;padding:24px}
+.wrap{max-width:760px;margin:auto}.card{background:#1b1f29;border:1px solid #303646;border-radius:14px;padding:20px;margin-bottom:16px}
+h1{font-size:22px;margin:0 0 8px}.muted{color:#9aa3b2}.ok{color:#6ee7b7}.err{color:#f87171}
+button{background:#7c3aed;color:#fff;border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;margin-right:8px}
+button:disabled{opacity:.5}.url{word-break:break-all;background:#0f1117;border:1px solid #303646;border-radius:8px;padding:12px;margin-top:12px;font-family:monospace}
+#preview{max-width:260px;max-height:260px;border-radius:10px;margin-top:12px;display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap}.status{margin-top:12px;white-space:pre-wrap}
+</style>
+<script src="/cdg-editor-ia/vendor/jsQR.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>QR LAB · IA TEST</h1>
+    <div class="muted">Prueba aislada: portapapeles → QR → URL → OVH.</div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <button id="paste">Pegar QR desde portapapeles</button>
+      <button id="check" disabled>Probar descarga en OVH</button>
+    </div>
+    <div id="lib" class="status"></div>
+    <img id="preview" alt="QR copiado">
+    <div id="url" class="url" style="display:none"></div>
+    <div id="status" class="status"></div>
+  </div>
+</div>
+<script>
+const lib=document.getElementById('lib'),statusEl=document.getElementById('status'),
+      urlEl=document.getElementById('url'),preview=document.getElementById('preview'),
+      check=document.getElementById('check');
+let decodedUrl='';
+lib.innerHTML = (typeof window.jsQR==='function')
+  ? '<span class="ok">✓ jsQR local cargado correctamente</span>'
+  : '<span class="err">✗ jsQR local NO cargó</span>';
+
+function setStatus(msg,ok){statusEl.className='status '+(ok===true?'ok':ok===false?'err':'');statusEl.textContent=msg;}
+async function clipboardImage(){
+  if(!navigator.clipboard||!navigator.clipboard.read)throw new Error('El navegador no permite leer imágenes del portapapeles.');
+  const items=await navigator.clipboard.read();
+  for(const item of items){
+    const t=(item.types||[]).find(x=>String(x).startsWith('image/'));
+    if(t)return await item.getType(t);
+  }
+  throw new Error('No encontré una imagen en el portapapeles.');
+}
+async function decode(blob){
+  if(typeof window.jsQR!=='function')throw new Error('jsQR no está disponible.');
+  const bmp=await createImageBitmap(blob);
+  try{
+    const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
+    const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(bmp,0,0);
+    const img=ctx.getImageData(0,0,c.width,c.height);
+    const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+    if(!code||!code.data)throw new Error('No pude decodificar el QR.');
+    return String(code.data).trim();
+  } finally { try{bmp.close()}catch(_){} }
+}
+document.getElementById('paste').onclick=async()=>{
+  try{
+    setStatus('Leyendo imagen del portapapeles…');
+    const blob=await clipboardImage();
+    preview.src=URL.createObjectURL(blob);preview.style.display='block';
+    decodedUrl=await decode(blob);
+    urlEl.style.display='block';urlEl.textContent=decodedUrl;
+    check.disabled=false;
+    setStatus('✓ QR leído correctamente.',true);
+  }catch(e){setStatus('ERROR: '+(e.message||e),false);}
+};
+check.onclick=async()=>{
+  try{
+    setStatus('OVH está probando la descarga desde UVR…');
+    const r=await fetch('/cdg-editor-ia/api/qr-lab/check',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:decodedUrl})
+    });
+    const d=await r.json();
+    if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));
+    setStatus('✓ OVH recibió audio desde UVR\nTipo: '+(d.content_type||'sin tipo')+
+      '\nBytes de prueba: '+d.bytes_received+
+      (d.content_length?'\nTamaño anunciado: '+d.content_length:'')+
+      '\nURL final: '+d.final_url,true);
+  }catch(e){setStatus('ERROR OVH: '+(e.message||e),false);}
+};
+</script>
+</body>
+</html>
