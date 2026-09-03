@@ -1,0 +1,218 @@
+TIMESTAMP=2026-09-03T06:10:12+00:00
+TEST=active
+PROD=active
+=== ROUTE LOCATION ===
+3123:def ai_align_block(jid):
+    with db() as c:
+        r=jobrow(c,jid); lyrics='\n'.join(seg.get('text','') if seg.get('kind')!='break' else '' for seg in proj.get('segments',[]))
+        if _sheet_managed(r): drive_bridge_call('autosave',{'id':jid,'lyrics':lyrics,'actor':'Valeria' if SESSIONS.get(d.get('token'))=='CORRECTORA' else 'Augusto'})
+        c.execute('UPDATE jobs SET project_json=?,lyrics_corrected=?,updated=? WHERE id=?',(json.dumps(proj,ensure_ascii=False),lyrics,now(),jid))
+    schedule_timings_backup(jid,raw)
+    return jsonify(ok=True)
+
+@app.post('/api/jobs/<jid>/ai-align-block')
+def ai_align_block(jid):
+    if not TEST_MODE:
+        return jsonify(ok=False,error='Alineación IA de bloque disponible sólo en el clon TEST.'),403
+    d=request.get_json() or {}
+    try:
+        session(d.get('token'),'ADMIN')
+        words=d.get('words') or []
+        if not isinstance(words,list) or not words:
+            raise ValueError('Selecciona primero las palabras del bloque.')
+        clean=[]
+        for item in words:
+            if not isinstance(item,dict): continue
+            wid=str(item.get('id') or '').strip(); txt=str(item.get('text') or '').strip()
+            if wid and txt: clean.append({'id':wid,'text':txt})
+        if not clean: raise ValueError('La selección no contiene texto utilizable.')
+        clip_start=max(0.0,float(d.get('clip_start') or 0))
+        clip_end=float(d.get('clip_end') or 0)
+        if clip_end<=clip_start+.25:
+            raise ValueError('No pude determinar el tramo de audio del bloque.')
+        if clip_end-clip_start>180:
+            raise ValueError('El bloque es demasiado largo. Selecciona un tramo menor de 3 minutos.')
+        with db() as c: job=dict(jobrow(c,jid))
+        if (job.get('origin') or '')=='HISTORICO_DRIVE':
+            raise ValueError('Esta función IA de bloque está habilitada por ahora para trabajos nuevos del clon.')
+        source=JOBS/jid/job['voice_filename']
+        if not source.is_file(): raise ValueError('No encuentro la pista de voz del trabajo.')
+        with tempfile.TemporaryDirectory(prefix='karaoke_block_ai_') as td0:
+            td=Path(td0); clip=td/'block.wav'
+            dur=clip_end-clip_start
+            cmd=['ffmpeg','-hide_banner','-loglevel','error','-i',str(source),
+                 '-ss',f'{clip_start:.6f}','-t',f'{dur:.6f}',
+                 '-vn','-ac','1','-ar','44100','-c:a','pcm_s16le',str(clip)]
+            proc=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=180)
+            if proc.returncode!=0 or not clip.is_file() or clip.stat().st_size<1000:
+                raise ValueError('No pude preparar el fragmento de audio: '+(proc.stderr or '')[-500:])
+            text_block=' '.join(x['text'] for x in clean)
+            with clip.open('rb') as fh:
+                rr=requests.post(
+                    'http://127.0.0.1:8097/api/elevenlabs/forced-align',
+                    files={'audio':('block.wav',fh,'audio/wav')},
+                    data={'text':text_block},
+                    timeout=(30,1200)
+                )
+            if not rr.ok:
+                try: detail=rr.json().get('detail') or rr.text[:800]
+                except Exception: detail=rr.text[:800]
+                raise ValueError('ElevenLabs no pudo alinear el bloque: '+str(detail))
+            payload=rr.json(); aligned=payload.get('words') or []
+            if len(aligned)!=len(clean):
+                raise ValueError(
+                    f'ElevenLabs devolvió {len(aligned)} palabras para una selección de {len(clean)}. '
+                    'No aplicaré timings ambiguos; ajusta el texto del bloque y vuelve a intentar.'
+                )
+            updates=[]
+            for srcw,aw in zip(clean,aligned):
+                a=float(aw.get('start'))+clip_start
+                b=float(aw.get('end'))+clip_start
+                if b<=a: b=a+.03
+                updates.append({'id':srcw['id'],'text':srcw['text'],'start':round(a,6),'end':round(b,6),'loss':aw.get('loss')})
+            with db() as c: log(c,jid,'ELEVENLABS · ALINEAR BLOQUE',f"{len(updates)} palabras · {clip_start:.2f}-{clip_end:.2f}")
+            return jsonify(ok=True,engine='elevenlabs-forced-alignment',updates=updates,
+                           clip_start=clip_start,clip_end=clip_end,loss=payload.get('loss'),elapsed_s=payload.get('elapsed_s'))
+    except PermissionError as e: return jsonify(ok=False,error=str(e)),401
+    except ValueError as e: return jsonify(ok=False,error=str(e)),400
+    except Exception as e:
+        app.logger.exception('ai-align-block %s',jid)
+        return jsonify(ok=False,error='No se pudo alinear el bloque: '+str(e)),500
+
+
+def _render_set(task_id, **kw):
+    jid=''
+    with _RENDER_LOCK:
+        t=_RENDER_TASKS.setdefault(task_id,{'status':'queued','progress':0,'message':'En cola…'})
+        t.update(kw); t['updated']=time.time(); jid=str(t.get('job_id') or '')
+        progress=int(t.get('progress') or 0); status=str(t.get('status') or '')
+    if jid and status in ('queued','running'):
+        try:
+            with db() as c: c.execute('UPDATE jobs SET render_status=?,render_progress=?,updated=? WHERE id=?',('RENDERIZANDO',progress,now(),jid))
+        except Exception: pass
+
+def _next_correctora_job(current):
+    with db() as c:
+        r=c.execute('SELECT id FROM jobs WHERE deleted=0 AND id<? AND status<>? ORDER BY id DESC LIMIT 1',(current,EST_TERM)).fetchone()
+        if not r: r=c.execute('SELECT id FROM jobs WHERE deleted=0 AND id<>? AND status<>? ORDER BY id DESC LIMIT 1',(current,EST_TERM)).fetchone()
+        return r['id'] if r else ''
+
+def resolve_render_font(family):
+    family=str(family or 'impact').lower()
+    explicit={
+        'impact':os.getenv('DJGABO_FONT_IMPACT'),
+        'arialbd':os.getenv('DJGABO_FONT_ARIAL_BOLD'),
+        'arial':os.getenv('DJGABO_FONT_ARIAL'),
+    }.get(family)
+    candidates=[]
+    if explicit: candidates.append(Path(explicit).expanduser())
+    font_dir=str(os.getenv('DJGABO_FONT_DIR') or '').strip()
+    if font_dir:
+        base=Path(font_dir).expanduser()
+        candidates.extend([base/('impact.ttf' if family=='impact' else ('arialbd.ttf' if family=='arialbd' else 'arial.ttf'))])
+    if family=='impact':
+        candidates.extend([Path(r'C:/Windows/Fonts/impact.ttf'),Path('/usr/local/share/fonts/impact.ttf'),Path('/usr/share/fonts/truetype/msttcorefonts/Impact.ttf')])
+    elif family=='arialbd':
+        candidates.extend([Path(r'C:/Windows/Fonts/arialbd.ttf'),Path('/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf'),Path('/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf')])
+    else:
+        candidates.extend([Path(r'C:/Windows/Fonts/arial.ttf'),Path('/usr/share/fonts/truetype/msttcorefonts/Arial.ttf'),Path('/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf')])
+    candidates.extend([Path('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'),Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')])
+    for path in candidates:
+        if path.is_file():
+            if family=='impact' and 'impact' not in path.name.lower():
+                app.logger.warning('Impact no está instalado; se usará la fuente alternativa %s.',path)
+            return str(path)
+    raise ValueError('No existe una fuente TTF utilizable. Configura DJGABO_FONT_IMPACT/DJGABO_FONT_DIR en el servidor.')
+
+def _render_worker(task_id,jid,token,timings_bytes,opts):
+    try:
+        role=session(token); _render_set(task_id,status='running',progress=2,message='Preparando proyecto…')
+        with db() as c:
+            job=dict(jobrow(c,jid)); c.execute('UPDATE jobs SET render_status=?,render_progress=?,render_error=?,updated=? WHERE id=?',('RENDERIZANDO',2,'',now(),jid))
+        with tempfile.TemporaryDirectory(prefix='karaoke_cdg_online_') as td0:
+            td=Path(td0); timings=td/'proyecto.timings.json'; timings.write_bytes(timings_bytes)
+            if (job.get('origin') or '')=='HISTORICO_DRIVE':
+                info=drive_audio_info(jid); suffix=Path(info['name']).suffix or '.mp3'; audio=td/f'audio_helper{suffix}'
+                total=info['size']; loaded=0
+                with audio.open('wb') as f:
+                    for part in drive_audio_iter(jid):
+                        f.write(part); loaded+=len(part); pct=4+int((loaded/max(1,total))*22)
+                        _render_set(task_id,progress=pct,message='Preparando audio online…',loaded=loaded,total=total)
+            else:
+                source=JOBS/jid/job['voice_filename']; audio=td/f'audio_helper{source.suffix or ".mp3"}'; shutil.copy2(source,audio)
+            out=td/'salida'; style=json.loads((ROOT/'renderer'/'style.json').read_text(encoding='utf-8'))
+            allowed={'intro_mode','instrumental_label','lines_per_page','intro_duration_seconds','intro_short_duration_seconds','font_family','font_size','stroke_width','lyric_y_offset','outro_line1','outro_line2','outro_size','outro_x','outro_y','outro_transition'}
+            for k,v in (opts or {}).items():
+                if k in allowed: style[k]=v
+            fam=str(style.get('font_family','impact')); style['font']=resolve_render_font(fam)
+            style['intro_mode']='auto'; style['intro_duration_seconds']=6.0; style['intro_short_duration_seconds']=3.0
+            st=td/'style.json'; st.write_text(json.dumps(style,ensure_ascii=False,indent=2),encoding='utf-8')
+
+=== PYTHON IMPORTS ===
+from __future__ import annotations
+import base64, json, os, re, secrets, shutil, sqlite3, subprocess, sys, tempfile, time, zipfile, unicodedata, difflib, threading, math, math, math, math, math
+from contextlib import contextmanager
+from array import array
+from datetime import datetime
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlparse, unquote
+from flask import Flask, request, send_file, jsonify, abort, redirect, Response
+import requests
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+ROOT=Path(__file__).resolve().parent
+
+def env_bool(name, default=False):
+    value=os.getenv(name)
+    if value is None: return bool(default)
+    return str(value).strip().lower() in ('1','true','yes','si','on')
+
+ENVIRONMENT=str(os.getenv('DJGABO_ENV') or 'local').strip().lower()
+IS_PRODUCTION=ENVIRONMENT in ('production','prod','server','ovh')
+TEST_MODE=env_bool('DJGABO_TEST_MODE', ENVIRONMENT in ('test','testing','lab'))
+URL_PREFIX=str(os.getenv('DJGABO_URL_PREFIX') or '').strip().rstrip('/')
+
+def public_path(path):
+    path='/' + str(path or '').lstrip('/')
+    return (URL_PREFIX + path) if URL_PREFIX else path
+DATA=Path(os.getenv('DJGABO_DATA_DIR') or (ROOT/'data')).expanduser().resolve()
+JOBS=Path(os.getenv('DJGABO_JOBS_DIR') or (DATA/'jobs')).expanduser().resolve()
+OUTPUT=Path(os.getenv('DJGABO_OUTPUT_DIR') or (ROOT/'output' if not IS_PRODUCTION else DATA/'output')).expanduser().resolve()
+DB=Path(os.getenv('DJGABO_DB_PATH') or (DATA/'local.db')).expanduser().resolve()
+RENDER=ROOT/'renderer'/'render.py'
+DROPBOX_CFG=DATA/'dropbox_oauth.json'
+# LOCAL 16.4: la configuración del puente Drive ya no depende de la carpeta/version
+# extraída. Se conserva también en AppData del usuario para que ADMIN la configure
+# una sola vez y Augusto/Valeria reutilicen siempre la misma conexión.
+GLOBAL_CFG_ROOT=Path(os.getenv('DJGABO_CONFIG_DIR') or os.getenv('LOCALAPPDATA') or (Path.home()/'.djgabo_cdg')).expanduser()/'DJGABO_CONTROL_CDG'
+DRIVE_BRIDGE_CFG=DATA/'drive_bridge.json'                 # espejo portable/local
+DRIVE_BRIDGE_CFG_GLOBAL=GLOBAL_CFG_ROOT/'drive_bridge.json'  # fuente persistente
+DRIVE_BRIDGE_KEY_DEFAULT=str(os.getenv('DJGABO_DRIVE_BRIDGE_KEY') or '')
+DRIVE_AUDIO_TOKEN_SECRET=str(os.getenv('DJGABO_DRIVE_AUDIO_TOKEN_SECRET') or '')
+DRIVE_ACAPELLAS_FOLDER_ID=str(os.getenv('DJGABO_DRIVE_ACAPELLAS_FOLDER_ID') or '112a-UKRFBUHylAN1NXu19eOELxiAWT6y').strip()
+DRIVE_TIMINGS_FOLDER_ID=str(os.getenv('DJGABO_DRIVE_TIMINGS_FOLDER_ID') or '1Pj10IsZ_tUh8OLpIhHnhJvCcp4CiXWlp').strip()
+# Las URL /exec identifican despliegues públicos, no autentican. Se conservan
+# como respaldo para autorreparar un endpoint guardado que Google deje en 404.
+
+=== LATEST BLOCK ALIGNMENTS ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB LET-0078 Amor Rebelde - Mix Cuanto te amo updated 03/09/2026 06:04
+BLOCK_ALIGNMENTS [
+  {
+    "engine": "elevenlabs-forced-alignment",
+    "at": "2026-09-03T06:02:22.921Z",
+    "words": 40,
+    "clip_start": 155.41000000000003,
+    "clip_end": 183.32999999999998,
+    "loss": 1.2028779179216869
+  },
+  {
+    "engine": "elevenlabs-forced-alignment",
+    "at": "2026-09-03T06:03:34.901Z",
+    "words": 40,
+    "clip_start": 270.209,
+    "clip_end": 297.97999999999996,
+    "loss": 1.1148913280073418
+  }
+]
