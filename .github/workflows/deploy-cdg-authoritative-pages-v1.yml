@@ -1,0 +1,175 @@
+name: Deploy CDG authoritative pages V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-authoritative-pages-v1.yml"
+      - "deploy/cdg_authoritative_pages_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_authoritative_pages_v1/patch_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production safely
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_authoritative_pages_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_authoritative_pages_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-authoritative-pages-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          NORMALIZE="$ROOT/renderer/normalize.py"
+          RENDER="$ROOT/renderer/render.py"
+          COMPOSER="$ROOT/renderer/vendor/cdgmaker/composer.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/authoritative_pages_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          for p in "$EDITOR" "$NORMALIZE" "$RENDER" "$COMPOSER"; do test -f "$p"; done
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/cdgmaker"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$BACKUP/renderer/normalize.py"
+          sudo cp "$RENDER" "$BACKUP/renderer/render.py"
+          sudo cp "$COMPOSER" "$BACKUP/cdgmaker/composer.py"
+          echo "BACKUP=$BACKUP"
+
+          # Staging primero.
+          STAGE=/tmp/djgabo-authoritative-pages-stage
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1" "$STAGE/renderer"
+          sudo cp "$EDITOR" "$STAGE/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$STAGE/renderer/normalize.py"
+          sudo cp "$RENDER" "$STAGE/renderer/render.py"
+          sudo cp "$COMPOSER" "$STAGE/composer.py"
+
+          sudo python3 /tmp/patch_cdg_authoritative_pages_v1.py --root "$STAGE" --composer "$STAGE/composer.py"
+          sudo python3 -m py_compile "$STAGE/renderer/normalize.py" "$STAGE/renderer/render.py" "$STAGE/composer.py"
+
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_V1' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V4' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'out.render_pages = buildRenderPagesDecision()' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'clearMode:"page"' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_NORMALIZER_V1' "$STAGE/renderer/normalize.py"
+          sudo grep -Fq 'visual, render_pages = resolve_render_pages' "$STAGE/renderer/normalize.py"
+          if sudo grep -Fq 'visual = smart_page_breaks(visual' "$STAGE/renderer/normalize.py"; then
+            echo "ERROR=smart_page_breaks todavía gobierna el render"
+            exit 1
+          fi
+          sudo grep -Fq 'style_run["clear_mode"] = "page"' "$STAGE/renderer/render.py"
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_COMPOSER_V1' "$STAGE/composer.py"
+
+          # Verificación de algoritmo del normalizador sin depender del navegador.
+          PYEXE="$(sudo readlink -f /proc/$(sudo systemctl show -p MainPID --value djgabo-cdg)/exe)"
+          echo "PYEXE=$PYEXE"
+          sudo "$PYEXE" - <<'PY'
+          import importlib.util,sys
+          p="/tmp/djgabo-authoritative-pages-stage/renderer/normalize.py"
+          spec=importlib.util.spec_from_file_location("nstage",p)
+          n=importlib.util.module_from_spec(spec);sys.modules["nstage"]=n;spec.loader.exec_module(n)
+          from PIL import ImageFont
+          font=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",18)
+          words=[]
+          segs=[]
+          t=10.0
+          for li in range(8):
+              ww=[]
+              for j in range(2):
+                  w={"id":f"w{li}_{j}","text":f"L{li+1}W{j+1}","start_time":t,"end_time":t+.25,"spoken":False}
+                  t+=.35;ww.append(w);words.append(w)
+              # Pausa enorme en medio: NO debe crear otra página por sí sola.
+              if li==2:t+=4.5
+              segs.append({"kind":"lyric","words":ww,"text":" ".join(x["text"] for x in ww)})
+          pages={"version":"CDG_RENDER_PAGES_V1","lines_per_page":6,"pages":[
+              {"page":1,"lines":[{"slot":i+1,"word_ids":[x["id"] for x in segs[i]["words"]],"text":segs[i]["text"]} for i in range(6)]},
+              {"page":2,"lines":[
+                  {"slot":1,"word_ids":[],"text":""},
+                  {"slot":2,"word_ids":[],"text":""},
+                  {"slot":3,"word_ids":[x["id"] for x in segs[6]["words"]],"text":segs[6]["text"]},
+                  {"slot":4,"word_ids":[x["id"] for x in segs[7]["words"]],"text":segs[7]["text"]},
+                  {"slot":5,"word_ids":[],"text":""},
+                  {"slot":6,"word_ids":[],"text":""}
+              ]}
+          ]}
+          doc={"segments":segs,"render_pages":pages}
+          visual,meta=n.resolve_render_pages(doc,{"lines_per_page":6},font,True)
+          assert len(visual)==12
+          assert [w["id"] for w in visual[0]]==["w0_0","w0_1"]
+          assert [w["id"] for w in visual[5]]==["w5_0","w5_1"]
+          assert visual[6]==[] and visual[7]==[]
+          assert [w["id"] for w in visual[8]]==["w6_0","w6_1"]
+          assert meta["authoritative"] is True and meta["clear_mode"]=="page"
+          print("PAGE_POLICY_TEST=PASS")
+          PY
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_cdg_authoritative_pages_v1.py --root "$ROOT" --composer "$COMPOSER"
+          sudo python3 -m py_compile "$NORMALIZE" "$RENDER" "$COMPOSER"
+
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_V1' "$EDITOR"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V4' "$EDITOR"
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_NORMALIZER_V1' "$NORMALIZE"
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_RENDERER_V1' "$RENDER"
+          sudo grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_COMPOSER_V1' "$COMPOSER"
+
+          # No reinicio: server.py no cambió; editor se sirve desde disco y
+          # cada render nuevo carga normalize/render/composer recién parcheados.
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-authoritative-pages.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'DJGABO_AUTHORITATIVE_PAGES_V1' /tmp/editor-authoritative-pages.html
+          grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V4' /tmp/editor-authoritative-pages.html
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/editor_v1/index.html' > diagnostics/cdg-prod-current-index.html
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/normalize.py' > diagnostics/cdg-prod-current-normalize.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/render.py' > diagnostics/cdg-prod-current-render.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py' > diagnostics/cdg-prod-current-composer.py
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-authoritative-pages-v1-deploy.txt                   diagnostics/cdg-prod-current-index.html                   diagnostics/cdg-prod-current-normalize.py                   diagnostics/cdg-prod-current-render.py                   diagnostics/cdg-prod-current-composer.py 2>/dev/null || true
+          git commit -m "diag: record authoritative pages deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
