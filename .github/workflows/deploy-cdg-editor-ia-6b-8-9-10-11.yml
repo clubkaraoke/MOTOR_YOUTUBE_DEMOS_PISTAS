@@ -66,16 +66,16 @@ jobs:
           sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py" "$ROOT/renderer/normalize.py" "$ROOT/renderer/render.py"
 
           echo "=== STATIC ASSERTIONS ==="
-          grep -q "ai-align-block" "$ROOT/server.py"
-          grep -q "balanced_visual_v3" "$ROOT/server.py"
-          grep -q 'id="btnAiBlock"' "$ROOT/editor_v1/index.html"
-          grep -q 'fallbackEnd=(w)=>' "$ROOT/editor_v1/index.html"
-          grep -q 'smartPageGap:2.0' "$ROOT/editor_v1/index.html"
-          grep -q 'spokenMin:6.0, spokenLead:4.0' "$ROOT/editor_v1/index.html"
-          grep -q 'smart_page_breaks' "$ROOT/renderer/normalize.py"
+          sudo -u djgabo-cdg grep -q "ai-align-block" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q "balanced_visual_v3" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q 'id="btnAiBlock"' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -q 'fallbackEnd=(w)=>' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -q 'smartPageGap:2.0' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -q 'spokenMin:6.0, spokenLead:4.0' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -q 'smart_page_breaks' "$ROOT/renderer/normalize.py"
 
           if command -v node >/dev/null 2>&1; then
-            python3 - <<'PY'
+            sudo -u djgabo-cdg python3 - <<'PY'
           from pathlib import Path
           import re
           html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
