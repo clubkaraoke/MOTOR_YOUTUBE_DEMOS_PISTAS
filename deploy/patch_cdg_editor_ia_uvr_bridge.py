@@ -344,6 +344,26 @@ new_fd="""    fd.append('voice_duration',String(archivoSeleccionado.duracion||0)
 if old_fd in panel:
     panel=panel.replace(old_fd,new_fd,1)
 
+# Fallback por límites del bloque: el panel vivo puede tener pequeñas variaciones
+# de espaciado/regex de versiones previas.
+submit_anchor=panel.find("document.getElementById('btnEnviarNueva').addEventListener('click'")
+if submit_anchor<0:
+    raise SystemExit('ANCHOR_NOT_FOUND: submit nueva cancion')
+
+if "const nombreVoz=archivoSeleccionado.file?" not in panel[submit_anchor:submit_anchor+9000]:
+    va=panel.find("  if(!archivoSeleccionado",submit_anchor)
+    vb=panel.find("\n\n  const btn=document.getElementById('btnEnviarNueva');",va)
+    if va<0 or vb<0:
+        raise SystemExit('ANCHOR_NOT_FOUND: submit validation bounds')
+    panel=panel[:va]+new_validate+panel[vb:]
+
+if "fd.append('voice_bridge_token'" not in panel[submit_anchor:submit_anchor+14000]:
+    fa=panel.find("    fd.append('voice_duration'",submit_anchor)
+    fb=panel.find("\n\n    const startData=await new Promise",fa)
+    if fa<0 or fb<0:
+        raise SystemExit('ANCHOR_NOT_FOUND: formdata bounds')
+    panel=panel[:fa]+new_fd+panel[fb:]
+
 SERVER.write_text(server,encoding='utf-8')
 PANEL.write_text(panel,encoding='utf-8')
 
