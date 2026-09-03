@@ -1,0 +1,123 @@
+name: Inspect CDG spoken instrumental rule once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-spoken-rule-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect live TEST clone read-only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-spoken-rule-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "TEST_SERVICE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo
+          echo "=== LIVE EDITOR CONFIG / SPOKEN LOGIC ==="
+          sudo -u djgabo-cdg grep -nE 'spokenMin|spokenLead|spokenJoin|function pvInstrumentalState|longSpoken|regularGap' "$ROOT/editor_v1/index.html" || true
+          echo
+          echo "=== LIVE RENDERER SPOKEN LOGIC ==="
+          sudo -u djgabo-cdg grep -nE 'def build_instrumentals|spoken_instrumental|min_seconds|lead_seconds|spoken_intervals|spoken_join|spoken' "$ROOT/renderer/normalize.py" || true
+          echo
+          echo "=== LIVE STYLE ==="
+          sudo -u djgabo-cdg python3 - <<'PY'
+          import json
+          p='/opt/djgabo-cdg-ia-test/renderer/style.json'
+          d=json.load(open(p,encoding='utf-8'))
+          for k in sorted(d):
+              if 'spoken' in k or 'instrumental' in k or 'smart_page' in k:
+                  print(f'{k}={d[k]!r}')
+          PY
+          echo
+          echo "=== LATEST IA_TEST JOB / SEGMENTS 105-120 ==="
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import json
+          import server
+          with server.db() as c:
+              r=c.execute("select id,artist,title,project_json,updated from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          if not r:
+              print('NO_IA_TEST_JOB'); raise SystemExit
+          row=dict(r)
+          print('JOB',row['id'],row['artist'],'-',row['title'],'updated',row['updated'])
+          doc=json.loads(row.get('project_json') or '{}')
+          segs=doc.get('segments') or []
+          def times(ws):
+              vals=[w for w in ws if w.get('start_time') is not None]
+              if not vals:return (None,None)
+              a=min(float(w['start_time']) for w in vals)
+              b=max(float(w.get('end_time') if w.get('end_time') is not None else w['start_time']) for w in vals)
+              return (a,b)
+          for i,seg in enumerate(segs,1):
+              if 105<=i<=120:
+                  ws=seg.get('words') or []
+                  txt=' '.join(str(w.get('text') or '') for w in ws)
+                  sp=[bool(w.get('spoken')) for w in ws]
+                  a,b=times(ws)
+                  print(f'L{i}: kind={seg.get("kind")} start={a} end={b} all_spoken={bool(ws) and all(sp)} any_spoken={any(sp)} text={txt!r}')
+                  for j,w in enumerate(ws,1):
+                      print('  W',j,repr(w.get('text')),'spoken=',bool(w.get('spoken')),'start=',w.get('start_time'),'end=',w.get('end_time'))
+
+          # Reproduce the preview's interval-merging idea using the live config values.
+          words=[]
+          for seg in segs:
+              words.extend(seg.get('words') or [])
+          sp=[w for w in words if w.get('spoken') and w.get('start_time') is not None]
+          sp.sort(key=lambda w: float(w.get('start_time')))
+          join=.75
+          groups=[]
+          for w in sp:
+              a=float(w['start_time'])
+              b=float(w.get('end_time') if w.get('end_time') is not None else w['start_time'])
+              if not groups or a-groups[-1][1]>join:
+                  groups.append([a,b,[str(w.get('text') or '')]])
+              else:
+                  groups[-1][1]=max(groups[-1][1],b)
+                  groups[-1][2].append(str(w.get('text') or ''))
+          print('SPOKEN_GROUPS_JOIN_0.75')
+          for g in groups:
+              if 360<=g[0]<=430 or 360<=g[1]<=430:
+                  print(round(g[0],3),round(g[1],3),'dur',round(g[1]-g[0],3),'text',repr(' '.join(g[2])))
+          PY
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-spoken-rule-live.txt
+          git commit -m "diag: inspect live spoken instrumental rule" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
