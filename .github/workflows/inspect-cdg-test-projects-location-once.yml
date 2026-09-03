@@ -1,0 +1,141 @@
+name: Inspect CDG test projects location once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-test-projects-location-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect projects in test and production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-test-projects-location.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          TEST=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_SERVICE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo
+
+          echo "=== DATA PATHS / DB CANDIDATES ==="
+          sudo find /var/lib/djgabo-cdg /var/lib/djgabo-cdg-ia-test "$PROD" "$TEST" -maxdepth 3 -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name 'jobs.db' \) -printf '%p|%s|%TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | sort || true
+          echo
+
+          echo "=== CONFIG DATA ROOT MARKERS ==="
+          for f in "$PROD/server.py" "$TEST/server.py"; do
+            echo "--- $f ---"
+            sudo grep -nE 'DATA|DB=|JOBS=|sqlite3.connect|/var/lib/djgabo-cdg' "$f" | head -80 || true
+          done
+          echo
+
+          echo "=== SQLITE SEARCH BY ARTIST/TITLE ==="
+          python3 - <<'PY'
+import sqlite3, pathlib, os, re
+roots=[
+    pathlib.Path('/var/lib/djgabo-cdg'),
+    pathlib.Path('/var/lib/djgabo-cdg-ia-test'),
+    pathlib.Path('/opt/djgabo-cdg'),
+    pathlib.Path('/opt/djgabo-cdg-ia-test'),
+]
+seen=set()
+terms=['armonia','laura','amor rebelde','mujeres enganadas','mujeres engañadas']
+for root in roots:
+    if not root.exists(): continue
+    for p in root.rglob('*'):
+        if not p.is_file() or p.suffix.lower() not in ('.db','.sqlite','.sqlite3'): continue
+        sp=str(p)
+        if sp in seen: continue
+        seen.add(sp)
+        print(f'--- DB {sp} ---')
+        try:
+            con=sqlite3.connect(sp)
+            con.row_factory=sqlite3.Row
+            tabs=[r[0] for r in con.execute("select name from sqlite_master where type='table'")]
+            print('tables=',tabs)
+            for tab in tabs:
+                try:
+                    cols=[r[1] for r in con.execute(f'pragma table_info("{tab}")')]
+                except Exception:
+                    continue
+                low=[c.lower() for c in cols]
+                if not any(c in low for c in ('artist','artista','title','titulo','lyrics_moises','lyrics_corrected')): continue
+                # build permissive concat over text-ish columns
+                expr=' || " " || '.join([f'coalesce(cast("{c}" as text),"")' for c in cols[:40]])
+                sql=f'select * from "{tab}" where lower({expr}) like ?'
+                for term in terms:
+                    try:
+                        rows=con.execute(sql,('%'+term+'%',)).fetchall()
+                    except Exception:
+                        rows=[]
+                    for row in rows[:20]:
+                        d=dict(row)
+                        keep={k:d.get(k) for k in d.keys() if k.lower() in ('id','idtrabajo','artist','artista','title','titulo','status','origin','created','updated','voice_filename','instrumental_filename','project_json','lyrics_moises','lyrics_corrected')}
+                        if 'project_json' in keep and keep['project_json']:
+                            keep['project_json']=str(keep['project_json'])[:180]+'...'
+                        if 'lyrics_moises' in keep and keep['lyrics_moises']:
+                            keep['lyrics_moises']=str(keep['lyrics_moises'])[:120]+'...'
+                        if 'lyrics_corrected' in keep and keep['lyrics_corrected']:
+                            keep['lyrics_corrected']=str(keep['lyrics_corrected'])[:120]+'...'
+                        print(term, tab, keep)
+            con.close()
+        except Exception as e:
+            print('ERROR',e)
+PY
+          echo
+
+          echo "=== FILE/FOLDER SEARCH BY NAMES ==="
+          for root in /var/lib/djgabo-cdg /var/lib/djgabo-cdg-ia-test "$PROD" "$TEST"; do
+            echo "--- ROOT $root ---"
+            sudo find "$root" -maxdepth 5 \( -iname '*armonia*' -o -iname '*armonía*' -o -iname '*laura*' -o -iname '*mujeres*' -o -iname '*amor*rebelde*' \) -printf '%p|%y|%s|%TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | head -250 || true
+          done
+          echo
+
+          echo "=== LATEST JOB FOLDERS PROD ==="
+          sudo find /var/lib/djgabo-cdg -maxdepth 2 -type d -name 'LET-*' -printf '%p|%TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | sort -r | head -30 || true
+          echo "=== LATEST JOB FOLDERS TEST ==="
+          sudo find /var/lib/djgabo-cdg-ia-test -maxdepth 2 -type d -name 'LET-*' -printf '%p|%TY-%Tm-%Td %TH:%TM:%TS\n' 2>/dev/null | sort -r | head -30 || true
+
+          echo
+          echo "=== HEALTH RECHECK ==="
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg) HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test) HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/healthz)"
+          REMOTE
+
+      - name: Commit report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-test-projects-location.txt
+          git commit -m "diag: locate IA test projects on OVH" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
