@@ -38,9 +38,9 @@ jobs:
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
           set -euo pipefail
           echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
-          voice="$(sudo find /var/lib/djgabo-cdg-ia-test/jobs -type f \( -iname '*Amor*Rebelde*Voz*.mp3' -o -iname '*Mix*Cuanto*Voz*.mp3' \) -print | head -n1)"
+          voice="$(sudo find /var/lib/djgabo-cdg-ia-test/jobs -type f \( -iname '*Amor*Rebelde*Voz*.mp3' -o -iname '*Mix*Cuanto*Voz*.mp3' \) -print -quit)"
           if [ -z "$voice" ]; then
-            voice="$(sudo find /var/lib/djgabo-cdg-ia-test/jobs -type f -iname '*.mp3' -print | head -n1)"
+            voice="$(sudo find /var/lib/djgabo-cdg-ia-test/jobs -type f -iname '*.mp3' -print -quit)"
           fi
           test -f "$voice"
           rm -f /tmp/forced-align-mio.wav /tmp/forced-align-result.json
