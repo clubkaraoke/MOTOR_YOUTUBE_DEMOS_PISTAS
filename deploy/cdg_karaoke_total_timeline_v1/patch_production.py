@@ -24,18 +24,11 @@ def main():
         print("PATCH=ALREADY_PRESENT")
         return
 
-    text=replace_once(
-        text,
-        'const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);',
-        'const base=prev?(prev.end_time??prev.start_time):Math.max(0,pvOpeningDecision().end+.25);',
-        "pvInstrumentalState base opening",
-    )
-    text=replace_once(
-        text,
-        'const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);',
-        'const base=prev?(prev.end_time??prev.start_time):Math.max(0,pvOpeningDecision().end+.25);',
-        "diag instrumental base opening",
-    )
+    base_old='const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);'
+    base_new='const base=prev?(prev.end_time??prev.start_time):Math.max(0,pvOpeningDecision().end+.25);'
+    if text.count(base_old)!=2:
+        raise RuntimeError(f"opening base: esperaba 2 coincidencias y encontre {text.count(base_old)}")
+    text=text.replace(base_old,base_new,2)
 
     old='''    out.push({
       prev:{line:_diagLineNoForWord(prev),text:prev?.text||null,start:prev?.start_time??null,end:prev?.end_time??null},
