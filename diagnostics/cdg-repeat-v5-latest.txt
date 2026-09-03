@@ -1,0 +1,7 @@
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB LET-0078 Amor Rebelde - Mix Cuanto te amo updated 03/09/2026 06:37
+COUNT 2
+{"at": "2026-09-03T06:24:29.866Z", "calls": 6, "chunks": 5, "clip_end": 183.35, "clip_start": 155.41000000000003, "engine": "elevenlabs-forced-alignment+repeat-chunks", "loss": 1.21536034273814, "quality": {"collapsed": 2, "huge": 0, "huge_limit": 2, "median_duration": 0.18, "ok": true, "reasons": [], "tiny": 0}, "repetition": {"adjacent_ratio": 0.5897, "dominant_ratio": 0.5, "repetitive": true, "unique_ratio": 0.05}, "strategy": "repeat_chunks", "words": 40}
+{"engine": "elevenlabs-forced-alignment+repeat-chunks", "strategy": "repeat_chunks", "quality": {"accepted_words": 40, "collapsed": 1, "huge": 0, "huge_limit": 2, "median_duration": 0.24, "ok": true, "partial": false, "reasons": [], "review_chunks": 0, "review_words": 0, "tiny": 0}, "repetition": {"adjacent_ratio": 0.5897, "dominant_ratio": 0.5, "repetitive": true, "unique_ratio": 0.05}, "calls": 6, "chunks": 5, "review_chunks": [], "applied_words": 40, "requested_words": 40, "at": "2026-09-03T06:37:55.517Z", "words": 40, "clip_start": 270.589, "clip_end": 297.99, "loss": 1.1267391342714608}
+TEST=active
+PROD=active
