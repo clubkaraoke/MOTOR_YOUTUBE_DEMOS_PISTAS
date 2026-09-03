@@ -28,7 +28,7 @@ required=[
     'def _ai_alignment_quality(aligned):',
     'def _ai_align_repeat_chunks(',
     "session(d.get('token'))",
-    "strategy='repeat_chunks'",
+    "strategy='repeat_chunks_partial' if reviews else 'repeat_chunks'",
 ]
 for x in required:
     if x not in s:
