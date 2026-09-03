@@ -334,8 +334,8 @@ def patch_panel(root,test_root):
 
     qr_voice='    <div class="qr-import-row"><button class="btn btn-sm qr-import-btn" type="button" id="btnQrVoz">▣ Pegar QR UVR</button><span id="qrVozEstado">Copia el QR de VOZ (MP3) en UVR y pulsa aquí.</span></div>'
     qr_inst='    <div class="qr-import-row"><button class="btn btn-sm qr-import-btn" type="button" id="btnQrInstrumental">▣ Pegar QR UVR</button><span id="qrInstrumentalEstado">Copia el QR del INSTRUMENTAL (WAV) en UVR y pulsa aquí.</span></div>\n    <div class="ia-source-note"><b>✨ ElevenLabs Scribe v2</b><span>Sincroniza la canción completa. Si pegas una letra maestra, la conserva y marca diferencias para revisión.</span></div>'
-    if 'id="btnQrVoz"' not in h: h=insert_after_id_before_next_label(h,'dropVoz',qr_voice)
-    if 'id="btnQrInstrumental"' not in h: h=insert_after_id_before_next_label(h,'dropInstrumental',qr_inst)
+    if 'id="btnQrVoz"' not in h: h=insert_after_id_before_next_label(h,'dropzone',qr_voice)
+    if 'id="btnQrInstrumental"' not in h: h=insert_after_id_before_next_label(h,'dropzoneInstrumental',qr_inst)
 
     h=h.replace('Letra preliminar (Moisés)','Letra maestra · OPCIONAL')
     h=h.replace('Pega aquí la letra generada por Moisés…','Opcional. Si ya tienes letra, se usará como referencia sin reemplazarla.')
