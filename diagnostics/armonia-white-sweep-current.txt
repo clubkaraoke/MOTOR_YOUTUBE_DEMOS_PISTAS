@@ -1,0 +1,138 @@
+TIMESTAMP=2026-09-03T08:13:54+00:00
+=== SERVICE ===
+active
+
+=== PROJECT COMPARISON ===
+
+JOB LET-0080 'Armonia 10' 'Tu sin mi (En vivo) KARAOKE (Coro)' STATUS LETRA CORREGIDA UPDATED 03/09/2026 08:09
+SEGMENTS 77 WORDS 368 START_TIMED 365 END_TIMED 365 BOTH_TIMED 365
+PROJECT_KEYS ['ai', 'calibration_ms', 'cdg_settings', 'segments', 'song', 'version']
+AI {"coverage_check": "audio_energy_vs_scribe", "engine": "elevenlabs-scribe-v2", "format_version": 3, "generated_at": "03/09/2026 08:01", "line_mode": "balanced_visual_v3", "scribe_word_count": 366, "source_mode": "scribe_only", "voice_gaps": [{"duration": 2.6, "end": 39.8, "kind": "untranscribed_voice", "peak_db": -23.2, "score": 1, "start": 37.2, "threshold_db": -52}]}
+FIRST_12_WORDS
+{"text": "PRIMICIA", "start_time": 0.36, "end_time": 0.76}
+{"text": "DOS", "start_time": null, "end_time": null}
+{"text": "MIL", "start_time": null, "end_time": null}
+{"text": "DOCE.", "start_time": null, "end_time": null}
+{"text": "¡TÚ", "start_time": 2.05, "end_time": 2.66}
+{"text": "SÍÍÍÍ", "start_time": 2.96, "end_time": 4.37}
+{"text": "MÍÍÍ!", "start_time": 4.58, "end_time": 6.36}
+{"text": "Y", "start_time": 8.38, "end_time": 8.68}
+{"text": "AHORA", "start_time": 8.72, "end_time": 9.18}
+{"text": "ESTÁÁÁS", "start_time": 9.24, "end_time": 11.24}
+{"text": "TÚ", "start_time": 11.72, "end_time": 11.94}
+{"text": "SIN", "start_time": 12.04, "end_time": 12.38}
+MID_6_WORDS
+{"text": "AMOR?", "start_time": 145.92, "end_time": 146.3}
+{"text": "¿CÓMO", "start_time": 147.37, "end_time": 147.62}
+{"text": "ME", "start_time": 147.66, "end_time": 147.76}
+{"text": "LO", "start_time": 147.8, "end_time": 147.92}
+{"text": "ARRANCO", "start_time": 147.94, "end_time": 148.58}
+{"text": "DEL", "start_time": 148.6, "end_time": 148.74}
+LAST_6_WORDS
+{"text": "CONTIGO.", "start_time": 291.74, "end_time": 293.36}
+{"text": "Y", "start_time": 296.48, "end_time": 296.6}
+{"text": "SEGUIMOS", "start_time": 296.62, "end_time": 297.03}
+{"text": "BAILANDO", "start_time": 297.06, "end_time": 297.32}
+{"text": "Y", "start_time": 297.33, "end_time": 297.38}
+{"text": "GOZANDO...", "start_time": 297.34, "end_time": 297.6}
+UNTIMED_SAMPLE [{"end_time": null, "id": "w0366", "locked": false, "provisional": false, "spoken": true, "start_time": null, "text": "DOS", "vocal_role": null}, {"end_time": null, "id": "w0367", "locked": false, "provisional": false, "spoken": true, "start_time": null, "text": "MIL", "vocal_role": null}, {"end_time": null, "id": "w0368", "locked": false, "provisional": false, "spoken": true, "start_time": null, "text": "DOCE.", "vocal_role": null}]
+
+JOB LET-0079 'Laura Leon' 'Mujeres Engañadas' STATUS LETRA CORREGIDA UPDATED 03/09/2026 08:06
+SEGMENTS 56 WORDS 198 START_TIMED 198 END_TIMED 198 BOTH_TIMED 198
+PROJECT_KEYS ['ai', 'calibration_ms', 'cdg_settings', 'segments', 'song', 'version']
+AI {"coverage_check": "audio_energy_vs_scribe", "engine": "elevenlabs-scribe-v2", "format_version": 3, "generated_at": "03/09/2026 07:20", "line_mode": "balanced_visual_v3", "scribe_word_count": 198, "source_mode": "scribe_only", "voice_gaps": [{"duration": 3.4, "end": 104.4, "kind": "untranscribed_voice", "peak_db": -10.8, "score": 1, "start": 101, "threshold_db": -43.7}, {"duration": 2.6, "end": 173.8, "kind": "untranscribed_voice", "peak_db": -12, "score": 1, "start": 171.2, "threshold_db": -43.7}, {"duration": 3.2, "end": 190.2, "kind": "untranscribed_voice", "peak_db": -12.6, "score": 1, "start": 187, "threshold_db": -43.7}, {"duration": 5, "end": 216.8, "kind": "untranscribed_voice", "peak_db": -17.1, "score": 1, "start": 211.8, "threshold_db": -43.7}]}
+FIRST_12_WORDS
+{"text": "MAL", "start_time": 16.34, "end_time": 16.62}
+{"text": "AMADA,", "start_time": 16.64, "end_time": 17.66}
+{"text": "ENGAÑADA", "start_time": 18.2, "end_time": 19.439}
+{"text": "CONTIGO", "start_time": 20.1, "end_time": 21.8}
+{"text": "YO", "start_time": 21.86, "end_time": 22.32}
+{"text": "VIVÍ.", "start_time": 22.38, "end_time": 23.32}
+{"text": "HUMILLADA", "start_time": 24.4, "end_time": 25.51}
+{"text": "Y", "start_time": 26.32, "end_time": 26.38}
+{"text": "ABNEGADA", "start_time": 26.42, "end_time": 27.5}
+{"text": "PORQUE", "start_time": 28.26, "end_time": 28.94}
+{"text": "YO", "start_time": 29, "end_time": 29.52}
+{"text": "CREÍ", "start_time": 29.6, "end_time": 30.28}
+MID_6_WORDS
+{"text": "NO,", "start_time": 97.82, "end_time": 98.24}
+{"text": "YA", "start_time": 98.34, "end_time": 98.52}
+{"text": "NO.", "start_time": 98.62, "end_time": 99.24}
+{"text": "TÚ", "start_time": 105.26, "end_time": 105.44}
+{"text": "ME", "start_time": 105.56, "end_time": 105.76}
+{"text": "DESPRECIASTE,", "start_time": 105.82, "end_time": 107.52}
+LAST_6_WORDS
+{"text": "Y", "start_time": 198.86, "end_time": 198.92}
+{"text": "HOY", "start_time": 199, "end_time": 199.34}
+{"text": "TE", "start_time": 199.42, "end_time": 199.68}
+{"text": "DIGO", "start_time": 199.74, "end_time": 200.36}
+{"text": "ADIÓS.", "start_time": 201.46, "end_time": 204.86}
+{"text": "ADIÓS.", "start_time": 209.83955185121036, "end_time": 216.1338559090909}
+UNTIMED_SAMPLE []
+
+=== EDITOR SWEEP / HIGHLIGHT LOGIC ===
+
+=== PANEL/EDITOR FILES ===
+drwxr-xr-x 2 djgabo-cdg djgabo-cdg 4.0K Sep  3 07:47 editor_v1
+-rw-r----- 1 djgabo-cdg djgabo-cdg 189K Sep  3 07:13 panel.html
+-rw-r----- 1 root       root       190K Sep  3 06:46 panel.html.bak_qr_blob_20260903-065312
+-rw-r----- 1 root       root       188K Sep  3 06:53 panel.html.bak_qr_blob_20260903-065313
+-rw-r----- 1 root       root       188K Sep  3 06:53 panel.html.bak_qr_blob_20260903-070640
+-rw-r----- 1 root       root       189K Sep  3 07:06 panel.html.bak_qr_blob_20260903-071335
+-rw-r----- 1 root       root       189K Sep  3 07:13 panel.html.bak_qr_blob_20260903-071351
+-rw-r----- 1 root       root       174K Sep  3 05:45 panel.html.bak_qr_uvr_20260903-054516
+-rw-r----- 1 root       root       181K Sep  3 05:54 panel.html.bak_qr_uvr_20260903-055425
+-rw-r----- 1 root       root       182K Sep  3 05:58 panel.html.bak_qr_uvr_20260903-055832
+-rw-r----- 1 root       root       185K Sep  3 06:13 panel.html.bak_qr_uvr_20260903-061323
+-rw-r----- 1 root       root       186K Sep  3 06:13 panel.html.bak_qr_uvr_20260903-061341
+-rw-r----- 1 root       root       187K Sep  3 06:31 panel.html.bak_uvr_bridge_20260903-064345
+-rw-r----- 1 root       root       189K Sep  3 06:43 panel.html.bak_uvr_bridge_20260903-064401
+-rw-r----- 1 root       root       189K Sep  3 06:44 panel.html.bak_uvr_bridge_20260903-064506
+-rw-r----- 1 root       root       190K Sep  3 06:45 panel.html.bak_uvr_bridge_20260903-064604
+
+=== EDITOR HTML LIVE EXCERPTS AROUND CURRENT TIME LOGIC ===
+
+=== RECENT DEPLOYS / RESTARTS ===
+2026-09-03T06:44:01+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:44:01+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:44:01+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:45:06+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:45:07+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:45:07+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:46:02+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:46:02+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:46:02+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:46:04+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:46:04+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:46:05+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:53:12+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:53:12+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:53:12+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:53:14+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T06:53:14+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T06:53:14+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:02:43+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:06:40+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:35+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:21+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+
+=== PROD SAFETY ===
+PROD_STATUS=active
+PROD_HTTP=200
