@@ -1,0 +1,29 @@
+TIMESTAMP=2026-09-03T19:27:13+00:00
+PROD_SERVICE_BEFORE=active
+PROD_HTTP_BEFORE=200
+PROD_CODE_HASH_BEFORE=9e7c557d8037e5bcf910f66b14639fb851091b2286c1a6bbbe8f104c4be7a880
+=== INSTALL LAB APP ===
+=== FREEZE RENDERER BASELINE ===
+=== VENV ===
+=== SYSTEMD ISOLATED ===
+Created symlink /etc/systemd/system/multi-user.target.wants/djgabo-cdg-render-lab.service → /etc/systemd/system/djgabo-cdg-render-lab.service.
+{"data":"/var/lib/djgabo-cdg-render-lab","ok":true,"renderer":false,"scribe_url":"http://127.0.0.1:8097/api/elevenlabs/transcribe","service":"cdg-render-lab","version":"1"}
+
+=== LOCAL FUNCTIONAL SMOKE ===
+/tmp/cdg-render-lab-smoke.wav
+UPLOAD_SMOKE=PASS
+LAB_SMOKE=PASS
+=== NGINX ROUTE ===
+NGINX_ROUTE=INSTALLED
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+=== FINAL SAFETY ===
+PROD_CODE_HASH_AFTER=9e7c557d8037e5bcf910f66b14639fb851091b2286c1a6bbbe8f104c4be7a880
+PRODUCTION_CODE_UNCHANGED=YES
+LAB_SERVICE=active
+LAB_HTTP=200
+SCRIBE_GATEWAY_LISTEN=1
+PROD_SERVICE_AFTER=active
+PROD_HTTP_AFTER=200
+DEPLOY=OK
+PUBLIC_ROUTE_HTTP=404
