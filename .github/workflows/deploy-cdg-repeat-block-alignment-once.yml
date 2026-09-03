@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/deploy-cdg-repeat-block-alignment-once.yml"
+      - ".github/workflows/deploy-cdg-repeat-block-alignment-once.yml"\n      - "deploy/trigger-cdg-repeat-block-alignment.txt"
 
 permissions:
   contents: write
