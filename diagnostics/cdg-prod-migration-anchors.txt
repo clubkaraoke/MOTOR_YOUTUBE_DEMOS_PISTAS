@@ -1,3 +1,367 @@
+=== PROD PANEL MODAL NUEVA ===
+577-
+578-      <!-- PAPELERA -->
+579-      <div class="view" id="view-papelera">
+580-        <h1 style="font-size:20px;margin:0 0 2px;" id="saludoPapelera">Hola 👋</h1>
+581-        <div id="fechaPapelera" style="color:var(--text-2);font-size:13px;margin-bottom:14px;"></div>
+582-        <h2 style="font-size:15px;margin:0 0 10px;color:var(--text-2);font-weight:600;">Papelera</h2>
+583-        <div id="papeleraBody"><div class="loading-block"><span class="spinner"></span> Cargando papelera…</div></div>
+584-      </div>
+585-
+586-    </div>
+587-  </div>
+588-</div>
+589-
+590-<div class="tabs-bottom">
+591-  <button class="tb-item active" data-view="dashboard">🏠<span>Home</span></button>
+592-  <button class="tb-item" data-view="lista">🎵<span>Trabajos</span></button>
+593-  <button class="tb-item role-gate-hide" data-role-admin data-view="papelera">🗑<span>Papelera</span></button>
+594-</div>
+595-
+596-<!-- MODAL NUEVA CANCIÓN -->
+597:<div class="modal-overlay" id="modalNueva">
+598-  <div class="modal">
+599-    <h3>Nueva canción <span class="close-x" id="cerrarModalNueva">×</span></h3>
+600-    <label>Artista</label>
+601-    <input id="inArtista" placeholder="Ej. Feid">
+602-    <label>Título</label>
+603-    <input id="inTitulo" placeholder="Ej. Luna">
+604-    <div id="dupBox"></div>
+605-
+606-    <label>Acapella / Voz</label>
+607-    <div class="dropzone" id="dropzone">⬆ Arrastra la VOZ aquí o haz clic para elegir archivo</div>
+608-    <input type="file" id="inAudio" accept="audio/mpeg,.mp3" style="display:none">
+609-    <div id="audioInfo"></div>
+610-    <div id="warnBox"></div>
+611-
+612-    <label>Instrumental <span style="color:var(--teal);font-size:10px">· NOMBRE MAESTRO</span></label>
+613-    <div class="dropzone" id="dropzoneInstrumental">⬆ Arrastra el INSTRUMENTAL aquí o haz clic para elegir archivo</div>
+614-    <input type="file" id="inInstrumental" accept="audio/wav,.wav" style="display:none">
+615-    <div id="instrumentalInfo"></div>
+616-    <div id="masterInfo" class="master-note"></div>
+617-
+618-    <label>Letra preliminar (Moisés)</label>
+619-    <textarea id="inLetra" rows="6" placeholder="Pega aquí la letra generada por Moisés…"></textarea>
+620-
+621-    <label>Destino Dropbox actual <span style="color:var(--teal);font-size:10px">· WAV ahora · CDG al finalizar</span></label>
+622-    <input id="inDropboxFolderId" type="hidden" value="">
+623-    <div class="dropbox-dest-card">
+624-      <div class="dropbox-dest-icon">📁</div>
+625-      <div class="dropbox-dest-text">
+626-        <div class="dropbox-dest-name" id="dropboxDestName">Sin carpeta seleccionada</div>
+627-        <div class="dropbox-dest-path" id="dropboxDestPath">Elige la carpeta mensual una vez</div>
+628-      </div>
+629-      <button class="btn" type="button" id="btnElegirDropbox">Cambiar carpeta</button>
+630-    </div>
+631-    <div id="dropboxNuevaStatus" class="dropbox-status">Comprobando Dropbox…</div>
+632-
+633-    <div id="uploadProgress" style="display:none;margin-top:10px;color:var(--teal);font-size:12px"></div>
+634-
+635-    <div class="modal-actions">
+636-      <button class="btn" id="btnCancelarNueva">Cancelar</button>
+637-      <button class="btn btn-primary" id="btnEnviarNueva">Enviar a corrección</button>
+638-    </div>
+639-  </div>
+640-</div>
+641-
+642-<!-- DROPBOX: configuración única + selector de carpeta -->
+643-<div class="modal-overlay" id="modalDropbox">
+644-  <div class="modal" style="width:580px">
+645-    <h3>Dropbox <span class="close-x" id="cerrarModalDropbox">×</span></h3>
+646-    <div id="dbxStatusBox" class="dropbox-status">Comprobando conexión…</div>
+647-
+648-    <div id="dbxConfigBox">
+649-      <label>App Key</label>
+650-      <input id="dbxAppKey" value="2ld58g05ug5g6i1" autocomplete="off">
+651-      <label>App Secret <span style="color:var(--text-3);font-size:10px">· se pega una sola vez</span></label>
+652-      <input id="dbxAppSecret" type="password" placeholder="Pega aquí el App Secret de DJGABO_CDG_PANEL" autocomplete="new-password">
+653-      <div class="dbx-secret-note">Se guarda únicamente en <b>data/dropbox_oauth.json</b> de esta instalación local. No se envía a ChatGPT. En OVH podremos moverlo a variables de entorno.</div>
+654-      <div class="modal-actions">
+655-        <button class="btn" id="btnSoloConectarDropbox" type="button" style="display:none">Autorizar Dropbox</button>
+656-        <button class="btn btn-primary" id="btnGuardarConectarDropbox" type="button">Guardar y conectar Dropbox</button>
+657-      </div>
+658-    </div>
+659-
+660-    <div id="dbxBrowserBox" style="display:none">
+661-      <div class="dbx-browser-head">
+662-        <button class="btn btn-sm" type="button" id="btnDbxSubir">← Arriba</button>
+663-        <div class="dbx-current" id="dbxCurrentPath">/</div>
+664-      </div>
+665-      <div class="dbx-list" id="dbxFolderList"><div class="dbx-empty">Cargando carpetas…</div></div>
+666-      <div class="modal-actions">
+667-        <button class="btn" type="button" id="btnDbxReconfigurar">Cambiar conexión</button>
+668-        <div style="flex:1"></div>
+669-        <button class="btn btn-primary" type="button" id="btnUsarCarpetaDropbox">Usar esta carpeta</button>
+670-      </div>
+671-    </div>
+672-  </div>
+673-</div>
+674-
+675-<!-- GOOGLE DRIVE HISTÓRICO: puente con el Apps Script existente -->
+676-<div class="modal-overlay" id="modalDriveHistorico">
+677-  <div class="modal" style="width:560px">
+678-    <h3>Drive histórico <span class="close-x" id="cerrarModalDrive">×</span></h3>
+679-    <div id="driveStatusBox" class="dropbox-status">Comprobando conexión…</div>
+680-    <label>URL del Web App de EDITOR_LETRAS <span style="color:var(--text-3);font-size:10px">· termina en /exec</span></label>
+681-    <input id="driveWebappUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+682-    <div class="dbx-secret-note">Los audios y letras NO se copian al PC. El panel consulta Google Drive sólo cuando abre un trabajo histórico. Al guardar una corrección, se sigue usando el mismo Sheet + carpetas + backups del panel antiguo.</div>
+683-    <div class="modal-actions">
+684-      <button class="btn" id="btnCerrarDrive" type="button">Cerrar</button>
+685-      <button class="btn btn-primary" id="btnGuardarDrive" type="button">Guardar y probar</button>
+686-    </div>
+687-  </div>
+688-</div>
+689-
+690-<!-- CONFIRM GENERICO -->
+691-<div class="modal-overlay" id="modalConfirm">
+692-  <div class="modal" style="width:380px;">
+693-    <h3 id="confirmTitulo">Confirmar</h3>
+694-    <div id="confirmTexto" style="font-size:13.5px;color:var(--text-2);"></div>
+695-    <div class="modal-actions">
+696-      <button class="btn" id="confirmCancelar">Cancelar</button>
+697-      <button class="btn btn-danger" id="confirmAceptar" style="border:1px solid var(--danger);">Confirmar</button>
+698-    </div>
+699-  </div>
+700-</div>
+701-
+702-<div class="sheet-overlay" id="sheetOverlay"></div>
+703-<div class="sheet" id="sheet" style="display:none;"></div>
+704-
+705-<audio id="audioPlayer" style="display:none;"></audio>
+706-
+707-<script>
+708-/* =========================================================
+709-   ESTADO GLOBAL
+710-   ========================================================= */
+711-const ESTADOS = {
+712-  PENDIENTE:'PENDIENTE DE CORRECCIÓN', CORRECCION:'EN CORRECCIÓN', CORREGIDA:'LETRA CORREGIDA',
+713-  COPIADA:'LETRA COPIADA', TERMINADO:'KARAOKE TERMINADO', ELIMINADO:'ELIMINADO'
+714-};
+715-const ESTADO_COLOR = {
+716-  [ESTADOS.PENDIENTE]:'orange', [ESTADOS.CORRECCION]:'yellow', [ESTADOS.CORREGIDA]:'teal',
+717-  [ESTADOS.COPIADA]:'blue', [ESTADOS.TERMINADO]:'green', [ESTADOS.ELIMINADO]:'danger'
+718-};
+719-const ESTADO_LABEL = {
+720-  [ESTADOS.PENDIENTE]:'Pendiente', [ESTADOS.CORRECCION]:'Corrigiendo', [ESTADOS.CORREGIDA]:'Corregida',
+721-  [ESTADOS.COPIADA]:'Copiada', [ESTADOS.TERMINADO]:'Terminado', [ESTADOS.ELIMINADO]:'Eliminado'
+722-};
+723-
+724-const NOMBRES_ROL = { ADMIN: 'Augusto', CORRECTORA: 'Valeria' };
+725-let ROL = 'CORRECTORA';
+726-let SESSION_TOKEN = localStorage.getItem('consola_session_token') || '';
+727-let CORRECTORA_PASSWORD_REQUIRED = false;
+728-let listaVisible = 60;
+729-let lockHeartbeat = null;
+730-let cambiosPendientesGlobal = false;
+731-let trabajosCache = [];
+732-let filtroActivo = 'TODOS';
+733-let busquedaActual = '';
+734-let seleccionados = new Set();
+735-let dupEncontrado = null;
+736-let archivoSeleccionado = null; // VOZ
+737-let instrumentalSeleccionado = null; // INSTRUMENTAL = fuente maestra de artista/título
+738-let DROPBOX_STATUS = {configured:false,connected:false,default_folder:null};
+739-let DRIVE_HIST_STATUS = {configured:false,online:false,webapp_url:'',error:''};
+740-let DBX_SELECTED_FOLDER = null; // {id,path_display,path_lower,name}
+741-let DBX_BROWSER_CURRENT = {id:'',display_path:'/',path_lower:'',parent_ref:''};
+742-let DBX_OAUTH_POPUP = null;
+743-let DBX_PICK_MODE = 'new'; // new | bulk
+744-
+745-// estado del editor abierto
+746-let editor = {
+747-  idTrabajo:null, audioBuffer:null, duracion:0, selStart:null, selEnd:null,
+=== TEST PANEL MODAL NUEVA ===
+588-
+589-      <!-- PAPELERA -->
+590-      <div class="view" id="view-papelera">
+591-        <h1 style="font-size:20px;margin:0 0 2px;" id="saludoPapelera">Hola 👋</h1>
+592-        <div id="fechaPapelera" style="color:var(--text-2);font-size:13px;margin-bottom:14px;"></div>
+593-        <h2 style="font-size:15px;margin:0 0 10px;color:var(--text-2);font-weight:600;">Papelera</h2>
+594-        <div id="papeleraBody"><div class="loading-block"><span class="spinner"></span> Cargando papelera…</div></div>
+595-      </div>
+596-
+597-    </div>
+598-  </div>
+599-</div>
+600-
+601-<div class="tabs-bottom">
+602-  <button class="tb-item active" data-view="dashboard">🏠<span>Home</span></button>
+603-  <button class="tb-item" data-view="lista">🎵<span>Trabajos</span></button>
+604-  <button class="tb-item role-gate-hide" data-role-admin data-view="papelera">🗑<span>Papelera</span></button>
+605-</div>
+606-
+607-<!-- MODAL NUEVA CANCIÓN -->
+608:<div class="modal-overlay" id="modalNueva">
+609-  <div class="modal">
+610-    <h3>Nueva canción <span class="close-x" id="cerrarModalNueva">×</span></h3>
+611-    <label>Artista</label>
+612-    <input id="inArtista" placeholder="Ej. Feid">
+613-    <label>Título</label>
+614-    <input id="inTitulo" placeholder="Ej. Luna">
+615-    <div id="dupBox"></div>
+616-
+617-    <label>Acapella / Voz</label>
+618-    <div class="dropzone" id="dropzone">⬆ Arrastra la VOZ aquí o haz clic para elegir archivo</div>
+619-    <input type="file" id="inAudio" accept="audio/mpeg,.mp3" style="display:none">
+620-    <div id="audioInfo"></div>
+621-    <div class="qr-import-row"><button class="btn btn-sm qr-import-btn" type="button" id="btnQrVoz">▣ Pegar QR UVR</button><span id="qrVozEstado">Copia el QR de VOZ (MP3) en UVR y pulsa aquí.</span></div>
+622-    <div id="warnBox"></div>
+623-
+624-    <label>Instrumental <span style="color:var(--teal);font-size:10px">· NOMBRE MAESTRO</span></label>
+625-    <div class="dropzone" id="dropzoneInstrumental">⬆ Arrastra el INSTRUMENTAL aquí o haz clic para elegir archivo</div>
+626-    <input type="file" id="inInstrumental" accept="audio/wav,.wav" style="display:none">
+627-    <div id="instrumentalInfo"></div>
+628-    <div class="qr-import-row"><button class="btn btn-sm qr-import-btn" type="button" id="btnQrInstrumental">▣ Pegar QR UVR</button><span id="qrInstrumentalEstado">Copia el QR del INSTRUMENTAL (WAV) en UVR y pulsa aquí.</span></div>
+629-    <div id="masterInfo" class="master-note"></div>
+630-
+631-    <div class="ia-source-note"><b>✨ ElevenLabs Scribe v2</b><span>Generará la letra completa + timings automáticamente. No necesitas pegar una letra.</span></div>
+632-    <textarea id="inLetra" rows="1" style="display:none"></textarea>
+633-
+634-    <label style="display:none">Destino Dropbox actual <span style="color:var(--teal);font-size:10px">· WAV ahora · CDG al finalizar</span></label>
+635-    <input id="inDropboxFolderId" type="hidden" value="">
+636-    <div class="dropbox-dest-card" style="display:none">
+637-      <div class="dropbox-dest-icon">📁</div>
+638-      <div class="dropbox-dest-text">
+639-        <div class="dropbox-dest-name" id="dropboxDestName">Sin carpeta seleccionada</div>
+640-        <div class="dropbox-dest-path" id="dropboxDestPath">Elige la carpeta mensual una vez</div>
+641-      </div>
+642-      <button class="btn" type="button" id="btnElegirDropbox">Cambiar carpeta</button>
+643-    </div>
+644-    <div id="dropboxNuevaStatus" class="dropbox-status" style="display:none">Dropbox desactivado en IA TEST</div>
+645-
+646-    <div id="uploadProgress" class="ia-progress" style="display:none">
+647-      <div class="ia-progress-head"><span id="iaProgressStage">Preparando…</span><b id="iaProgressPct">0%</b></div>
+648-      <div class="ia-progress-track"><div id="iaProgressFill" class="ia-progress-fill"></div></div>
+649-      <div class="ia-progress-meta"><span id="iaProgressDetail">Esperando…</span><span id="iaProgressTime">0.0 s</span></div>
+650-    </div>
+651-
+652-    <div class="modal-actions">
+653-      <button class="btn" id="btnCancelarNueva">Cancelar</button>
+654-      <button class="btn btn-primary" id="btnEnviarNueva">✨ Crear y sincronizar con IA</button>
+655-    </div>
+656-  </div>
+657-</div>
+658-
+659-<!-- DROPBOX: configuración única + selector de carpeta -->
+660-<div class="modal-overlay" id="modalDropbox">
+661-  <div class="modal" style="width:580px">
+662-    <h3>Dropbox <span class="close-x" id="cerrarModalDropbox">×</span></h3>
+663-    <div id="dbxStatusBox" class="dropbox-status">Comprobando conexión…</div>
+664-
+665-    <div id="dbxConfigBox">
+666-      <label>App Key</label>
+667-      <input id="dbxAppKey" value="2ld58g05ug5g6i1" autocomplete="off">
+668-      <label>App Secret <span style="color:var(--text-3);font-size:10px">· se pega una sola vez</span></label>
+669-      <input id="dbxAppSecret" type="password" placeholder="Pega aquí el App Secret de DJGABO_CDG_PANEL" autocomplete="new-password">
+670-      <div class="dbx-secret-note">Se guarda únicamente en <b>data/dropbox_oauth.json</b> de esta instalación local. No se envía a ChatGPT. En OVH podremos moverlo a variables de entorno.</div>
+671-      <div class="modal-actions">
+672-        <button class="btn" id="btnSoloConectarDropbox" type="button" style="display:none">Autorizar Dropbox</button>
+673-        <button class="btn btn-primary" id="btnGuardarConectarDropbox" type="button">Guardar y conectar Dropbox</button>
+674-      </div>
+675-    </div>
+676-
+677-    <div id="dbxBrowserBox" style="display:none">
+678-      <div class="dbx-browser-head">
+679-        <button class="btn btn-sm" type="button" id="btnDbxSubir">← Arriba</button>
+680-        <div class="dbx-current" id="dbxCurrentPath">/</div>
+681-      </div>
+682-      <div class="dbx-list" id="dbxFolderList"><div class="dbx-empty">Cargando carpetas…</div></div>
+683-      <div class="modal-actions">
+684-        <button class="btn" type="button" id="btnDbxReconfigurar">Cambiar conexión</button>
+685-        <div style="flex:1"></div>
+686-        <button class="btn btn-primary" type="button" id="btnUsarCarpetaDropbox">Usar esta carpeta</button>
+687-      </div>
+688-    </div>
+689-  </div>
+690-</div>
+691-
+692-<!-- GOOGLE DRIVE HISTÓRICO: puente con el Apps Script existente -->
+693-<div class="modal-overlay" id="modalDriveHistorico">
+694-  <div class="modal" style="width:560px">
+695-    <h3>Drive histórico <span class="close-x" id="cerrarModalDrive">×</span></h3>
+696-    <div id="driveStatusBox" class="dropbox-status">Comprobando conexión…</div>
+697-    <label>URL del Web App de EDITOR_LETRAS <span style="color:var(--text-3);font-size:10px">· termina en /exec</span></label>
+698-    <input id="driveWebappUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+699-    <div class="dbx-secret-note">Los audios y letras NO se copian al PC. El panel consulta Google Drive sólo cuando abre un trabajo histórico. Al guardar una corrección, se sigue usando el mismo Sheet + carpetas + backups del panel antiguo.</div>
+700-    <div class="modal-actions">
+701-      <button class="btn" id="btnCerrarDrive" type="button">Cerrar</button>
+702-      <button class="btn btn-primary" id="btnGuardarDrive" type="button">Guardar y probar</button>
+703-    </div>
+704-  </div>
+705-</div>
+706-
+707-<!-- CONFIRM GENERICO -->
+708-<div class="modal-overlay" id="modalConfirm">
+709-  <div class="modal" style="width:380px;">
+710-    <h3 id="confirmTitulo">Confirmar</h3>
+711-    <div id="confirmTexto" style="font-size:13.5px;color:var(--text-2);"></div>
+712-    <div class="modal-actions">
+713-      <button class="btn" id="confirmCancelar">Cancelar</button>
+714-      <button class="btn btn-danger" id="confirmAceptar" style="border:1px solid var(--danger);">Confirmar</button>
+715-    </div>
+716-  </div>
+717-</div>
+718-
+719-<div class="sheet-overlay" id="sheetOverlay"></div>
+720-<div class="sheet" id="sheet" style="display:none;"></div>
+721-
+722-<audio id="audioPlayer" style="display:none;"></audio>
+723-
+724-<script src="/cdg-editor-ia/vendor/jsQR.js"></script>
+725-<script>
+726-/* =========================================================
+727-   ESTADO GLOBAL
+728-   ========================================================= */
+729-const ESTADOS = {
+730-  PENDIENTE:'PENDIENTE DE CORRECCIÓN', CORRECCION:'EN CORRECCIÓN', CORREGIDA:'LETRA CORREGIDA',
+731-  COPIADA:'LETRA COPIADA', TERMINADO:'KARAOKE TERMINADO', ELIMINADO:'ELIMINADO'
+732-};
+733-const ESTADO_COLOR = {
+734-  [ESTADOS.PENDIENTE]:'orange', [ESTADOS.CORRECCION]:'yellow', [ESTADOS.CORREGIDA]:'teal',
+735-  [ESTADOS.COPIADA]:'blue', [ESTADOS.TERMINADO]:'green', [ESTADOS.ELIMINADO]:'danger'
+736-};
+737-const ESTADO_LABEL = {
+738-  [ESTADOS.PENDIENTE]:'Pendiente', [ESTADOS.CORRECCION]:'Corrigiendo', [ESTADOS.CORREGIDA]:'Corregida',
+739-  [ESTADOS.COPIADA]:'Copiada', [ESTADOS.TERMINADO]:'Terminado', [ESTADOS.ELIMINADO]:'Eliminado'
+740-};
+741-
+742-const NOMBRES_ROL = { ADMIN: 'Augusto', CORRECTORA: 'Valeria' };
+743-let ROL = 'CORRECTORA';
+744-let SESSION_TOKEN = localStorage.getItem('consola_session_token') || '';
+745-let CORRECTORA_PASSWORD_REQUIRED = false;
+746-let listaVisible = 60;
+747-let lockHeartbeat = null;
+748-let cambiosPendientesGlobal = false;
+749-let trabajosCache = [];
+750-let filtroActivo = 'TODOS';
+751-let busquedaActual = '';
+752-let seleccionados = new Set();
+753-let dupEncontrado = null;
+754-let archivoSeleccionado = null; // VOZ
+755-let instrumentalSeleccionado = null; // INSTRUMENTAL = fuente maestra de artista/título
+756-let DROPBOX_STATUS = {configured:false,connected:false,default_folder:null};
+757-let DRIVE_HIST_STATUS = {configured:false,online:false,webapp_url:'',error:''};
+758-let DBX_SELECTED_FOLDER = null; // {id,path_display,path_lower,name}
+759-let DBX_BROWSER_CURRENT = {id:'',display_path:'/',path_lower:'',parent_ref:''};
+760-let DBX_OAUTH_POPUP = null;
+761-let DBX_PICK_MODE = 'new'; // new | bulk
+762-
+763-// estado del editor abierto
+764-let editor = {
+765-  idTrabajo:null, audioBuffer:null, duracion:0, selStart:null, selEnd:null,
+766-  loopActivo:false, guardadoTimer:null, autosaveTimer:null, ultimaLetraGuardada:'',
+767-  versiones:[], rolBloqueado:false, audioCargando:false
+768-};
+769-
+770-/* =========================================================
+771-   HELPERS DE UI
+772-   ========================================================= */
+773-function toast(msg, tipo){
+774-  const el = document.createElement('div');
+775-  el.className = 'toast' + (tipo==='error' ? ' error' : '');
+776-  el.textContent = msg;
+777-  document.getElementById('toastWrap').appendChild(el);
+778-  setTimeout(()=>el.remove(), 4200);
 === PROD PANEL NUEVA CANCION HANDLER ===
 1638-/**
 1639- * Detecta el patrón "Artista - Título" en el nombre del archivo de audio y llena
