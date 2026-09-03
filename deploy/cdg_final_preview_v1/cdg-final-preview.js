@@ -159,7 +159,12 @@
     q('cdgFinalRender').onclick=async()=>{
       if(typeof crearCdg!=='function'){setStatus('No encuentro el renderer del editor.','bad');return;}
       pauseAll(); setStatus('Generando el CDG final real…','warn');
-      await crearCdg(false);
+      window.DJGABO_CDG_PREVIEW_RENDERING=true;
+      try{
+        await crearCdg(false);
+      }finally{
+        window.DJGABO_CDG_PREVIEW_RENDERING=false;
+      }
       if(P.active) await loadFinal(true);
     };
 
