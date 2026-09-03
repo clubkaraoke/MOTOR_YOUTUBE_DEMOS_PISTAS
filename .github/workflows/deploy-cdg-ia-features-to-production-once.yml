@@ -81,12 +81,12 @@ jobs:
           echo "=== STAGE PATCH ==="
           sudo python3 "$MIG" --root "$STAGE" --test-root "$REF" --vendor-source "$VENDOR"
           sudo python3 -m py_compile "$STAGE/server.py" "$STAGE/renderer/normalize.py"
-          grep -Fq "pollProductionIaTask" "$STAGE/panel.html"
-          grep -Fq "btnAiFull" "$STAGE/editor_v1/index.html"
-          grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$STAGE/server.py"
-          ! grep -Fq "Dropbox desactivado en IA TEST" "$STAGE/panel.html"
-          ! grep -Fq "/cdg-editor-ia" "$STAGE/panel.html"
-          ! grep -Fq "/cdg-editor-ia" "$STAGE/editor_v1/index.html"
+          sudo grep -Fq "pollProductionIaTask" "$STAGE/panel.html"
+          sudo grep -Fq "btnAiFull" "$STAGE/editor_v1/index.html"
+          sudo grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$STAGE/server.py"
+          ! sudo grep -Fq "Dropbox desactivado en IA TEST" "$STAGE/panel.html"
+          ! sudo grep -Fq "/cdg-editor-ia" "$STAGE/panel.html"
+          ! sudo grep -Fq "/cdg-editor-ia" "$STAGE/editor_v1/index.html"
           echo "STAGE_VALIDATION=PASS"
 
           echo "=== BACKUP PRODUCTION ==="
@@ -124,25 +124,25 @@ jobs:
           sudo python3 -m py_compile "$PROD/server.py" "$PROD/renderer/normalize.py"
 
           echo "=== STATIC VERIFY ==="
-          grep -Fq "@app.post('/api/jobs/create')" "$PROD/server.py"
-          grep -Fq "backup_voice_to_drive(jid)" "$PROD/server.py"
-          grep -Fq "dropbox_confirm_uploaded_file" "$PROD/server.py"
-          grep -Fq "@app.post('/api/render/start')" "$PROD/server.py"
-          grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$PROD/server.py"
-          grep -Fq "@app.get('/api/ai/tasks/<task_id>')" "$PROD/server.py"
-          grep -Fq "@app.post('/api/jobs/<jid>/ai-align-block')" "$PROD/server.py"
-          grep -Fq "https://*.uvronline.app" "$PROD/server.py"
-          grep -Fq "btnQrVoz" "$PROD/panel.html"
-          grep -Fq "QR_UPSCALE_FALLBACK_V2" "$PROD/panel.html"
-          grep -Fq "pollProductionIaTask" "$PROD/panel.html"
-          grep -Fq "Manteniendo Dropbox + Drive" "$PROD/panel.html"
-          grep -Fq "playHi" "$PROD/editor_v1/index.html"
-          grep -Fq "btnAiFull" "$PROD/editor_v1/index.html"
-          grep -Fq "syncIncompleteNotice" "$PROD/editor_v1/index.html"
-          grep -Fq "voice_gaps" "$PROD/editor_v1/index.html"
-          ! grep -Fq "Dropbox desactivado en IA TEST" "$PROD/panel.html"
-          ! grep -Fq "/cdg-editor-ia" "$PROD/panel.html"
-          ! grep -Fq "/cdg-editor-ia" "$PROD/editor_v1/index.html"
+          sudo grep -Fq "@app.post('/api/jobs/create')" "$PROD/server.py"
+          sudo grep -Fq "backup_voice_to_drive(jid)" "$PROD/server.py"
+          sudo grep -Fq "dropbox_confirm_uploaded_file" "$PROD/server.py"
+          sudo grep -Fq "@app.post('/api/render/start')" "$PROD/server.py"
+          sudo grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$PROD/server.py"
+          sudo grep -Fq "@app.get('/api/ai/tasks/<task_id>')" "$PROD/server.py"
+          sudo grep -Fq "@app.post('/api/jobs/<jid>/ai-align-block')" "$PROD/server.py"
+          sudo grep -Fq "https://*.uvronline.app" "$PROD/server.py"
+          sudo grep -Fq "btnQrVoz" "$PROD/panel.html"
+          sudo grep -Fq "QR_UPSCALE_FALLBACK_V2" "$PROD/panel.html"
+          sudo grep -Fq "pollProductionIaTask" "$PROD/panel.html"
+          sudo grep -Fq "Manteniendo Dropbox + Drive" "$PROD/panel.html"
+          sudo grep -Fq "playHi" "$PROD/editor_v1/index.html"
+          sudo grep -Fq "btnAiFull" "$PROD/editor_v1/index.html"
+          sudo grep -Fq "syncIncompleteNotice" "$PROD/editor_v1/index.html"
+          sudo grep -Fq "voice_gaps" "$PROD/editor_v1/index.html"
+          ! sudo grep -Fq "Dropbox desactivado en IA TEST" "$PROD/panel.html"
+          ! sudo grep -Fq "/cdg-editor-ia" "$PROD/panel.html"
+          ! sudo grep -Fq "/cdg-editor-ia" "$PROD/editor_v1/index.html"
           echo "STATIC_VERIFY=PASS"
 
           echo "=== RESTART PRODUCTION ==="
@@ -166,8 +166,8 @@ jobs:
           test "$PROD_HTTP" = 200
           test "$EDITOR_HTTP" = 200
           test "$VENDOR_HTTP" = 200
-          grep -Fq "btnAiFull" /tmp/editor-live.html
-          grep -Fq "jsQR" /tmp/jsqr-live.js
+          sudo grep -Fq "btnAiFull" /tmp/editor-live.html
+          sudo grep -Fq "jsQR" /tmp/jsqr-live.js
 
           echo "=== ELEVENLABS BACKEND REACHABILITY ==="
           if ss -ltn | grep -q ':8097 '; then echo "SCRIBE_BACKEND_PORT=LISTENING"; else echo "SCRIBE_BACKEND_PORT=NOT_LISTENING"; false; fi
