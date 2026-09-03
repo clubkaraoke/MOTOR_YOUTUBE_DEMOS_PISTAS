@@ -1,0 +1,93 @@
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB LET-0078 Amor Rebelde - Mix Cuanto te amo updated 03/09/2026 06:04
+VOICE /var/lib/djgabo-cdg-ia-test/jobs/LET-0078/Amor Rebelde - Mix Cuanto te amo (Voz).mp3 True 13789184
+
+=== WINDOW 1 155.41 183.33 dur 27.92 ===
+1 'LA' start 155.489 end 155.649
+2 'IRA,' start 155.69 end 156.09
+3 'IRA,' start 156.169 end 156.489
+4 'LA' start 156.63 end 156.849
+5 'IRA,' start 156.949 end 157.169
+6 'IRA,' start 157.309 end 157.65
+7 'IRA,' start 157.789 end 157.809
+8 'LA,' start 157.81 end 158.289
+9 'LA,' start 158.29 end 158.769
+10 'LA' start 160.129 end 160.29
+11 'LA' start 160.31 end 160.311
+12 'IRA,' start 160.33 end 160.709
+13 'IRA,' start 160.83 end 161.089
+14 'LA' start 161.149 end 161.509
+15 'IRA' start 161.569 end 162.249
+16 'IRA,' start 162.309 end 162.589
+17 'IRA,' start 162.829 end 162.849
+18 'LA,' start 162.87 end 163.209
+19 'LA,' start 163.249 end 164.049
+20 'LA' start 164.689 end 164.83
+21 'LA' start 164.87 end 164.89
+22 'IRA,' start 164.891 end 165.29
+23 'IRA,' start 165.37 end 165.67
+24 'LA' start 166.489 end 166.51
+25 'IRA,' start 166.51 end 166.511
+26 'IRA,' start 166.51 end 166.511
+27 'IRA,' start 166.569 end 167.37
+28 'LA,' start 167.469 end 167.83
+29 'LA,' start 167.849 end 168.569
+30 'LA' start 169.33 end 169.449
+31 'LA' start 169.489 end 169.51
+32 'IRA,' start 169.989 end 170.309
+33 'IRA,' start 171.129 end 171.889
+34 'LA' start 171.91 end 171.911
+35 'IRA,' start 171.91 end 171.911
+36 'IRA,' start 171.91 end 171.911
+37 'IRA,' start 171.91 end 171.911
+38 'LA,' start 172.09 end 172.409
+39 'LA,' start 172.469 end 173.309
+40 'LA' start 183.25 end 183.289
+41 'OYE,' start 183.38 end 183.56
+TOKENS 41 UNIQUE ['ira', 'ira,', 'la', 'la,', 'oye,']
+DB p20/p35/p50/max -85.9 -47.0 -23.4 -8.3
+
+=== WINDOW 2 270.209 297.98 dur 27.771 ===
+1 'LA' start 271.709 end 271.868
+2 'IRA,' start 271.949 end 272.288
+3 'IRA,' start 272.449 end 272.728
+4 'LA' start 272.868 end 273.108
+5 'IRA,' start 273.189 end 273.488
+6 'IRA,' start 273.548 end 273.888
+7 'IRA,' start 273.908 end 274.209
+8 'LA,' start 274.488 end 275.528
+9 'LA,' start 276.328 end 276.388
+10 'LA' start 276.389 end 276.488
+11 'LA' start 277.328 end 281.068
+12 'IRA,' start 281.148 end 281.528
+13 'IRA,' start 281.648 end 281.948
+14 'LA' start 282.069 end 282.07
+15 'IRA' start 282.069 end 282.07
+16 'IRA,' start 282.069 end 282.07
+17 'IRA,' start 282.069 end 282.07
+18 'LA,' start 282.069 end 282.07
+19 'LA,' start 282.069 end 282.07
+20 'LA' start 282.069 end 282.07
+21 'LA' start 282.069 end 282.07
+22 'IRA,' start 282.069 end 282.07
+23 'IRA,' start 282.069 end 282.07
+24 'LA' start 282.069 end 282.07
+25 'IRA,' start 282.069 end 282.07
+26 'IRA,' start 282.069 end 282.07
+27 'IRA,' start 282.069 end 282.07
+28 'LA,' start 282.069 end 282.07
+29 'LA,' start 282.069 end 282.07
+30 'LA' start 282.069 end 282.07
+31 'LA' start 282.069 end 282.07
+32 'IRA,' start 282.069 end 282.07
+33 'IRA,' start 282.069 end 282.07
+34 'LA' start 282.069 end 282.07
+35 'IRA,' start 282.069 end 282.07
+36 'IRA,' start 282.069 end 282.07
+37 'IRA,' start 282.069 end 282.07
+38 'LA,' start 282.069 end 282.07
+39 'LA,' start 282.069 end 282.07
+40 'LA' start 283.728 end 290.688
+41 '¿Y' start 298.03 end 298.18
+TOKENS 41 UNIQUE ['ira', 'ira,', 'la', 'la,', '¿y']
+DB p20/p35/p50/max -83.5 -38.0 -21.8 -8.9
