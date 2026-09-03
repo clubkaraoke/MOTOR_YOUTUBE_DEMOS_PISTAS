@@ -1,0 +1,181 @@
+name: Deploy final CDG preview V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-final-preview-v1.yml"
+      - "deploy/cdg_final_preview_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch and player
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_final_preview_v1/patch_production.py deploy/cdg_final_preview_v1/cdg_preview_routes.py deploy/cdg_final_preview_v1/verify_laura_timeline.py
+          node --check deploy/cdg_final_preview_v1/cdg-final-preview.js
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production, restart and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/cdg_final_preview_patch.py"
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/cdg_preview_routes.py "$OVH_USER@$OVH_HOST:/tmp/cdg_preview_routes.py"
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/cdg-final-preview.js "$OVH_USER@$OVH_HOST:/tmp/cdg-final-preview.js"
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/verify_laura_timeline.py "$OVH_USER@$OVH_HOST:/tmp/verify_laura_timeline.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-final-preview-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          STAGE=/tmp/djgabo-cdg-final-preview-stage
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/cdg_final_preview_$STAMP"
+          PATCH=/tmp/cdg_final_preview_patch.py
+          ROUTES=/tmp/cdg_preview_routes.py
+          PLAYER=/tmp/cdg-final-preview.js
+          VERIFY=/tmp/verify_laura_timeline.py
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "DEPLOY=START"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1" "$STAGE/renderer" "$STAGE/vendor"
+          sudo cp "$PROD/server.py" "$STAGE/server.py"
+          sudo cp "$PROD/editor_v1/index.html" "$STAGE/editor_v1/index.html"
+          sudo cp "$PROD/renderer/normalize.py" "$STAGE/renderer/normalize.py"
+          sudo cp "$PROD/renderer/style.json" "$STAGE/renderer/style.json"
+
+          echo "=== STAGE PATCH ==="
+          sudo python3 "$PATCH" --root "$STAGE" --routes-source "$ROUTES" --player-source "$PLAYER"
+          sudo python3 -m py_compile "$STAGE/server.py" "$STAGE/renderer/normalize.py" "$STAGE/cdg_preview_routes.py"
+          sudo grep -Fq "PROD_FINAL_CDG_PREVIEW_V1" "$STAGE/renderer/normalize.py"
+          sudo grep -Fq "register_cdg_preview_routes" "$STAGE/server.py"
+          sudo grep -Fq "cdg-final-preview.js" "$STAGE/editor_v1/index.html"
+          sudo grep -Fq "DJGABO_CDG_FINAL_PREVIEW" "$STAGE/vendor/cdg-final-preview.js"
+          echo "STAGE=PASS"
+
+          echo "=== BACKUP ==="
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/vendor"
+          sudo cp "$PROD/server.py" "$BACKUP/server.py"
+          sudo cp "$PROD/editor_v1/index.html" "$BACKUP/editor_v1/index.html"
+          sudo cp "$PROD/renderer/normalize.py" "$BACKUP/renderer/normalize.py"
+          [ ! -f "$PROD/cdg_preview_routes.py" ] || sudo cp "$PROD/cdg_preview_routes.py" "$BACKUP/cdg_preview_routes.py"
+          [ ! -f "$PROD/vendor/cdg-final-preview.js" ] || sudo cp "$PROD/vendor/cdg-final-preview.js" "$BACKUP/vendor/cdg-final-preview.js"
+          echo "BACKUP=$BACKUP"
+
+          rollback() {
+            code=$?
+            echo "ROLLBACK_TRIGGERED=$code"
+            sudo cp "$BACKUP/server.py" "$PROD/server.py" || true
+            sudo cp "$BACKUP/editor_v1/index.html" "$PROD/editor_v1/index.html" || true
+            sudo cp "$BACKUP/renderer/normalize.py" "$PROD/renderer/normalize.py" || true
+            if [ -f "$BACKUP/cdg_preview_routes.py" ]; then sudo cp "$BACKUP/cdg_preview_routes.py" "$PROD/cdg_preview_routes.py"; else sudo rm -f "$PROD/cdg_preview_routes.py"; fi
+            if [ -f "$BACKUP/vendor/cdg-final-preview.js" ]; then sudo cp "$BACKUP/vendor/cdg-final-preview.js" "$PROD/vendor/cdg-final-preview.js"; else sudo rm -f "$PROD/vendor/cdg-final-preview.js"; fi
+            sudo systemctl restart djgabo-cdg || true
+            sleep 3
+            echo "ROLLBACK_STATUS=$(sudo systemctl is-active djgabo-cdg || true)"
+            echo "ROLLBACK_HTTP=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            exit "$code"
+          }
+          trap rollback ERR
+
+          echo "=== APPLY ==="
+          sudo python3 "$PATCH" --root "$PROD" --routes-source "$ROUTES" --player-source "$PLAYER"
+          sudo chown djgabo-cdg:djgabo-cdg "$PROD/cdg_preview_routes.py" "$PROD/vendor/cdg-final-preview.js"
+          sudo python3 -m py_compile "$PROD/server.py" "$PROD/renderer/normalize.py" "$PROD/cdg_preview_routes.py"
+
+          echo "=== STATIC VERIFY ==="
+          sudo grep -Fq "intro_duration_seconds" "$PROD/renderer/normalize.py"
+          sudo grep -Fq "PROD_FINAL_CDG_PREVIEW_V1" "$PROD/renderer/normalize.py"
+          sudo grep -Fq "register_cdg_preview_routes" "$PROD/server.py"
+          sudo grep -Fq "cdg-final-preview.js" "$PROD/editor_v1/index.html"
+          echo "STATIC=PASS"
+
+          echo "=== RESTART ==="
+          sudo systemctl restart djgabo-cdg
+          ok=0
+          for i in $(seq 1 40); do
+            code="$(curl -sS -o /tmp/cdg-root.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            if [ "$code" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          ROOT_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          EDITOR_HTTP="$(curl -sS -o /tmp/cdg-editor.html -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          PLAYER_HTTP="$(curl -sS -o /tmp/cdg-final-preview.js -w '%{http_code}' http://127.0.0.1:8765/api/vendor/cdg-final-preview.js)"
+          echo "ROOT_HTTP=$ROOT_HTTP"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          echo "PLAYER_HTTP=$PLAYER_HTTP"
+          test "$ROOT_HTTP" = 200
+          test "$EDITOR_HTTP" = 200
+          test "$PLAYER_HTTP" = 200
+          grep -Fq "cdg-final-preview.js" /tmp/cdg-editor.html
+          grep -Fq "DJGABO_CDG_FINAL_PREVIEW" /tmp/cdg-final-preview.js
+
+          echo "=== LAURA TIMELINE VERIFY ==="
+          PROJECT="$(sudo find "$PROD" /var/lib/djgabo-cdg /srv -type f -path '*/LET-0079/proyecto.timings.json' 2>/dev/null | head -n1 || true)"
+          if [ -z "$PROJECT" ]; then
+            DBFILE="$(sudo find "$PROD" /var/lib/djgabo-cdg /srv -type f -name local.db 2>/dev/null | head -n1 || true)"
+            test -n "$DBFILE"
+            sudo python3 - "$DBFILE" /tmp/laura-LET-0079.timings.json <<'PY'
+import sqlite3,sys
+db,out=sys.argv[1:3]
+c=sqlite3.connect(db)
+row=c.execute("select project_json from jobs where id='LET-0079'").fetchone()
+if not row or not row[0]: raise SystemExit("LET-0079 project_json missing")
+open(out,'w',encoding='utf-8').write(row[0])
+PY
+            PROJECT=/tmp/laura-LET-0079.timings.json
+          fi
+          PID="$(sudo systemctl show djgabo-cdg -p MainPID --value)"
+          PYBIN="$(sudo bash -c "tr '\0' '\n' < /proc/$PID/cmdline | head -n1")"
+          test -x "$PYBIN"
+          sudo -u djgabo-cdg "$PYBIN" "$VERIFY" --root "$PROD" --project "$PROJECT"
+
+          trap - ERR
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-final-preview-v1-deploy.txt ]; then
+            git add diagnostics/cdg-final-preview-v1-deploy.txt
+            git commit -m "diag: record final CDG preview V1 deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
