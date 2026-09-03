@@ -322,7 +322,14 @@ newplan='''  const syl = [], geom = [];
       syl.push({li,si:k,s:st,e:en});
     }
   }'''
-if oldplan in e: e=e.replace(oldplan,newplan,1)
+if "fallbackEnd=(w)=>" not in e:
+    plan_start=e.find("function pvPlan(){")
+    geom_start=e.find("  // geometría y sílabas",plan_start)
+    if geom_start<0: geom_start=e.find("  const flatSync = [];",plan_start)
+    geom_end=e.find("  const n = lines.length;",geom_start)
+    if plan_start<0 or geom_start<0 or geom_end<0:
+        raise SystemExit('PATCH_FAIL:pvPlan_real_end_bounds')
+    e=e[:geom_start]+newplan+"\n\n"+e[geom_end:]
 
 if "async function aiAlignSelectedBlock()" not in e:
     marker="function applyRoleToIndices(indices, role, quiet=false){"
