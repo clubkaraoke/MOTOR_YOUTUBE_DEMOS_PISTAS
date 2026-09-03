@@ -99,7 +99,7 @@ jobs:
           print('DIRECT_BODY_PREVIEW='+repr(b[:300]))
           PY
 
-          grep -q '<script src="/cdg-editor-ia/vendor/jsQR.js"></script>' /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q '<script src="/cdg-editor-ia/vendor/jsQR.js"></script>' /opt/djgabo-cdg-ia-test/panel.html
           echo "PANEL_PRELOAD=OK"
           echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
           echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
