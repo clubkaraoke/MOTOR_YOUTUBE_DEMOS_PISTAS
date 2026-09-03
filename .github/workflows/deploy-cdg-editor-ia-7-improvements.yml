@@ -48,6 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_7_improvements.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_7_improvements.py"
+          scp -P "$OVH_PORT" deploy/vendor/jsQR.js "$OVH_USER@$OVH_HOST:/tmp/jsQR.js"
 
       - name: Apply, repair current test, verify
         env:
@@ -77,6 +78,10 @@ jobs:
           done
           test "$ok" = 1
           echo "TEST_HEALTH=OK"
+          qr_vendor_code=$(curl -sS -o /tmp/jsQR-served.js -w '%{http_code}' http://127.0.0.1:8775/vendor/jsQR.js)
+          test "$qr_vendor_code" = "200"
+          grep -q 'webpackUniversalModuleDefinition' /tmp/jsQR-served.js
+          echo "QR_VENDOR_HTTP=$qr_vendor_code"
 
           echo "=== REBUILD CURRENT IA TEST FROM FULL SCRIBE ==="
           cd /opt/djgabo-cdg-ia-test
