@@ -1,0 +1,171 @@
+247-    Nuestro `end_time` sigue siendo útil —el editor y el preview lo enseñan, y
+248-    de él salen los instrumentales— pero para juzgar si un barrido cabe en el
+249-    presupuesto de paquetes hay que usar este otro número.
+250-    """
+251-    flat = [(li, wi) for li, line in enumerate(visual) for wi in range(len(line))]
+252-    for k, (li, wi) in enumerate(flat):
+253-        w = visual[li][wi]
+254-        explicit_end = w.get("end_time")
+255-        if explicit_end is not None and explicit_end > w["start_time"]:
+256-            end = explicit_end
+257-        elif wi + 1 < len(visual[li]):
+258-            end = visual[li][wi + 1]["start_time"]
+259-        else:
+260-            end = w["start_time"] + tail
+261-            nxt = next((visual[l][i]["start_time"] for l, i in flat[k + 1:]), None)
+262-            if nxt is not None:
+263-                end = min(end, nxt)
+264-        w["_wipe"] = max(0.01, end - w["start_time"])
+265-
+266-
+267:def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals: list[tuple[float, float]] | None = None) -> list[list[dict]]:
+268-    """Inserta INSTRUMENTAL como una PÁGINA visual propia y centrada.
+269-
+270-    El bloque siempre ocupa una página completa: se rellena con líneas vacías
+271-    arriba/abajo para que `INSTRUMENTAL` y los cuatro círculos queden en el
+272-    centro independientemente de cuántas líneas por pantalla haya elegido la
+273-    operadora. El rótulo usa cantante 2 (sin sweep); los círculos conservan la
+274-    cuenta temporal.
+275-    """
+276-    label = style.get("instrumental_label", "INSTRUMENTAL")
+277-    dot = "§"  # glifo especial: el renderer lo dibuja como círculo real
+278-    n_dots = int(style.get("instrumental_dots", 4))
+279-    span = float(style.get("instrumental_span_seconds", 6.0))
+280-    lead = float(style.get("instrumental_lead_seconds", 4.0))
+281-    min_gap = float(style.get("instrumental_min_gap", 6.0))
+282-    spoken_min = float(style.get("spoken_instrumental_min_seconds", 6.0))
+283-    spoken_lead = float(style.get("spoken_instrumental_lead_seconds", 4.0))
+284-    spoken_join = float(style.get("spoken_block_join_seconds", 0.75))
+285-    lpp = max(2, min(8, int(style.get("lines_per_page", 8))))
+286-    spoken_intervals = spoken_intervals or []
+287-
+288-    # Un bloque HABLADO puede estar compuesto por muchas palabras cortas.
+289-    # Se unen intervalos contiguos para medir la duración REAL del bloque, no
+290-    # la duración individual de cada palabra.
+291-    merged_spoken: list[list[float]] = []
+292-    for sa, sb in sorted(spoken_intervals):
+293-        if not merged_spoken or sa - merged_spoken[-1][1] > spoken_join:
+294-            merged_spoken.append([sa, sb])
+295-        else:
+296-            merged_spoken[-1][1] = max(merged_spoken[-1][1], sb)
+297-
+298-    out: list[list[dict]] = []
+299-    prev_end: float | None = None
+300-    n = 0
+301-
+302-    def pad_to_page() -> None:
+303-        while len(out) % lpp:
+304-            out.append([])
+305-
+306-    for line in visual:
+307-        if not line:
+308-            out.append([])
+309-            continue
+310-        start = line[0]["start_time"]
+311-        gap = start if prev_end is None else start - prev_end
+312-        base = prev_end or 0.0
+313-
+314-        # R11: si HABLADO crea un hueco visual >= spoken_min, no exportamos
+315-        # ese texto y mostramos INSTRUMENTAL. La próxima página cantada queda
+316-        # libre spoken_lead segundos antes.
+317-        overlaps = [
+318-            (max(sa, base), min(sb, start))
+319-            for sa, sb in merged_spoken
+320-            if sa < start and sb > base
+321-        ]
+322-        overlaps = [(sa, sb) for sa, sb in overlaps if sb > sa]
+323-        has_spoken = bool(overlaps)
+324-        # R11: la duración que manda es el HUECO VISUAL entre dos líneas cantadas.
+325-        # Los intervalos HABLADO sólo prueban que ese hueco fue ocultado a propósito.
+326-        # Así, pausas internas del locutor no parten el bloque ni impiden INSTRUMENTAL.
+327-        long_spoken = has_spoken and gap >= spoken_min
+328-        regular_gap = gap >= min_gap and not has_spoken
+329-
+330-        if label and n_dots > 0 and (long_spoken or regular_gap):
+331-            use_lead = spoken_lead if long_spoken else lead
+332-            LABEL_SLOT = 0.55
+333-            avail = (start - use_lead) - (base + 0.4)
+334-            use_label = avail >= 1.0 + LABEL_SLOT
+335-            use_span = min(span, avail - (LABEL_SLOT if use_label else 0.0))
+336-            # Con HABLADO de apenas >4 s quedan ~1 s antes de liberar la próxima
+337-            # letra. Permitimos un contador compacto sin exigir los 6 s completos.
+338-            min_span = 0.6 if long_spoken else 1.0
+339-            if use_span >= min_span:
+340-                dots_end = start - use_lead
+341-                step = use_span / n_dots
+342-                dots_start = dots_end - use_span
+343-                spacer_at = base + 0.3
+344-                label_at = dots_start - LABEL_SLOT
+345-
+346-                # Fuerza página independiente para que nunca quede arriba/abajo.
+347-                # El rótulo puede ir algo por encima, pero la fila de círculos
+348-                # debe quedar en el centro visual real.
+349-                pad_to_page()
+350-                dot_row = lpp // 2
+351-                top = max(0, dot_row - 1)
+352-                bottom = max(0, lpp - 2 - top)
+353-                out.extend([[] for _ in range(top)])
+354-
+355-                if use_label and label_at > spacer_at + 0.15:
+356-                    out.append([
+357-                        {"id": f"in{n}s", "text": "_", "_inst": True, "_silent": True,
+358-                         "_label": True, "start_time": spacer_at, "end_time": label_at},
+359-                        {"id": f"in{n}", "text": label, "_inst": True, "_label": True,
+360-                         "start_time": label_at, "end_time": dots_start - 0.05},
+361-                    ])
+362-                else:
+363-                    out.append([{
+364-                        "id": f"in{n}", "text": label, "_inst": True, "_label": True,
+365-                        "start_time": spacer_at,
+366-                        "end_time": max(spacer_at + 0.4, dots_start - 0.05),
+367-                    }])
+368-
+369-                out.append([
+370-                    {"id": f"dot{n}_{i}", "text": dot, "_inst": True, "_dotline": True,
+371-                     "start_time": dots_start + i * step,
+372-                     "end_time": dots_start + (i + 1) * step}
+373-                    for i in range(n_dots)
+374-                ])
+375-                out.extend([[] for _ in range(bottom)])
+376-                n += 1
+377-
+378-        out.append(line)
+379-        prev_end = max(w["end_time"] for w in line)
+380-    return out
+381-
+382-
+383-def check_packet_budget(visual: list[list[dict]], font: ImageFont.FreeTypeFont,
+384-                        line_tile_height: int, highlight_bw: int, draw_bw: int,
+385-                        uppercase: bool) -> list[Warning_]:
+386-    """Predice qué palabras no caben en los 300 paquetes/s.
+387-
+388-    cdgmaker avisa de esto durante la composición, pero hacerlo aquí permite
+389-    devolverle a la operadora una lista de word_id sobre los que puede hacer
+390-    clic, antes de esperar al render completo.
+391-    """
+392-    warns: list[Warning_] = []
+393-    group = (draw_bw + highlight_bw) * line_tile_height   # frames por grupo de columnas
+394-    for line in visual:
+395-        for w in line:
+396-            if w.get("_inst"):
+397-                continue
+398-            text = w["text"].upper() if uppercase else w["text"]
+399-            width_px = max(1, int(text_width(text, font)))
+400-            frames = w.get("_wipe", w["end_time"] - w["start_time"]) * CDG_FPS
+401-            columns = int(frames // group) * highlight_bw
+402-            tiles_wide = math.ceil(width_px / 6)
+403-            if columns < tiles_wide:
+404-                warns.append(Warning_(
+405-                    word_id=w.get("id", "?"), text=w["text"], kind="too_fast",
+406-                    detail=(f"necesita {tiles_wide} pasos de barrido y sólo caben {max(columns,1)}; "
+407-                            f"el CDG la barre en {int(w.get('_wipe', 0) * 1000)} ms"),
+408-                ))
+409-    return warns
+410-
+411-
+412-def decide_intro(doc: dict, style: dict) -> float:
+413-    """Duración de la portada según cuándo entra la primera voz.
+414-
+415-    `intro_mode`: auto | always | never. En automático la regla es simple: si
+416-    el cantante entra enseguida no hay sitio para una portada, y meterla a la
+417-    fuerza retrasaría el audio.
