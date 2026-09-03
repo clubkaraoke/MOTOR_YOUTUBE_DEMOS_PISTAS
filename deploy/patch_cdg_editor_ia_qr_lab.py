@@ -100,6 +100,17 @@ def qr_lab_check():
 """
     server=server.replace(anchor,lab+anchor,1)
 
+
+# UVR puede rechazar clientes automatizados por User-Agent. Usamos cabeceras de navegador real.
+server=server.replace(
+    "headers={'User-Agent':'DJGABO-CDG-IA-TEST/1.0'},",
+    "headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36','Accept':'audio/mpeg,audio/*;q=0.9,*/*;q=0.8','Accept-Language':'es-PE,es;q=0.9,en;q=0.8','Referer':'https://nextgen.uvronline.app/'},"
+)
+server=server.replace(
+    "headers={'User-Agent':'DJGABO-QR-LAB/1.0'},timeout=(20,90))",
+    "headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36','Accept':'audio/mpeg,audio/*;q=0.9,*/*;q=0.8','Accept-Language':'es-PE,es;q=0.9,en;q=0.8','Referer':'https://nextgen.uvronline.app/'},timeout=(20,90))"
+)
+
 SERVER.write_text(server,encoding='utf-8')
 print('QR_LAB_PATCH=OK')
 print('PRELOAD=',preload in PANEL.read_text(encoding='utf-8'))
