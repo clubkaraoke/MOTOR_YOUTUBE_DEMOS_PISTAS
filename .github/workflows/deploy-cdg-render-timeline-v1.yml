@@ -87,10 +87,17 @@ jobs:
 
           # Pruebas de política: 4 s => sin opening; 7 s => 3 s; Laura 16.34 => 6 s.
           sudo "$PYEXE" - <<'PY'
-          import importlib.util
+          import importlib.util, sys, types
+          # Este test sólo ejecuta la política de timeline; no necesita Pillow.
+          pil=types.ModuleType("PIL")
+          imagefont=types.ModuleType("PIL.ImageFont")
+          imagefont.FreeTypeFont=object
+          pil.ImageFont=imagefont
+          sys.modules["PIL"]=pil
+          sys.modules["PIL.ImageFont"]=imagefont
           p="/tmp/djgabo-render-timeline-stage/renderer/normalize.py"
           spec=importlib.util.spec_from_file_location("norm_stage",p)
-          n=importlib.util.module_from_spec(spec); spec.loader.exec_module(n)
+          n=importlib.util.module_from_spec(spec); sys.modules["norm_stage"]=n; spec.loader.exec_module(n)
           style={"intro_duration_seconds":6.0,"intro_short_duration_seconds":3.0,"first_syllable_buffer_seconds":3.0}
           def doc(t, explicit=None):
               d={"segments":[{"words":[{"id":"w0","text":"VOZ","start_time":t,"end_time":t+0.4}]}]}
