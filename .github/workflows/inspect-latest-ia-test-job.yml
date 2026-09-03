@@ -1,0 +1,71 @@
+name: Inspect latest IA test job once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-latest-ia-test-job.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo -u djgabo-cdg python3 -' > diagnostics/latest-ia-test-job.txt <<'PY'
+          import sqlite3,json
+          db=sqlite3.connect('/var/lib/djgabo-cdg-ia-test/local.db')
+          db.row_factory=sqlite3.Row
+          r=db.execute("select id,artist,title,origin,lyrics_corrected,project_json,updated from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          if not r:
+              print('NO_IA_JOB'); raise SystemExit
+          p=json.loads(r['project_json'] or '{}')
+          segs=p.get('segments') or []
+          words=[w for s in segs for w in (s.get('words') or [])]
+          timed=[w for w in words if w.get('start_time') is not None]
+          print('ID='+r['id'])
+          print('ARTIST='+r['artist'])
+          print('TITLE='+r['title'])
+          print('UPDATED='+r['updated'])
+          print('LYRICS_WORDS='+str(len((r['lyrics_corrected'] or '').split())))
+          print('PROJECT_SEGMENTS='+str(len(segs)))
+          print('PROJECT_WORDS='+str(len(words)))
+          print('TIMED_WORDS='+str(len(timed)))
+          print('AUDIO_SHA1='+str((p.get('song') or {}).get('audio_sha1')))
+          print('AI='+json.dumps(p.get('ai') or {},ensure_ascii=False))
+          print('FIRST_LINES=')
+          for s in segs[:8]: print(repr(s.get('text','')))
+          print('FIRST_TIMINGS=')
+          for w in timed[:8]: print(w.get('text'),w.get('start_time'),w.get('end_time'))
+          PY
+      - name: Save
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/latest-ia-test-job.txt
+          git commit -m "diag: inspect latest IA test job" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
