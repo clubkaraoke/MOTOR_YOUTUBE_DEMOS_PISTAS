@@ -1,0 +1,97 @@
+name: Deploy new Scribe flow to CDG Editor IA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_editor_ia_new_scribe_flow.py"
+      - ".github/workflows/deploy-cdg-editor-ia-new-scribe-flow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Upload and apply patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_new_scribe_flow.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_new_scribe_flow.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 | tee diagnostics/cdg-editor-ia-new-scribe-flow.txt <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          curl -fsS http://127.0.0.1:8097/api/health > /tmp/ia-lab-health.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/ia-lab-health.json'))
+          assert d.get('ok') is True, d
+          assert d.get('elevenlabs_configured') is True, d
+          print('SCRIBE_LAB=READY',d.get('elevenlabs_model'))
+          PY
+          sudo python3 /tmp/patch_cdg_editor_ia_new_scribe_flow.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
+          sudo systemctl restart djgabo-cdg-ia-test
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/health.json; then break; fi
+            sleep 2
+          done
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json'))
+          assert d.get('ok') is True, d
+          print('TEST_HEALTH=OK')
+          PY
+          curl -fsS http://127.0.0.1:8775/ > /tmp/panel.html
+          grep -q 'Crear y sincronizar con IA' /tmp/panel.html
+          grep -q 'Letra maestra · OPCIONAL' /tmp/panel.html
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/api/ai/create-job)
+          test "$code" = "405"
+          echo "AI_ROUTE=READY"
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+
+      - name: Verify public route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-editor-ia/ || true)"
+          echo "PUBLIC_HTTP=$code" | tee -a diagnostics/cdg-editor-ia-new-scribe-flow.txt
+          case "$code" in 200|301|302|303|307|308) ;; *) exit 1 ;; esac
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-editor-ia-new-scribe-flow.txt ]; then
+            git add diagnostics/cdg-editor-ia-new-scribe-flow.txt
+            git commit -m "diag: verify new Scribe flow in CDG Editor IA" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
