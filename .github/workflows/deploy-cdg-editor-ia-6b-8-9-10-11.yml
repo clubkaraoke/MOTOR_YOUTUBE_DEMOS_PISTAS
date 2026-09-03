@@ -1,0 +1,169 @@
+name: Deploy CDG Editor IA improvements 6B 8 9 10 11
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/trigger-cdg-editor-ia-6b-11.txt"
+      - ".github/workflows/deploy-cdg-editor-ia-6b-8-9-10-11.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cdg-editor-ia-6b-8-9-10-11
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_editor_ia_6b_8_9_10_11.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_6b_8_9_10_11.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_6b_8_9_10_11.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE' 2>&1 | tee diagnostics/cdg-editor-ia-6b-8-9-10-11.txt
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = "active"
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+          curl -fsS http://127.0.0.1:8097/api/elevenlabs/health >/tmp/scribe-health.json
+          grep -q '"configured":true' /tmp/scribe-health.json
+
+          echo "=== APPLY TEST PATCH ==="
+          sudo python3 /tmp/patch_cdg_editor_ia_6b_8_9_10_11.py
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py" "$ROOT/renderer/normalize.py" "$ROOT/renderer/render.py"
+
+          echo "=== STATIC ASSERTIONS ==="
+          grep -q "ai-align-block" "$ROOT/server.py"
+          grep -q "balanced_visual_v3" "$ROOT/server.py"
+          grep -q 'id="btnAiBlock"' "$ROOT/editor_v1/index.html"
+          grep -q 'fallbackEnd=(w)=>' "$ROOT/editor_v1/index.html"
+          grep -q 'smartPageGap:2.0' "$ROOT/editor_v1/index.html"
+          grep -q 'spokenMin:6.0, spokenLead:4.0' "$ROOT/editor_v1/index.html"
+          grep -q 'smart_page_breaks' "$ROOT/renderer/normalize.py"
+
+          if command -v node >/dev/null 2>&1; then
+            python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          Path('/tmp/cdg-editor-ia-script.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+            node --check /tmp/cdg-editor-ia-script.js
+            echo "EDITOR_JS_SYNTAX=OK"
+          fi
+
+          echo "=== UNIT CHECKS ==="
+          cd "$ROOT"
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" - <<'PY'
+          import json,sys
+          sys.path.insert(0,'/opt/djgabo-cdg-ia-test/renderer')
+          import normalize as N
+
+          # 6B: 3.74 s de pausa -> pantalla nueva.
+          visual=[
+            [{'text':'DEBI','start_time':31.0,'end_time':32.0}],
+            [{'text':'MIO','start_time':34.96,'end_time':38.38}],
+            [{'text':'COMO','start_time':42.12,'end_time':43.2}],
+            [{'text':'ASI','start_time':44.0,'end_time':45.0}],
+          ]
+          sb=N.smart_page_breaks(visual,2.0)
+          assert any(not x for x in sb), sb
+          centered=N.center_stanza_pages(sb,6)
+          second=[i%6 for i,line in enumerate(centered) if line and line[0].get('text') in ('COMO','ASI')]
+          assert second==[2,3], second
+          print('SMART_PAGE_6B=PASS rows='+str(second))
+
+          # 8: MÍO 34.96 -> 38.38 = 3.42 s; nunca 0.45 s.
+          one=[[{'id':'w','text':'MIO','start_time':34.96,'end_time':38.38}]]
+          N.wipe_spans(one)
+          wipe=one[0][0]['_wipe']
+          assert abs(wipe-3.42)<0.02, wipe
+          print('REAL_END_SWEEP=PASS wipe='+str(round(wipe,3)))
+
+          style=json.load(open('/opt/djgabo-cdg-ia-test/renderer/style.json',encoding='utf-8'))
+          assert float(style['smart_page_gap_seconds'])==2.0
+          assert float(style['spoken_instrumental_min_seconds'])==6.0
+          assert float(style['spoken_instrumental_lead_seconds'])==4.0
+          print('SPOKEN_INSTRUMENTAL_RULE=PASS 6s/4s')
+          PY
+
+          echo "=== RESTART TEST ONLY ==="
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/test-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "TEST_HEALTH=OK"
+
+          curl -fsS http://127.0.0.1:8775/ >/tmp/test-panel.html
+          curl -fsS 'http://127.0.0.1:8775/editor-v1?embed=1' >/tmp/test-editor.html
+          grep -q 'btnAiBlock' /tmp/test-editor.html
+          grep -q 'smartPageGap:2.0' /tmp/test-editor.html
+
+          forced_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8097/api/elevenlabs/forced-align)"
+          test "$forced_code" = "405"
+          echo "FORCED_ALIGNMENT_LAB=READY"
+
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PRODUCTION_HTTP=$prod_http"
+          test "$prod_http" = "200"
+          echo "DEPLOY_6B_8_9_10_11=OK"
+          REMOTE
+
+      - name: Verify public TEST route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-editor-ia/ || true)"
+          echo "PUBLIC_HTTP=$code" | tee -a diagnostics/cdg-editor-ia-6b-8-9-10-11.txt
+          case "$code" in 200|301|302|303|307|308) ;; *) exit 1 ;; esac
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-editor-ia-6b-8-9-10-11.txt ]; then
+            git add diagnostics/cdg-editor-ia-6b-8-9-10-11.txt
+            git commit -m "diag: verify IA improvements 6B 8 9 10 11" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
