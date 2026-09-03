@@ -1,0 +1,281 @@
+name: Deploy isolated CDG Render Lab V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lab/cdg_render_lab/**"
+      - ".github/workflows/deploy-cdg-render-lab-v1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate lab source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile lab/cdg_render_lab/app.py lab/cdg_render_lab/gunicorn.conf.py
+          python3 - <<'PY'
+          import re, pathlib
+          s=pathlib.Path('lab/cdg_render_lab/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',s,re.S|re.I)
+          assert blocks, 'sin JS'
+          pathlib.Path('/tmp/cdg-render-lab.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+          node --check /tmp/cdg-render-lab.js
+          grep -Fq 'CDG_RENDER_LAB_V1' lab/cdg_render_lab/app.py
+          grep -Fq 'SIN DROPBOX' lab/cdg_render_lab/index.html
+          echo "SOURCE_PREFLIGHT=PASS"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Package lab
+        run: |
+          set -euo pipefail
+          tar -C lab/cdg_render_lab -czf /tmp/cdg-render-lab-v1.tgz .
+
+      - name: Deploy isolated service
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" /tmp/cdg-render-lab-v1.tgz "$OVH_USER@$OVH_HOST:/tmp/cdg-render-lab-v1.tgz"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-render-lab-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          BASE=/opt/djgabo-cdg-render-lab
+          APP=$BASE/app
+          DATA=/var/lib/djgabo-cdg-render-lab
+          SERVICE=djgabo-cdg-render-lab
+          PORT=8786
+          NGINX=/etc/nginx/sites-available/panel.kitkaraoke.com
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PROD_HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          PROD_HASH_BEFORE="$(sudo sha256sum /opt/djgabo-cdg/server.py /opt/djgabo-cdg/editor_v1/index.html /opt/djgabo-cdg/renderer/render.py | sha256sum | awk '{print $1}')"
+          echo "PROD_CODE_HASH_BEFORE=$PROD_HASH_BEFORE"
+
+          if sudo ss -ltn | grep -q ':8786 '; then
+            if ! sudo systemctl is-active --quiet "$SERVICE"; then
+              echo "PORT_8786_ALREADY_IN_USE" >&2
+              exit 1
+            fi
+          fi
+
+          echo "=== INSTALL LAB APP ==="
+          sudo mkdir -p "$APP" "$DATA/sessions"
+          sudo tar -xzf /tmp/cdg-render-lab-v1.tgz -C "$APP"
+          sudo chown -R djgabo-cdg:djgabo-cdg "$BASE" "$DATA"
+
+          echo "=== FREEZE RENDERER BASELINE ==="
+          if [ ! -f "$BASE/renderer/.lab_baseline_frozen" ]; then
+            sudo mkdir -p "$BASE/renderer"
+            sudo rsync -a --delete /opt/djgabo-cdg/renderer/ "$BASE/renderer/"
+            echo "source=/opt/djgabo-cdg/renderer" | sudo tee "$BASE/renderer/.lab_baseline_frozen" >/dev/null
+            echo "frozen_at=$(date -Is)" | sudo tee -a "$BASE/renderer/.lab_baseline_frozen" >/dev/null
+          fi
+          sudo chown -R djgabo-cdg:djgabo-cdg "$BASE/renderer"
+
+          echo "=== VENV ==="
+          if [ ! -x "$BASE/.venv/bin/python" ]; then
+            sudo -u djgabo-cdg python3 -m venv "$BASE/.venv"
+          fi
+          sudo -u djgabo-cdg "$BASE/.venv/bin/pip" install --disable-pip-version-check -q -r "$APP/requirements.txt"
+          if [ -f "$BASE/renderer/requirements.txt" ]; then
+            sudo -u djgabo-cdg "$BASE/.venv/bin/pip" install --disable-pip-version-check -q -r "$BASE/renderer/requirements.txt"
+          fi
+          sudo -u djgabo-cdg "$BASE/.venv/bin/python" -m py_compile \
+            "$APP/app.py" "$APP/gunicorn.conf.py" \
+            "$BASE/renderer/render.py" "$BASE/renderer/normalize.py"
+
+          echo "=== SYSTEMD ISOLATED ==="
+          sudo tee /etc/systemd/system/${SERVICE}.service >/dev/null <<'UNIT'
+          [Unit]
+          Description=DJGABO CDG Render Lab - isolated
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=djgabo-cdg
+          Group=djgabo-cdg
+          WorkingDirectory=/opt/djgabo-cdg-render-lab/app
+          Environment=CDG_RENDER_LAB_DATA=/var/lib/djgabo-cdg-render-lab
+          Environment=CDG_RENDER_LAB_BIND=127.0.0.1:8786
+          Environment=CDG_RENDER_LAB_PUBLIC_BASE=https://panel.kitkaraoke.com/cdg-render-lab
+          Environment=CDG_RENDER_LAB_SCRIBE_URL=http://127.0.0.1:8097/api/elevenlabs/transcribe
+          Environment=PYTHON=/opt/djgabo-cdg-render-lab/.venv/bin/python
+          ExecStart=/opt/djgabo-cdg-render-lab/.venv/bin/gunicorn --config /opt/djgabo-cdg-render-lab/app/gunicorn.conf.py app:app
+          Restart=on-failure
+          RestartSec=3
+          TimeoutStartSec=90
+          TimeoutStopSec=120
+          KillSignal=SIGTERM
+          KillMode=mixed
+          UMask=0077
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=strict
+          ProtectHome=true
+          ReadWritePaths=/var/lib/djgabo-cdg-render-lab
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo systemctl daemon-reload
+          sudo systemctl enable "$SERVICE" >/dev/null
+          sudo systemctl restart "$SERVICE"
+
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:$PORT/healthz" >/tmp/cdg-render-lab-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          test "$ok" = 1
+          cat /tmp/cdg-render-lab-health.json
+          echo
+
+          echo "=== LOCAL FUNCTIONAL SMOKE ==="
+          SESSION_JSON="$(curl -fsS -X POST http://127.0.0.1:$PORT/api/session/new)"
+          SID="$(python3 -c 'import json,sys;print(json.load(sys.stdin)["sid"])' <<<"$SESSION_JSON")"
+          python3 - <<'PY'
+          import wave,struct,math
+          p='/tmp/cdg-render-lab-smoke.wav'
+          rate=8000
+          with wave.open(p,'wb') as w:
+              w.setnchannels(1);w.setsampwidth(2);w.setframerate(rate)
+              frames=[]
+              for i in range(rate):
+                  v=int(1800*math.sin(2*math.pi*440*i/rate))
+                  frames.append(struct.pack('<h',v))
+              w.writeframes(b''.join(frames))
+          print(p)
+          PY
+          curl -fsS -F 'audio=@/tmp/cdg-render-lab-smoke.wav' "http://127.0.0.1:$PORT/api/upload/$SID" >/tmp/cdg-render-lab-upload.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/cdg-render-lab-upload.json'))
+          assert d['ok'] is True, d
+          assert d['duration'] > .9, d
+          print('UPLOAD_SMOKE=PASS')
+          PY
+          curl -fsS -o /tmp/cdg-render-lab-qr.png "http://127.0.0.1:$PORT/api/qr/$SID.png"
+          test -s /tmp/cdg-render-lab-qr.png
+          curl -fsS http://127.0.0.1:$PORT/ >/tmp/cdg-render-lab-index.html
+          grep -Fq 'CDG RENDER LAB' /tmp/cdg-render-lab-index.html
+          grep -Fq 'SIN DROPBOX' /tmp/cdg-render-lab-index.html
+          echo "LAB_SMOKE=PASS"
+
+          echo "=== NGINX ROUTE ==="
+          sudo cp "$NGINX" "${NGINX}.bak-cdg-render-lab-$STAMP"
+          sudo python3 - "$NGINX" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          s=p.read_text(encoding='utf-8')
+          marker='# DJGABO_CDG_RENDER_LAB_V1'
+          if marker not in s:
+              anchor='    location = /p-youtube { return 301 /p-youtube/; }'
+              if anchor not in s:
+                  raise SystemExit('No encontré ancla segura para Nginx')
+              block=r'''    # DJGABO_CDG_RENDER_LAB_V1
+    # Sólo el upload con token QR es público. El laboratorio principal sigue
+    # protegido por la sesión ADMIN del portal.
+    location ^~ /cdg-render-lab/upload/ {
+        client_max_body_size 800m;
+        rewrite ^/cdg-render-lab/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8786;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location ^~ /cdg-render-lab/api/qr-upload/ {
+        client_max_body_size 800m;
+        rewrite ^/cdg-render-lab/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8786;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location = /cdg-render-lab { return 301 /cdg-render-lab/; }
+    location /cdg-render-lab/ {
+        client_max_body_size 800m;
+        auth_request /_portal_auth_admin;
+        error_page 401 403 = @admin_required;
+        rewrite ^/cdg-render-lab/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8786;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_connect_timeout 15s;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+'''
+              s=s.replace(anchor,block+anchor,1)
+              p.write_text(s,encoding='utf-8')
+          PY
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          echo "=== FINAL SAFETY ==="
+          PROD_HASH_AFTER="$(sudo sha256sum /opt/djgabo-cdg/server.py /opt/djgabo-cdg/editor_v1/index.html /opt/djgabo-cdg/renderer/render.py | sha256sum | awk '{print $1}')"
+          echo "PROD_CODE_HASH_AFTER=$PROD_HASH_AFTER"
+          test "$PROD_HASH_BEFORE" = "$PROD_HASH_AFTER"
+          echo "PRODUCTION_CODE_UNCHANGED=YES"
+          echo "LAB_SERVICE=$(sudo systemctl is-active "$SERVICE")"
+          echo "LAB_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/)"
+          echo "SCRIBE_GATEWAY_LISTEN=$(sudo ss -ltn | grep -c ':8097 ' || true)"
+          echo "PROD_SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PROD_HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Verify public route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-render-lab/ || true)"
+          echo "PUBLIC_ROUTE_HTTP=$code" >> diagnostics/cdg-render-lab-v1-deploy.txt
+          case "$code" in
+            200|301|302|303|307|308) ;;
+            *) echo "Unexpected public route status: $code" >&2; exit 1 ;;
+          esac
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-render-lab-v1-deploy.txt 2>/dev/null || true
+          git commit -m "diag: record isolated CDG render lab deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
