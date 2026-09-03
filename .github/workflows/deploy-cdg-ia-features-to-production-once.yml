@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/deploy-cdg-ia-features-to-production-once.yml"
+      - "deploy/migrate_cdg_ia_features_to_production.py"
 
 permissions:
   contents: write
