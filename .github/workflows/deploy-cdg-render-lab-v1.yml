@@ -190,6 +190,10 @@ jobs:
           echo "=== NGINX ROUTE ==="
           sudo cp "$NGINX" "${NGINX}.bak-cdg-render-lab-$STAMP"
           sudo python3 "$APP/install_nginx_route.py" "$NGINX"
+          if sudo test -f /etc/nginx/sites-available/djgabo-cdg; then
+            sudo cp /etc/nginx/sites-available/djgabo-cdg "/etc/nginx/sites-available/djgabo-cdg.bak-cdg-render-lab-$STAMP"
+            sudo python3 "$APP/install_nginx_route.py" /etc/nginx/sites-available/djgabo-cdg
+          fi
           sudo nginx -t
           sudo systemctl reload nginx
 
