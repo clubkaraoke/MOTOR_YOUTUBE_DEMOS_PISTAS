@@ -1,0 +1,83 @@
+name: Inspect CDG export output once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-export-output-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect latest export on IA TEST
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-export-output-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          DATA=/var/lib/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "TEST=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD=$(sudo systemctl is-active djgabo-cdg)"
+
+          echo "=== LATEST FILES OUTPUT ==="
+          sudo -u djgabo-cdg find "$DATA/output" -type f -printf '%TY-%Tm-%Td %TH:%TM:%TS | %s | %p\n' 2>/dev/null | sort -r | head -40 || true
+
+          echo "=== LATEST JOB FILES LET-0078 ==="
+          sudo -u djgabo-cdg find "$DATA/jobs/LET-0078" -type f -printf '%TY-%Tm-%Td %TH:%TM:%TS | %s | %p\n' 2>/dev/null | sort -r | head -60 || true
+
+          echo "=== DB JOB LET-0078 ==="
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test             DJGABO_TEST_MODE=1             DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import server
+          with server.db() as c:
+              r=c.execute("select * from jobs where id='LET-0078'").fetchone()
+          if not r:
+              print('NO_JOB')
+          else:
+              d=dict(r)
+              for k in sorted(d):
+                  if k in ('project_json','lyrics_raw','lyrics_corrected'): continue
+                  print(f'{k}={d[k]}')
+          PY
+
+          echo "=== EXPORT/RENDER ROUTES ==="
+          sudo -u djgabo-cdg grep -n -E "export|render|download|output|cdg" "$ROOT/server.py" | tail -220 || true
+
+          echo "=== EDITOR EXPORT BUTTON ==="
+          sudo -u djgabo-cdg grep -n -B20 -A80 -E "CREAR CDG|Crear CDG|btn.*Export|export.*cdg|render" "$ROOT/editor_v1/index.html" | tail -260 || true
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-export-output-live.txt
+          git commit -m "diag: inspect latest CDG export output" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
