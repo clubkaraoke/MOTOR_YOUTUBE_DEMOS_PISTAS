@@ -1,0 +1,9 @@
+TIMESTAMP=2026-09-03T09:14:52+00:00
+PROD_BEFORE=active
+TEST_BEFORE=active
+PROD_HTTP_BEFORE=200
+BACKUP=/var/lib/djgabo-cdg/backups/import_ia_test_20260903-091454/local.db.before
+{"id": "LET-0078", "artist": "Amor Rebelde", "title": "Mix Cuanto te amo", "status": "LETRA CORREGIDA", "origin": "IA_TEST_IMPORTADO", "render_status": "", "dropbox_status": "TEST_LOCAL_IMPORTADO"} folder=True words=653 timed=653
+{"id": "LET-0079", "artist": "Laura Leon", "title": "Mujeres Engañadas", "status": "LETRA CORREGIDA", "origin": "IA_TEST_IMPORTADO", "render_status": "", "dropbox_status": "TEST_LOCAL_IMPORTADO"} folder=True words=198 timed=198
+{"id": "LET-0080", "artist": "Armonia 10", "title": "Tu sin mi (En vivo) KARAOKE (Coro)", "status": "LETRA CORREGIDA", "origin": "IA_TEST_IMPORTADO", "render_status": "", "dropbox_status": "TEST_LOCAL_IMPORTADO"} folder=True words=368 timed=368
+IMPORT_THREE_IA_TEST_PROJECTS=OK
