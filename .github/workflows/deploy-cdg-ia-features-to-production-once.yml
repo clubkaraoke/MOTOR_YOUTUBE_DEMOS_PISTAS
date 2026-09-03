@@ -1,0 +1,192 @@
+name: Deploy CDG IA features to production once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-ia-features-to-production-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate migration script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/migrate_cdg_ia_features_to_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Stage, migrate production and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/migrate_cdg_ia_features_to_production.py "$OVH_USER@$OVH_HOST:/tmp/migrate_cdg_ia_features_to_production.py"
+          scp -P "$OVH_PORT" deploy/vendor/jsQR.js "$OVH_USER@$OVH_HOST:/tmp/jsQR.js"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-production-migration.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          TEST=/opt/djgabo-cdg-ia-test
+          REF=/tmp/djgabo-cdg-ia-migration-reference
+          STAGE=/tmp/djgabo-cdg-production-stage
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/ia_migration_$STAMP"
+          MIG=/tmp/migrate_cdg_ia_features_to_production.py
+          VENDOR=/tmp/jsQR.js
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PRODUCTION_MIGRATION=START"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)" = 200
+
+          sudo rm -rf "$REF" "$STAGE"
+          sudo mkdir -p "$REF/editor_v1" "$REF/renderer" "$STAGE/editor_v1" "$STAGE/renderer"
+          sudo cp "$TEST/server.py" "$REF/server.py"
+          sudo cp "$TEST/panel.html" "$REF/panel.html"
+          sudo cp "$TEST/editor_v1/index.html" "$REF/editor_v1/index.html"
+          sudo cp "$TEST/renderer/normalize.py" "$REF/renderer/normalize.py"
+          sudo cp "$TEST/renderer/style.json" "$REF/renderer/style.json"
+
+          sudo cp "$PROD/server.py" "$STAGE/server.py"
+          sudo cp "$PROD/panel.html" "$STAGE/panel.html"
+          sudo cp "$PROD/editor_v1/index.html" "$STAGE/editor_v1/index.html"
+          sudo cp "$PROD/renderer/normalize.py" "$STAGE/renderer/normalize.py"
+          sudo cp "$PROD/renderer/style.json" "$STAGE/renderer/style.json"
+
+          echo "=== STAGE PATCH ==="
+          sudo python3 "$MIG" --root "$STAGE" --test-root "$REF" --vendor-source "$VENDOR"
+          sudo python3 -m py_compile "$STAGE/server.py" "$STAGE/renderer/normalize.py"
+          grep -Fq "pollProductionIaTask" "$STAGE/panel.html"
+          grep -Fq "btnAiFull" "$STAGE/editor_v1/index.html"
+          grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$STAGE/server.py"
+          ! grep -Fq "Dropbox desactivado en IA TEST" "$STAGE/panel.html"
+          ! grep -Fq "/cdg-editor-ia" "$STAGE/panel.html"
+          ! grep -Fq "/cdg-editor-ia" "$STAGE/editor_v1/index.html"
+          echo "STAGE_VALIDATION=PASS"
+
+          echo "=== BACKUP PRODUCTION ==="
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/vendor"
+          sudo cp "$PROD/server.py" "$BACKUP/server.py"
+          sudo cp "$PROD/panel.html" "$BACKUP/panel.html"
+          sudo cp "$PROD/editor_v1/index.html" "$BACKUP/editor_v1/index.html"
+          sudo cp "$PROD/renderer/normalize.py" "$BACKUP/renderer/normalize.py"
+          sudo cp "$PROD/renderer/style.json" "$BACKUP/renderer/style.json"
+          if [ -f "$PROD/vendor/jsQR.js" ]; then sudo cp "$PROD/vendor/jsQR.js" "$BACKUP/vendor/jsQR.js"; fi
+          echo "BACKUP=$BACKUP"
+
+          rollback() {
+            code=$?
+            echo "ROLLBACK_TRIGGERED code=$code"
+            sudo cp "$BACKUP/server.py" "$PROD/server.py" || true
+            sudo cp "$BACKUP/panel.html" "$PROD/panel.html" || true
+            sudo cp "$BACKUP/editor_v1/index.html" "$PROD/editor_v1/index.html" || true
+            sudo cp "$BACKUP/renderer/normalize.py" "$PROD/renderer/normalize.py" || true
+            sudo cp "$BACKUP/renderer/style.json" "$PROD/renderer/style.json" || true
+            if [ -f "$BACKUP/vendor/jsQR.js" ]; then
+              sudo mkdir -p "$PROD/vendor"; sudo cp "$BACKUP/vendor/jsQR.js" "$PROD/vendor/jsQR.js" || true
+            fi
+            sudo systemctl restart djgabo-cdg || true
+            sleep 3
+            echo "ROLLBACK_PROD_STATUS=$(sudo systemctl is-active djgabo-cdg || true)"
+            echo "ROLLBACK_PROD_HTTP=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            exit "$code"
+          }
+          trap rollback ERR
+
+          echo "=== APPLY PRODUCTION ==="
+          sudo python3 "$MIG" --root "$PROD" --test-root "$REF" --vendor-source "$VENDOR"
+          sudo chown -R djgabo-cdg:djgabo-cdg "$PROD/vendor"
+          sudo python3 -m py_compile "$PROD/server.py" "$PROD/renderer/normalize.py"
+
+          echo "=== STATIC VERIFY ==="
+          grep -Fq "@app.post('/api/jobs/create')" "$PROD/server.py"
+          grep -Fq "backup_voice_to_drive(jid)" "$PROD/server.py"
+          grep -Fq "dropbox_confirm_uploaded_file" "$PROD/server.py"
+          grep -Fq "@app.post('/api/render/start')" "$PROD/server.py"
+          grep -Fq "@app.post('/api/jobs/<jid>/ai-sync/start')" "$PROD/server.py"
+          grep -Fq "@app.get('/api/ai/tasks/<task_id>')" "$PROD/server.py"
+          grep -Fq "@app.post('/api/jobs/<jid>/ai-align-block')" "$PROD/server.py"
+          grep -Fq "https://*.uvronline.app" "$PROD/server.py"
+          grep -Fq "btnQrVoz" "$PROD/panel.html"
+          grep -Fq "QR_UPSCALE_FALLBACK_V2" "$PROD/panel.html"
+          grep -Fq "pollProductionIaTask" "$PROD/panel.html"
+          grep -Fq "Manteniendo Dropbox + Drive" "$PROD/panel.html"
+          grep -Fq "playHi" "$PROD/editor_v1/index.html"
+          grep -Fq "btnAiFull" "$PROD/editor_v1/index.html"
+          grep -Fq "syncIncompleteNotice" "$PROD/editor_v1/index.html"
+          grep -Fq "voice_gaps" "$PROD/editor_v1/index.html"
+          ! grep -Fq "Dropbox desactivado en IA TEST" "$PROD/panel.html"
+          ! grep -Fq "/cdg-editor-ia" "$PROD/panel.html"
+          ! grep -Fq "/cdg-editor-ia" "$PROD/editor_v1/index.html"
+          echo "STATIC_VERIFY=PASS"
+
+          echo "=== RESTART PRODUCTION ==="
+          sudo systemctl restart djgabo-cdg
+          ok=0
+          for i in $(seq 1 40); do
+            code="$(curl -sS -o /tmp/prod-root.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            if [ "$code" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          echo "=== LIVE HTTP VERIFY ==="
+          PROD_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-live.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?job=LET-0079&token=x&embed=1' || true)"
+          VENDOR_HTTP="$(curl -sS -o /tmp/jsqr-live.js -w '%{http_code}' http://127.0.0.1:8765/api/vendor/jsQR.js || true)"
+          echo "PROD_HTTP=$PROD_HTTP"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          echo "VENDOR_HTTP=$VENDOR_HTTP"
+          test "$PROD_HTTP" = 200
+          test "$EDITOR_HTTP" = 200
+          test "$VENDOR_HTTP" = 200
+          grep -Fq "btnAiFull" /tmp/editor-live.html
+          grep -Fq "jsQR" /tmp/jsqr-live.js
+
+          echo "=== ELEVENLABS BACKEND REACHABILITY ==="
+          if ss -ltn | grep -q ':8097 '; then echo "SCRIBE_BACKEND_PORT=LISTENING"; else echo "SCRIBE_BACKEND_PORT=NOT_LISTENING"; false; fi
+
+          trap - ERR
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PRODUCTION_MIGRATION=OK"
+          echo "NOTE=Production session tokens reset on service restart; login again once."
+          REMOTE
+
+      - name: Save migration report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-ia-production-migration.txt ]; then
+            git add diagnostics/cdg-ia-production-migration.txt
+            git commit -m "diag: record CDG IA production migration" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
