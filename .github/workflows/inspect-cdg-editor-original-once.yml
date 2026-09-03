@@ -87,13 +87,26 @@ jobs:
           fi
           REMOTE
 
+      - name: Snapshot current production code (no secrets)
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/editor_v1/index.html" > diagnostics/cdg-prod-current-index.html
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/renderer/normalize.py" > diagnostics/cdg-prod-current-normalize.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/renderer/style.json" > diagnostics/cdg-prod-current-style.json
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo cat /opt/djgabo-cdg/server.py" > diagnostics/cdg-prod-current-server.py
+
       - name: Commit inspection
         if: always()
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-editor-original-inspect.txt
+          git add diagnostics/cdg-editor-original-inspect.txt diagnostics/cdg-prod-current-index.html diagnostics/cdg-prod-current-normalize.py diagnostics/cdg-prod-current-style.json diagnostics/cdg-prod-current-server.py
           git commit -m "diag: inspect original CDG editor for safe clone" || exit 0
           git pull --rebase origin main || true
           git push origin HEAD:main || true
