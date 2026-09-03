@@ -50,6 +50,7 @@ jobs:
           set -euo pipefail
           echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
           sudo python3 /tmp/patch_cdg_editor_ia_qr_blob_memory.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
           sudo systemctl restart djgabo-cdg-ia-test
           ok=0
           for i in $(seq 1 30); do
@@ -62,6 +63,10 @@ jobs:
           sudo grep -q "new File(\[blob\]" /opt/djgabo-cdg-ia-test/panel.html
           sudo grep -q "procesarArchivoAudio(file)" /opt/djgabo-cdg-ia-test/panel.html
           sudo grep -q "procesarArchivoInstrumental(file" /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q "QR_UPSCALE_FALLBACK_V2" /opt/djgabo-cdg-ia-test/panel.html
+          curl -fsSI http://127.0.0.1:8775/ | tr -d '\r' > /tmp/ia-test-headers.txt
+          grep -qi "content-security-policy:.*https://uvronline.app.*https://\*.uvronline.app" /tmp/ia-test-headers.txt
+          echo "IA_TEST_CSP_UVR=OK"
           echo "IA_TEST_HEALTH=OK"
           echo "QR_BLOB_MEMORY=OK"
           echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
