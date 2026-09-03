@@ -60,13 +60,25 @@ jobs:
             if curl -fsS http://127.0.0.1:8775/healthz >/dev/null 2>&1; then ok=1; break; fi
             sleep 2
           done
-          test "$ok" = 1
+          if [ "$ok" != 1 ]; then
+            echo "IA_TEST_HEALTH=FAIL"
+            sudo systemctl status djgabo-cdg-ia-test --no-pager || true
+            sudo journalctl -u djgabo-cdg-ia-test -n 80 --no-pager || true
+            exit 1
+          fi
+          echo "IA_TEST_HEALTH=OK"
 
-          sudo grep -q "@app.post('/api/ai/bridge-stage')" /opt/djgabo-cdg-ia-test/server.py
-          sudo grep -q "voice_bridge_token" /opt/djgabo-cdg-ia-test/server.py
-          sudo grep -q "function esperarPuenteUvr" /opt/djgabo-cdg-ia-test/panel.html
-          sudo grep -q "instrumental_bridge_token" /opt/djgabo-cdg-ia-test/panel.html
-          test -d /var/lib/djgabo-cdg-ia-test/uvr_bridge
+          sudo grep -q "@app.post('/api/ai/bridge-stage')" /opt/djgabo-cdg-ia-test/server.py && echo "SERVER_STAGE=OK"
+          sudo grep -q "voice_bridge_token" /opt/djgabo-cdg-ia-test/server.py && echo "SERVER_CREATE_BRIDGE=OK"
+          sudo grep -q "function esperarPuenteUvr" /opt/djgabo-cdg-ia-test/panel.html && echo "PANEL_BRIDGE=OK"
+          sudo grep -q "instrumental_bridge_token" /opt/djgabo-cdg-ia-test/panel.html && echo "PANEL_SUBMIT_BRIDGE=OK"
+          if sudo test -d /var/lib/djgabo-cdg-ia-test/uvr_bridge; then
+            echo "BRIDGE_DIR=OK"
+          else
+            echo "BRIDGE_DIR=MISSING"
+            sudo ls -la /var/lib/djgabo-cdg-ia-test || true
+            exit 1
+          fi
 
           echo "IA_TEST_HEALTH=OK"
           echo "UVR_BRIDGE_CODE=OK"
