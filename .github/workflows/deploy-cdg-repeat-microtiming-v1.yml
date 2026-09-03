@@ -1,0 +1,187 @@
+name: Deploy CDG repeat microtiming V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-repeat-microtiming-v1.yml"
+      - "deploy/cdg_repeat_microtiming_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scripts
+        run: |
+          set -euo pipefail
+          python3 -m py_compile             deploy/cdg_repeat_microtiming_v1/patch_production.py             deploy/cdg_repeat_microtiming_v1/migrate_existing_projects.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch and migrate production safely
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT"             deploy/cdg_repeat_microtiming_v1/patch_production.py             deploy/cdg_repeat_microtiming_v1/migrate_existing_projects.py             "$OVH_USER@$OVH_HOST:/tmp/"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-repeat-microtiming-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          SERVER="$ROOT/server.py"
+          EDITOR="$ROOT/editor_v1/index.html"
+          PID="$(sudo systemctl show -p MainPID --value djgabo-cdg)"
+          DB_PATH="$(sudo sh -c "tr '\0' '\n' < /proc/$PID/environ" 2>/dev/null | sed -n 's/^DJGABO_DB_PATH=//p' | head -n1)"
+          if [ -z "$DB_PATH" ]; then DB_PATH="$ROOT/data/local.db"; fi
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/repeat_microtiming_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DB_PATH=$DB_PATH"
+          test -f "$SERVER"
+          test -f "$EDITOR"
+          test -f "$DB_PATH"
+
+          # Staging: no toca producción.
+          STAGE=/tmp/djgabo-repeat-microtiming-stage
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1"
+          sudo cp "$SERVER" "$STAGE/server.py"
+          sudo cp "$EDITOR" "$STAGE/editor_v1/index.html"
+          sudo python3 /tmp/patch_production.py --root "$STAGE"
+          sudo python3 -m py_compile "$STAGE/server.py"
+          sudo grep -Fq 'DJGABO_REPEAT_MICROTIMING_V1' "$STAGE/server.py"
+          sudo grep -Fq 'DJGABO_REPEAT_MICROTIMING_DIAG_V1' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V6' "$STAGE/editor_v1/index.html"
+
+          # Ejecuta exactamente las funciones nuevas del server stage.
+          sudo python3 - <<'PY'
+          import ast,re,unicodedata
+          p="/tmp/djgabo-repeat-microtiming-stage/server.py"
+          src=open(p,encoding="utf-8").read()
+          tree=ast.parse(src)
+          wanted={"_ai_norm_repeat_token","_ai_repair_repeated_microtimings","_ai_repeat_profile"}
+          nodes=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in wanted]
+          ns={"re":re,"unicodedata":unicodedata}
+          exec(compile(ast.Module(body=nodes,type_ignores=[]),p,"exec"),ns)
+
+          repair=ns["_ai_repair_repeated_microtimings"]
+          profile=ns["_ai_repeat_profile"]
+
+          ay=[
+            {"text":"AY,","start":106.94,"end":107.22,"match_type":"scribe_raw"},
+            {"text":"AY,","start":107.42,"end":107.43,"match_type":"scribe_raw"},
+            {"text":"AY,","start":107.44,"end":107.64,"match_type":"scribe_raw"},
+            {"text":"ES","start":107.78,"end":107.83,"match_type":"scribe_raw"},
+          ]
+          out,reps=repair(ay)
+          assert len(reps)==1, reps
+          assert abs(out[0]["start"]-106.94)<1e-6
+          assert abs(out[2]["start"]-107.44)<1e-6
+          assert abs(out[2]["end"]-107.64)<1e-6
+          assert out[1]["end"]-out[1]["start"]>.10
+          assert out[3]["start"]==107.78 and out[3]["end"]==107.83
+          assert out[1]["timing_original_start"]==107.42
+          assert profile([{"text":"LA"},{"text":"LA"},{"text":"LA"}])["repetitive"] is True
+
+          normal=[
+            {"text":"OH","start":10.0,"end":10.2},
+            {"text":"OH","start":10.35,"end":10.55},
+            {"text":"OH","start":10.7,"end":10.9},
+          ]
+          out2,reps2=repair(normal)
+          assert not reps2
+          assert out2[1]["start"]==10.35
+          print("REPEAT_MICROTIMING_TEST=PASS")
+          print("AY_REPAIRED=",[(x["start"],x["end"]) for x in out[:3]])
+          PY
+
+          echo "MIGRATION_DRY_RUN_BEGIN"
+          sudo python3 /tmp/migrate_existing_projects.py --db "$DB_PATH" --dry-run
+          echo "MIGRATION_DRY_RUN_END"
+          echo "STAGE=PASS"
+
+          sudo mkdir -p "$BACKUP/editor_v1"
+          sudo cp "$SERVER" "$BACKUP/server.py"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+
+          rollback() {
+            code=$?
+            echo "ROLLBACK=BEGIN code=$code"
+            sudo cp "$BACKUP/server.py" "$SERVER" || true
+            sudo cp "$BACKUP/editor_v1/index.html" "$EDITOR" || true
+            if [ -f "$BACKUP/local.db" ]; then sudo cp "$BACKUP/local.db" "$DB_PATH" || true; fi
+            sudo systemctl restart djgabo-cdg || true
+            echo "ROLLBACK=END"
+            exit "$code"
+          }
+          trap rollback ERR
+
+          sudo systemctl stop djgabo-cdg
+          sudo cp "$DB_PATH" "$BACKUP/local.db"
+          echo "BACKUP=$BACKUP"
+
+          sudo python3 /tmp/patch_production.py --root "$ROOT"
+          sudo python3 -m py_compile "$SERVER"
+          echo "MIGRATION_APPLY_BEGIN"
+          sudo python3 /tmp/migrate_existing_projects.py --db "$DB_PATH"
+          echo "MIGRATION_APPLY_END"
+
+          sudo grep -Fq 'DJGABO_REPEAT_MICROTIMING_V1' "$SERVER"
+          sudo grep -Fq 'DJGABO_REPEAT_MICROTIMING_DIAG_V1' "$EDITOR"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V6' "$EDITOR"
+
+          sudo systemctl start djgabo-cdg
+          ok=0
+          for i in $(seq 1 40); do
+            code="$(curl -sS -o /tmp/root-repeat-micro.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            if [ "$code" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          trap - ERR
+
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-repeat-micro.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V6' /tmp/editor-repeat-micro.html
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/server.py' > diagnostics/cdg-prod-current-server.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/editor_v1/index.html' > diagnostics/cdg-prod-current-index.html
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-repeat-microtiming-v1-deploy.txt                   diagnostics/cdg-prod-current-server.py                   diagnostics/cdg-prod-current-index.html 2>/dev/null || true
+          git commit -m "diag: record repeat microtiming deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
