@@ -1,0 +1,59 @@
+name: Deploy CDG Editor IA seven improvements simple
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/trigger-cdg-editor-ia-7.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          python3 -m py_compile deploy/patch_cdg_editor_ia_7_improvements.py deploy/rebuild_latest_ia_test_after_7.py
+          bash -n deploy/apply_cdg_editor_ia_7_improvements.sh
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_7_improvements.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_7_improvements.py"
+          scp -P "$OVH_PORT" deploy/rebuild_latest_ia_test_after_7.py "$OVH_USER@$OVH_HOST:/tmp/rebuild_latest_ia_test_after_7.py"
+          scp -P "$OVH_PORT" deploy/apply_cdg_editor_ia_7_improvements.sh "$OVH_USER@$OVH_HOST:/tmp/apply_cdg_editor_ia_7_improvements.sh"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "bash /tmp/apply_cdg_editor_ia_7_improvements.sh" 2>&1 | tee diagnostics/cdg-editor-ia-7-simple.txt
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-editor-ia-7-simple.txt ]; then
+            git add diagnostics/cdg-editor-ia-7-simple.txt
+            git commit -m "diag: verify seven IA improvements on OVH" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
