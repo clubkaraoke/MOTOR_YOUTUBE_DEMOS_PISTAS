@@ -559,30 +559,18 @@ class KaraokeComposer:
             wipe.start_offset - 900,
         )
 
-        # Calculate the available time between the start of this line
-        # and the desired page draw time
+        # DJGABO_AUTHORITATIVE_PAGES_COMPOSER_V1
+        # La página es autoridad y los timings también. Si el hueco es corto,
+        # dibujamos tan pronto como sea físicamente posible, pero NUNCA
+        # recortamos el barrido anterior para fabricar espacio.
         available_time = wipe.start_offset - page_draw_time
-        # Calculate the absolute minimum time from the last line to this
-        # line
-        # NOTE This is a sensible minimum, but not guaranteed.
         minimum_time = wipe.start_offset - last_wipe.start_offset - 24
-
-        # Warn the user if there's not likely to be enough time
-        if minimum_time < 32:
-            self.logger.warning("not enough bandwidth to clear screen on lyric " f"{wipe.lyric_index} line {wipe.line_index}")
-
-        # If there's not enough time between the end of the last line
-        # and the start of this line, but there is enough time between
-        # the start of the last line and the start of this page
-        if available_time < 32:
-            # Shorten the last wipe's duration to make room
-            new_duration = wipe.start_offset - last_wipe.start_offset - 150
-            if new_duration > 0:
-                last_wipe.end_offset = last_wipe.start_offset + new_duration
-                page_draw_time = last_wipe.end_offset + 12
-            else:
-                last_wipe.end_offset = last_wipe.start_offset
-                page_draw_time = last_wipe.end_offset + 32
+        if minimum_time < 32 or available_time < 32:
+            self.logger.warning(
+                "tight page transition on lyric %d line %d; preserving syllable timings",
+                wipe.lyric_index,
+                wipe.line_index,
+            )
 
         # Set the draw times for lines on this page
         start_line = this_page * lyric.lines_per_page

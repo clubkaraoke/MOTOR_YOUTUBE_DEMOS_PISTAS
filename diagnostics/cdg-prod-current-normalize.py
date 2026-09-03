@@ -62,6 +62,7 @@ class Normalized:
     instrumentals: list[dict]
     duration: float
     render_timeline: dict
+    render_pages: dict
     warnings: list[Warning_] = field(default_factory=list)
 
 
@@ -235,6 +236,96 @@ def center_stanza_pages(visual: list[list[dict]], lines_per_page: int) -> list[l
             out.extend([[] for _ in range(top)]);out.extend(chunk);out.extend([[] for _ in range(bottom)])
     while out and not out[-1]: out.pop()
     return out
+
+
+# DJGABO_AUTHORITATIVE_PAGES_NORMALIZER_V1
+def resolve_render_pages(doc: dict, style: dict, font: ImageFont.FreeTypeFont, uppercase: bool) -> tuple[list[list[dict]], dict]:
+    """Reconstruye EXACTAMENTE las páginas que exportó la pestaña Karaoke.
+
+    Si el proyecto es antiguo y todavía no trae render_pages, usamos el mismo
+    criterio del preview: saltos explícitos + wrap por ancho + bloques de LPP.
+    Ya no se crean páginas nuevas sólo porque exista una pausa temporal.
+    """
+    lpp=max(2,min(8,int(style.get("lines_per_page",6))))
+    raw=doc.get("render_pages")
+    by_id={
+        str(w.get("id")):w
+        for seg in doc.get("segments",[])
+        for w in seg.get("words",[])
+        if w.get("id") is not None
+    }
+
+    if isinstance(raw,dict) and isinstance(raw.get("pages"),list):
+        declared=int(raw.get("lines_per_page") or lpp)
+        if declared!=lpp:
+            raise NormalizeError(
+                f"render_pages fue creado con {declared} líneas/página pero el render pide {lpp}."
+            )
+        visual=[]
+        seen=[]
+        for pi,page in enumerate(raw["pages"]):
+            lines=page.get("lines") if isinstance(page,dict) else None
+            if not isinstance(lines,list) or len(lines)!=lpp:
+                raise NormalizeError(f"render_pages página {pi+1}: esperaba exactamente {lpp} slots.")
+            for li,spec in enumerate(lines):
+                ids=(spec or {}).get("word_ids") if isinstance(spec,dict) else None
+                ids=[] if ids is None else ids
+                if not isinstance(ids,list):
+                    raise NormalizeError(f"render_pages página {pi+1} línea {li+1}: word_ids inválido.")
+                line=[]
+                for wid in ids:
+                    w=by_id.get(str(wid))
+                    if w is None:
+                        raise NormalizeError(f"render_pages referencia una palabra inexistente: {wid}.")
+                    if w.get("spoken"):
+                        raise NormalizeError(f"render_pages incluyó HABLADO en una línea cantada: {wid}.")
+                    if w.get("start_time") is None:
+                        raise NormalizeError(f"render_pages incluyó una palabra sin timing: {wid}.")
+                    line.append(w); seen.append(str(wid))
+                visual.append(line)
+
+        expected=[
+            str(w.get("id"))
+            for seg in doc.get("segments",[])
+            for w in seg.get("words",[])
+            if not w.get("spoken") and w.get("start_time") is not None
+        ]
+        if seen!=expected:
+            # El orden también es autoridad: no basta con que estén las mismas palabras.
+            raise NormalizeError(
+                "render_pages no coincide con el orden actual de las palabras. "
+                "Vuelve a abrir/guardar el proyecto para regenerar las páginas."
+            )
+        meta=dict(raw)
+        meta["source"]="KARAOKE_PREVIEW"
+        meta["clear_mode"]="page"
+        meta["authoritative"]=True
+        return visual,meta
+
+    visual=wrap_lines(doc,font,uppercase)
+    visual=center_stanza_pages(visual,lpp)
+    visual=center_last_page(visual,lpp)
+    pages=[]
+    for pi in range(0,len(visual),lpp):
+        chunk=visual[pi:pi+lpp]
+        if len(chunk)<lpp: chunk=chunk+[[] for _ in range(lpp-len(chunk))]
+        pages.append({
+            "page":len(pages)+1,
+            "lines":[
+                {"slot":slot+1,
+                 "word_ids":[str(w.get("id")) for w in line],
+                 "text":" ".join((w["text"].upper() if uppercase else w["text"]) for w in line)}
+                for slot,line in enumerate(chunk)
+            ],
+        })
+    return visual,{
+        "version":"CDG_RENDER_PAGES_V1",
+        "source":"NORMALIZER_FALLBACK_PREVIEW_COMPAT",
+        "lines_per_page":lpp,
+        "clear_mode":"page",
+        "authoritative":False,
+        "pages":pages,
+    }
 
 
 def wipe_spans(visual: list[list[dict]], tail: float = 0.45) -> None:
@@ -594,9 +685,10 @@ def normalize(doc: dict, style: dict) -> Normalized:
         if vb > va:
             voice_gaps.append((va, vb))
 
-    visual = wrap_lines(doc, font, upper)
-    visual = smart_page_breaks(visual, float(style.get("smart_page_gap_seconds", 2.0)))
-    visual = center_stanza_pages(visual, style["lines_per_page"])
+    # La composición de páginas viene del preview/JSON. No se vuelve a
+    # reagrupar por pausas de 2 s: esa era la causa de que Preview y CDG
+    # mostraran distintas combinaciones de líneas.
+    visual, render_pages = resolve_render_pages(doc, style, font, upper)
     visual = build_instrumentals(visual, style, spoken_intervals, voice_gaps)
     visual = center_last_page(visual, style["lines_per_page"])
     instrumentals: list[dict] = []
@@ -692,6 +784,7 @@ def normalize(doc: dict, style: dict) -> Normalized:
         instrumentals=instrumentals,
         duration=doc["song"].get("duration", 0.0),
         render_timeline=render_timeline,
+        render_pages=render_pages,
         warnings=warns,
     )
 

@@ -241,6 +241,9 @@ def main() -> int:
         style_run = dict(style)
         style_run["intro_duration_seconds"] = float(norm.render_timeline["opening"]["duration_seconds"])
         style_run["intro_mode"] = "always" if style_run["intro_duration_seconds"] > 0 else "never"
+        # DJGABO_AUTHORITATIVE_PAGES_RENDERER_V1
+        # No mezclar filas de página anterior/nueva: el compositor limpia por página.
+        style_run["clear_mode"] = "page"
         log.info(
             "render timeline: first_real_voice=%s · opening=%ss · rule=%s · intro_delay=0",
             norm.render_timeline.get("first_real_voice_seconds"),
@@ -295,6 +298,7 @@ def main() -> int:
         "pre_render_warnings": [vars(w) for w in norm.warnings],
         "composer_warnings": catcher.items,
         "render_timeline": norm.render_timeline,
+        "render_pages": norm.render_pages,
     }
     (args.out / f"{outname}.avisos.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")

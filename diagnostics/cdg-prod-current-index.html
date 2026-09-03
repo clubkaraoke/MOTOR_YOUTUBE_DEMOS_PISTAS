@@ -1761,7 +1761,36 @@ function pvCountdowns(visual){
   return out;
 }
 
-/* --- 2. plan de dibujado, portado de KaraokeComposer._set_draw_times --- */
+/* DJGABO_AUTHORITATIVE_PAGES_V1
+   Las páginas que ves en Karaoke son las páginas que se exportan.
+   El renderer ya no vuelve a reagrupar por pausas ni por heurísticas. */
+function buildRenderPagesDecision(){
+  const lpp=Math.max(2,Math.min(8,Number(PV.cfg.linesPerPage||6)));
+  const raw=pvWrap();
+  const pages=[];
+  const count=Math.ceil(raw.length/lpp);
+  for(let pi=0;pi<count;pi++){
+    const lines=[];
+    for(let slot=0;slot<lpp;slot++){
+      const line=raw[pi*lpp+slot]||[];
+      lines.push({
+        slot:slot+1,
+        word_ids:line.map(w=>w.id),
+        text:line.map(w=>pvText(w.text)).join(" ")
+      });
+    }
+    pages.push({page:pi+1,lines});
+  }
+  return {
+    version:"CDG_RENDER_PAGES_V1",
+    source:"KARAOKE_PREVIEW",
+    lines_per_page:lpp,
+    clear_mode:"page",
+    pages
+  };
+}
+
+/* --- 2. plan de dibujado, PAGINADO BLOQUEADO al preview --- */
 function pvPlan(){
   const lpp = PV.cfg.linesPerPage, lth = PV.cfg.lineTileHeight;
   PV.cfg.row = Math.max(1, Math.floor((18 - lpp*lth)/2));
@@ -1801,45 +1830,36 @@ function pvPlan(){
 
   const n = lines.length;
   const draw = new Array(n).fill(0), erase = new Array(n).fill(0);
-  const firstOfLine = li => syl.find(s => s.li === li);
 
-  let dt = syl[0].s - 900;                                    // 3 s antes
-  for(let i=0; i<lpp && i<n; i++){ draw[i] = dt; dt += PV.GAP; }
+  // PAGE LOCK: la página anterior se limpia completa y la nueva se dibuja
+  // completa. Nunca mezclamos filas de dos páginas.
+  const pageCount=Math.ceil(n/lpp);
+  const pageSyllables=Array.from({length:pageCount},()=>[]);
+  for(const x of syl) pageSyllables[Math.floor(x.li/lpp)].push(x);
 
-  for(let k=1; k<syl.length; k++){
-    const a = syl[k-1], b = syl[k];
-    if(b.li <= a.li) continue;
-
-    const pageA = Math.floor(a.li / lpp), pageB = Math.floor(b.li / lpp);
-    if(pageA === pageB){
-      let et = Math.min(b.s + 100, a.e + 450);
-      for(let i=a.li; i<b.li; i++) if(i<n){ erase[i] = et; et += PV.GAP; }
-      continue;
-    }
-    const aEnd = Math.max(a.e, a.s + 100);
-    const inter = b.s - aEnd;
-    const lineStart = (firstOfLine(a.li) || a).s;
-    let et = Math.min(b.s + 100, aEnd + 450, aEnd + Math.floor(inter/3));
-    let dtp = Math.max(lineStart + 100, b.s - 900, aEnd + Math.floor(inter/3));
-
-    if(inter >= 1200){                                        // 4 s o más entre páginas
-      for(let i=a.li; i<b.li; i++) if(i<n){ erase[i] = et; et += PV.GAP; }
-      dtp = Math.max(dtp, et);
-      const start = pageA * lpp;
-      for(let i=start; i<start+lpp; i++){ const j=i+lpp; if(j<n){ draw[j]=dtp; dtp+=PV.GAP; } }
-      continue;
-    }
-    dtp = lineStart + 150;
-    const start = pageA * lpp;
-    for(let i=start; i<a.li; i++){ const j=i+lpp; if(j<n){ draw[j]=dtp; dtp+=PV.GAP; } }
-    dtp = Math.max(dtp, aEnd + Math.floor(inter/3));
-    for(let i=a.li; i<b.li; i++) if(i<n){ erase[i] = dtp; dtp += PV.GAP; }
-    for(let i=a.li; i<b.li; i++){ const j=i+lpp; if(j<n){ draw[j]=dtp; dtp+=PV.GAP; } }
+  if(pageSyllables[0]&&pageSyllables[0].length){
+    let dt=pageSyllables[0][0].s-900;
+    for(let i=0;i<Math.min(lpp,n);i++){draw[i]=dt;dt+=PV.GAP;}
   }
-  const last = syl[syl.length-1];
-  erase[last.li] = last.e + 600;
 
-  return {lines, geom, syl, draw, erase, lpp};
+  for(let page=1;page<pageCount;page++){
+    const cur=pageSyllables[page]||[];
+    if(!cur.length)continue;
+    const prev=(pageSyllables[page-1]||[]);
+    const first=cur[0];
+    const lastPrev=prev.length?prev[prev.length-1]:null;
+    // 3 s de anticipación cuando cabe; nunca alteramos START/END para fabricar hueco.
+    const pageAt=Math.max(first.s-900,lastPrev?lastPrev.e+12:first.s-900);
+
+    const prevStart=(page-1)*lpp;
+    for(let i=prevStart;i<Math.min(prevStart+lpp,n);i++) erase[i]=pageAt;
+
+    let dt=pageAt;
+    const start=page*lpp;
+    for(let i=start;i<Math.min(start+lpp,n);i++){draw[i]=dt;dt+=PV.GAP;}
+  }
+
+  return {lines, geom, syl, draw, erase, lpp, clearMode:"page"};
 }
 
 let pvT;
@@ -2123,7 +2143,7 @@ function buildDiagnosticJsonPayload(){
     ai_end_extension_seconds:w.ai_end_extension_seconds??null
   }));
   return {
-    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V3",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V4",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -2141,6 +2161,7 @@ function buildDiagnosticJsonPayload(){
     instrumental_decisions:_diagInstrumentalDecisions(),
     timeline:pvTimelineDiagnostic(),
     render_timeline:buildRenderTimelineDecision(),
+    render_pages:buildRenderPagesDecision(),
     ai_block_alignments:S.doc?.ai?.block_alignments||[],
     words
   };
@@ -3986,6 +4007,7 @@ function buildExport(){
     outro_line1:S.cfg.outroLine1,outro_line2:S.cfg.outroLine2,outro_size:S.cfg.outroSize,outro_x:S.cfg.outroX,outro_y:S.cfg.outroY,outro_transition:S.cfg.outroTransition};
   out.song.duration = S.duration;
   out.render_timeline = buildRenderTimelineDecision();
+  out.render_pages = buildRenderPagesDecision();
   for(const seg of out.segments){
     if(!seg.words.length){ seg.start_time = null; seg.end_time = null; continue; }
     const timed = seg.words.filter(w => w.start_time !== null);
@@ -4841,5 +4863,6 @@ resize(); loop();
 <!-- DJGABO_KARAOKE_TOTAL_TIMELINE_V1 -->
 <!-- DJGABO_POST_EXPORT_CHOICE_V1 -->
 <!-- DJGABO_RENDER_TIMELINE_V1 -->
+<!-- DJGABO_AUTHORITATIVE_PAGES_V1 -->
 </body>
 </html>
