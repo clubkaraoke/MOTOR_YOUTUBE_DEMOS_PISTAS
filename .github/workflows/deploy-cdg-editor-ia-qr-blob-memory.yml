@@ -1,0 +1,69 @@
+name: Deploy CDG IA QR Blob Memory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_editor_ia_qr_blob_memory.py"
+      - "deploy/trigger-cdg-editor-ia-qr-blob-memory.txt"
+      - ".github/workflows/deploy-cdg-editor-ia-qr-blob-memory.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: python3 -m py_compile deploy/patch_cdg_editor_ia_qr_blob_memory.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Upload patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_qr_blob_memory.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_qr_blob_memory.py"
+
+      - name: Apply and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          sudo python3 /tmp/patch_cdg_editor_ia_qr_blob_memory.py
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          sudo grep -q "function descargarAudioQrEnMemoria" /opt/djgabo-cdg-ia-test/panel.html
+          ! sudo grep -q "function esperarPuenteUvr" /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q "new File(\[blob\]" /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q "procesarArchivoAudio(file)" /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q "procesarArchivoInstrumental(file" /opt/djgabo-cdg-ia-test/panel.html
+          echo "IA_TEST_HEALTH=OK"
+          echo "QR_BLOB_MEMORY=OK"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
