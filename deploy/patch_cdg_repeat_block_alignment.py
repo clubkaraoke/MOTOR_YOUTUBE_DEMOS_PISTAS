@@ -393,10 +393,16 @@ new_apply='''    const byId=new Map((j.updates||[]).map(x=>[x.id,x]));
 e=replace_once(e,old_apply,new_apply,'frontend_partial_apply')
 
 old="""    S.doc.ai.block_alignments.push({engine:"elevenlabs-forced-alignment",at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});"""
+old_mid="""    S.doc.ai.block_alignments.push({engine:j.engine||"elevenlabs-forced-alignment",strategy:j.strategy||"full",quality:j.quality||null,repetition:j.repetition||null,calls:j.calls||1,chunks:j.chunks||1,at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});"""
 new="""    S.doc.ai.block_alignments.push({engine:j.engine||"elevenlabs-forced-alignment",strategy:j.strategy||"full",quality:j.quality||null,repetition:j.repetition||null,calls:j.calls||1,chunks:j.chunks||1,review_chunks:j.review_chunks||[],applied_words:j.applied_words??(j.updates||[]).length,requested_words:j.requested_words??selected.length,at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});"""
-e=replace_once(e,old,new,'frontend_alignment_history')
+if new not in e:
+    if old_mid in e: e=e.replace(old_mid,new,1)
+    elif old in e: e=e.replace(old,new,1)
+    else: raise SystemExit('PATCH_FAIL:frontend_alignment_history')
 
 old_toast='''    toast("✓ "+selected.length+" palabras sincronizadas con IA · el resto no se tocó",3200);'''
+old_toast_mid='''    const repeatMsg=j.strategy==="repeat_chunks"?" · repetición recalculada por subbloques de audio":"";
+    toast("✓ "+selected.length+" palabras sincronizadas con IA"+repeatMsg+" · el resto no se tocó",4200);'''
 new_toast='''    const applied=Number(j.applied_words??(j.updates||[]).length), reviewCount=(j.review_word_ids||[]).length;
     if(reviewCount){
       const firstReview=selected.find(w=>reviewIds.has(w.id));
@@ -406,7 +412,10 @@ new_toast='''    const applied=Number(j.applied_words??(j.updates||[]).length), 
       const repeatMsg=(j.strategy||"").startsWith("repeat_chunks")?" · repetición recalculada por subbloques de audio":"";
       toast("✓ "+applied+" palabras sincronizadas con IA"+repeatMsg+" · el resto no se tocó",4200);
     }'''
-e=replace_once(e,old_toast,new_toast,'frontend_repeat_toast')
+if new_toast not in e:
+    if old_toast_mid in e: e=e.replace(old_toast_mid,new_toast,1)
+    elif old_toast in e: e=e.replace(old_toast,new_toast,1)
+    else: raise SystemExit('PATCH_FAIL:frontend_repeat_toast')
 EDITOR.write_text(e,encoding='utf-8')
 
 print('PATCH_REPEAT_BLOCK_ALIGNMENT=OK')
