@@ -1,0 +1,102 @@
+name: Deploy final CDG preview V1C
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-final-preview-v1c.yml"
+      - "deploy/cdg_final_preview_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate files
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_final_preview_v1/patch_production.py deploy/cdg_final_preview_v1/cdg_preview_routes.py
+          node --check deploy/cdg_final_preview_v1/cdg-final-preview.js
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy and verify production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/cdg_final_preview_patch.py"
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/cdg_preview_routes.py "$OVH_USER@$OVH_HOST:/tmp/cdg_preview_routes.py"
+          scp -P "$OVH_PORT" deploy/cdg_final_preview_v1/cdg-final-preview.js "$OVH_USER@$OVH_HOST:/tmp/cdg-final-preview.js"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-final-preview-v1c-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/cdg_final_preview_$STAMP"
+
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)" = 200
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/vendor"
+          sudo cp "$PROD/server.py" "$BACKUP/server.py"
+          sudo cp "$PROD/editor_v1/index.html" "$BACKUP/editor_v1/index.html"
+          sudo cp "$PROD/renderer/normalize.py" "$BACKUP/renderer/normalize.py"
+          echo "BACKUP=$BACKUP"
+
+          sudo python3 /tmp/cdg_final_preview_patch.py --root "$PROD" --routes-source /tmp/cdg_preview_routes.py --player-source /tmp/cdg-final-preview.js
+          sudo chown djgabo-cdg:djgabo-cdg "$PROD/cdg_preview_routes.py" "$PROD/vendor/cdg-final-preview.js"
+          sudo python3 -m py_compile "$PROD/server.py" "$PROD/renderer/normalize.py" "$PROD/cdg_preview_routes.py"
+
+          sudo grep -Fq "PROD_FINAL_CDG_PREVIEW_V1" "$PROD/renderer/normalize.py"
+          sudo grep -Fq "register_cdg_preview_routes" "$PROD/server.py"
+          sudo grep -Fq "cdg-final-preview.js" "$PROD/editor_v1/index.html"
+
+          sudo systemctl restart djgabo-cdg
+          ok=0
+          for i in $(seq 1 40); do
+            code="$(curl -sS -o /tmp/root.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            if [ "$code" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          echo "ROOT_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "EDITOR_HTTP=$(curl -sS -o /tmp/editor.html -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          echo "PLAYER_HTTP=$(curl -sS -o /tmp/player.js -w '%{http_code}' http://127.0.0.1:8765/api/vendor/cdg-final-preview.js)"
+          grep -Fq "cdg-final-preview.js" /tmp/editor.html
+          grep -Fq "DJGABO_CDG_FINAL_PREVIEW" /tmp/player.js
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-final-preview-v1c-deploy.txt ]; then
+            git add diagnostics/cdg-final-preview-v1c-deploy.txt
+            git commit -m "diag: final CDG preview V1C deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
