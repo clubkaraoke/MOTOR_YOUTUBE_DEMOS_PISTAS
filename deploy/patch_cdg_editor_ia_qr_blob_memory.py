@@ -5,11 +5,14 @@ import shutil
 
 ROOT=Path('/opt/djgabo-cdg-ia-test')
 PANEL=ROOT/'panel.html'
-if not PANEL.is_file():
-    raise SystemExit('MISSING: '+str(PANEL))
+SERVER=ROOT/'server.py'
+for p in (PANEL,SERVER):
+    if not p.is_file():
+        raise SystemExit('MISSING: '+str(p))
 
 stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 shutil.copy2(PANEL,PANEL.with_name(PANEL.name+'.bak_qr_blob_'+stamp))
+shutil.copy2(SERVER,SERVER.with_name(SERVER.name+'.bak_qr_blob_'+stamp))
 panel=PANEL.read_text(encoding='utf-8')
 
 start=panel.find("function esperarPuenteUvr(")
@@ -143,7 +146,21 @@ if "QR_UPSCALE_FALLBACK_V2" not in panel[reader_start:reader_end]:
     panel=panel[:reader_start]+robust_reader+panel[reader_end:]
 
 PANEL.write_text(panel,encoding='utf-8')
+
+# El panel IA TEST sirve una CSP estricta. Aunque UVR permita CORS, el navegador
+# bloquea fetch() si uvronline.app no aparece en connect-src y muestra sólo
+# "Failed to fetch". Abrimos exclusivamente UVR en IA TEST; producción no se toca.
+server=SERVER.read_text(encoding='utf-8')
+csp_old="connect-src 'self' https://content.dropboxapi.com;"
+csp_new="connect-src 'self' https://content.dropboxapi.com https://uvronline.app https://*.uvronline.app;"
+if csp_new not in server:
+    if csp_old not in server:
+        raise SystemExit('ANCHOR_NOT_FOUND: CSP connect-src')
+    server=server.replace(csp_old,csp_new)
+SERVER.write_text(server,encoding='utf-8')
+
 print('QR_BLOB_PATCH=OK')
 print('BLOB_FN=',"function descargarAudioQrEnMemoria(" in panel)
 print('OLD_BRIDGE=',"function esperarPuenteUvr(" in panel)
 print('QR_UPSCALE_FALLBACK_V2=',"QR_UPSCALE_FALLBACK_V2" in panel)
+print('CSP_UVR_FETCH=',csp_new in server)
