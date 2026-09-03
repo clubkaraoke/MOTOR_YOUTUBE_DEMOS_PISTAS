@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/deploy-cdg-repeat-block-alignment-v3.yml"
+      - "deploy/trigger-cdg-repeat-block-v4.txt"
 
 permissions:
   contents: write
@@ -42,6 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_repeat_block_alignment.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_repeat_block_alignment.py"
           scp -P "$OVH_PORT" deploy/cleanup_cdg_repeat_block_alignment.py "$OVH_USER@$OVH_HOST:/tmp/cleanup_cdg_repeat_block_alignment.py"
           ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-repeat-block-alignment-v3.txt 2>&1 <<'REMOTE'
           set -euo pipefail
@@ -52,6 +54,7 @@ jobs:
           test "$(sudo systemctl is-active djgabo-cdg)" = active
           curl -fsS http://127.0.0.1:8765/ >/dev/null
 
+          sudo python3 /tmp/patch_cdg_repeat_block_alignment.py
           sudo python3 /tmp/cleanup_cdg_repeat_block_alignment.py
           sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py"
 
@@ -59,9 +62,11 @@ jobs:
           sudo -u djgabo-cdg grep -Fq "_ai_repeat_profile" "$ROOT/server.py"
           sudo -u djgabo-cdg grep -Fq "_ai_alignment_quality" "$ROOT/server.py"
           sudo -u djgabo-cdg grep -Fq "_ai_align_repeat_chunks" "$ROOT/server.py"
-          sudo -u djgabo-cdg grep -Fq "strategy='repeat_chunks'" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -Fq "strategy='repeat_chunks_partial' if reviews else 'repeat_chunks'" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -Fq "review_word_ids" "$ROOT/server.py"
           sudo -u djgabo-cdg grep -Fq "session(d.get('token'))" "$ROOT/server.py"
-          sudo -u djgabo-cdg grep -Fq 'const repeatMsg=j.strategy==="repeat_chunks"' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq 'const reviewIds=new Set(j.review_word_ids||[])' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq 'marcadas para revisión · no se descartó el bloque' "$ROOT/editor_v1/index.html"
           echo "STATIC_MARKERS=PASS"
 
           if command -v node >/dev/null 2>&1; then
@@ -89,8 +94,10 @@ jobs:
           qb=server._ai_alignment_quality(collapsed)
           assert qg['ok'] is True, qg
           assert qb['ok'] is False, qb
+          # V4: un subbloque terminal ambiguo ya no tumba todo el bloque.
           print('REPEAT_DETECTION=PASS')
           print('COLLAPSE_GUARD=PASS',qb)
+          print('PARTIAL_REVIEW_MODE=READY')
           PY
 
           sudo systemctl restart djgabo-cdg-ia-test
@@ -105,7 +112,7 @@ jobs:
           prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
           echo "PROD_HTTP=$prod_http"
           test "$prod_http" = 200
-          echo "DEPLOY_REPEAT_BLOCK_ALIGNMENT_V3=OK"
+          echo "DEPLOY_REPEAT_BLOCK_ALIGNMENT_V4=OK"
           REMOTE
 
       - name: Save report
