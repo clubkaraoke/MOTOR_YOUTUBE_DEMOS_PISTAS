@@ -1,0 +1,71 @@
+name: Inspect Laura instrumental gap once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-laura-instrumental-gap-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect latest Laura job and instrumental logic
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/laura-instrumental-gap-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test             DJGABO_TEST_MODE=1             DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import json, server
+          with server.db() as c:
+              r=c.execute("select id,artist,title,project_json,updated from jobs where lower(artist) like '%laura%' or lower(title) like '%mujeres engañadas%' order by updated desc limit 1").fetchone()
+          if not r:
+              print('NO_LAURA_JOB'); raise SystemExit
+          row=dict(r); doc=json.loads(row.get('project_json') or '{}')
+          print('JOB',row['id'],row['artist'],'-',row['title'],'updated',row['updated'])
+          words=[w for s in doc.get('segments') or [] for w in s.get('words') or []]
+          for i,w in enumerate(words):
+              t=w.get('start_time')
+              if t is None: continue
+              t=float(t)
+              if 94<=t<=110:
+                  print(i,repr(w.get('text')),'start',w.get('start_time'),'end',w.get('end_time'),'spoken',w.get('spoken'))
+          print('VOICE_GAPS',json.dumps((doc.get('ai') or {}).get('voice_gaps') or [],ensure_ascii=False))
+          PY
+          echo "=== PREVIEW INSTRUMENTAL ==="
+          sudo -u djgabo-cdg grep -n -B20 -A65 "function pvInstrumentalState" "$ROOT/editor_v1/index.html" || true
+          echo "=== RENDERER INSTRUMENTAL ==="
+          sudo -u djgabo-cdg grep -n -B30 -A80 -E "spoken_min|regular_gap|long_spoken|instrumental" "$ROOT/renderer/normalize.py" | tail -220 || true
+          REMOTE
+      - name: Save
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/laura-instrumental-gap-live.txt
+          git commit -m "diag: inspect Laura instrumental gap" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
