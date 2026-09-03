@@ -46,8 +46,14 @@ jobs:
           echo "=== LIVE EDITOR CONFIG / SPOKEN LOGIC ==="
           sudo -u djgabo-cdg grep -nE 'spokenMin|spokenLead|spokenJoin|function pvInstrumentalState|longSpoken|regularGap' "$ROOT/editor_v1/index.html" || true
           echo
+          echo "=== LIVE EDITOR FUNCTION BODY ==="
+          sudo -u djgabo-cdg sed -n '1738,1810p' "$ROOT/editor_v1/index.html" || true
+          echo
           echo "=== LIVE RENDERER SPOKEN LOGIC ==="
           sudo -u djgabo-cdg grep -nE 'def build_instrumentals|spoken_instrumental|min_seconds|lead_seconds|spoken_intervals|spoken_join|spoken' "$ROOT/renderer/normalize.py" || true
+          echo
+          echo "=== LIVE RENDERER FUNCTION BODY ==="
+          sudo -u djgabo-cdg sed -n '260,345p' "$ROOT/renderer/normalize.py" || true
           echo
           echo "=== LIVE STYLE ==="
           sudo -u djgabo-cdg python3 - <<'PY'
