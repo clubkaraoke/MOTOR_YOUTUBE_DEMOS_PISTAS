@@ -50,8 +50,18 @@ jobs:
           SERVER="$ROOT/server.py"
           EDITOR="$ROOT/editor_v1/index.html"
           PID="$(sudo systemctl show -p MainPID --value djgabo-cdg)"
-          DB_PATH="$(sudo sh -c "tr '\0' '\n' < /proc/$PID/environ" 2>/dev/null | sed -n 's/^DJGABO_DB_PATH=//p' | head -n1)"
-          if [ -z "$DB_PATH" ]; then DB_PATH="$ROOT/data/local.db"; fi
+          ENV_DUMP="$(sudo sh -c "tr '\0' '\n' < /proc/$PID/environ" 2>/dev/null || true)"
+          DB_PATH="$(printf '%s\n' "$ENV_DUMP" | sed -n 's/^DJGABO_DB_PATH=//p' | head -n1)"
+          DATA_PATH="$(printf '%s\n' "$ENV_DUMP" | sed -n 's/^DJGABO_DATA_DIR=//p' | head -n1)"
+          if [ -z "$DB_PATH" ]; then
+            if [ -n "$DATA_PATH" ]; then DB_PATH="$DATA_PATH/local.db"; else DB_PATH="$ROOT/data/local.db"; fi
+          fi
+          if [ ! -f "$DB_PATH" ]; then
+            echo "DB_PRIMARY_MISSING=$DB_PATH"
+            for cand in "$ROOT/data/local.db" "$ROOT/DATA/local.db" /var/lib/djgabo-cdg/local.db /opt/djgabo-cdg-data/local.db; do
+              if [ -f "$cand" ]; then DB_PATH="$cand"; break; fi
+            done
+          fi
           STAMP="$(date +%Y%m%d-%H%M%S)"
           BACKUP="$ROOT/backups/repeat_microtiming_v1_$STAMP"
 
