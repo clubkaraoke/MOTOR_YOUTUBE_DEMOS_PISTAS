@@ -61,7 +61,7 @@ jobs:
           PID="$(sudo systemctl show -p MainPID --value djgabo-cdg)"
           test -n "$PID"
           PYEXE="$(sudo readlink -f /proc/$PID/exe)"
-          COMPOSER="$(cd "$ROOT/renderer" && "$PYEXE" -c 'import cdgmaker.composer as c; print(c.__file__)')"
+          COMPOSER="$ROOT/renderer/vendor/cdgmaker/composer.py"
           echo "PYEXE=$PYEXE"
           echo "COMPOSER=$COMPOSER"
           test -f "$COMPOSER"
@@ -162,8 +162,7 @@ jobs:
           scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/editor_v1/index.html" diagnostics/cdg-prod-current-index.html
           scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/renderer/normalize.py" diagnostics/cdg-prod-current-normalize.py
           scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/renderer/render.py" diagnostics/cdg-prod-current-render.py
-          COMPOSER_REMOTE="$(ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'ROOT=/opt/djgabo-cdg; PID=$(sudo systemctl show -p MainPID --value djgabo-cdg); PYEXE=$(sudo readlink -f /proc/$PID/exe); cd "$ROOT/renderer"; "$PYEXE" -c "import cdgmaker.composer as c; print(c.__file__)"')"
-          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:$COMPOSER_REMOTE" diagnostics/cdg-prod-current-composer.py
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py" diagnostics/cdg-prod-current-composer.py
 
       - name: Save deploy report and production snapshots
         if: always()
