@@ -1,0 +1,99 @@
+name: Diagnose CDG IA session expiry once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-cdg-session-expiry-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture session diagnostics
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ia-session-expiry-current.txt <<'REMOTE'
+          set +e
+          echo "TIMESTAMP=$(date -Is)"
+          echo
+          echo "=== IA TEST SERVICE STATUS ==="
+          sudo systemctl status djgabo-cdg-ia-test --no-pager -l | sed -n '1,40p'
+          echo
+          echo "=== IA TEST RESTARTS LAST 60M ==="
+          sudo journalctl -u djgabo-cdg-ia-test --since "60 min ago" --no-pager -o short-iso | grep -E 'Started|Stopping|Stopped|Handling signal|Shutting down|Booting worker|Listening at' | tail -200
+          echo
+          echo "=== PANEL SESSION ERROR STRING ==="
+          sudo grep -n -C 8 -E 'Sesión vencida|Vuelve a ingresar|session_token|SESSION_TOKEN' /opt/djgabo-cdg-ia-test/panel.html | sed -E 's/[A-Za-z0-9_-]{32,}/<REDACTED>/g' | head -220
+          echo
+          echo "=== SERVER SESSION/AUTH CODE ==="
+          sudo grep -n -C 12 -E '^def session\(|session_token|SESSION_TTL|expires|expiry|expir|login|iniciarSesion|portal/auth' /opt/djgabo-cdg-ia-test/server.py | sed -E 's/[A-Za-z0-9_-]{32,}/<REDACTED>/g' | head -320
+          echo
+          echo "=== CREATE JOB ROUTE ==="
+          sudo grep -n -A 110 -B 10 "@app.post('/api/ai/create-job/start')" /opt/djgabo-cdg-ia-test/server.py | sed -E 's/[A-Za-z0-9_-]{32,}/<REDACTED>/g' | head -180
+          echo
+          echo "=== NGINX IA REQUESTS LAST 40M ==="
+          sudo grep '/cdg-editor-ia/' /var/log/nginx/djgabo-panel.access.log | tail -250
+          echo
+          echo "=== IA TEST JOURNAL LAST 40M ==="
+          sudo journalctl -u djgabo-cdg-ia-test --since "40 min ago" --no-pager -o short-iso | tail -350 | sed -E 's/[A-Za-z0-9_-]{32,}/<REDACTED>/g'
+          echo
+          echo "=== DB TABLES / SESSION COUNTS (NO TOKENS) ==="
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import sqlite3, json, os, datetime
+          p='/var/lib/djgabo-cdg-ia-test/local.db'
+          c=sqlite3.connect(p)
+          c.row_factory=sqlite3.Row
+          tabs=[r[0] for r in c.execute("select name from sqlite_master where type='table' order by name")]
+          print('TABLES='+','.join(tabs))
+          for t in tabs:
+              if 'session' in t.lower() or 'auth' in t.lower() or 'token' in t.lower():
+                  try:
+                      cols=[r[1] for r in c.execute(f"pragma table_info({t})")]
+                      print('TABLE',t,'COLS',cols,'COUNT',c.execute(f"select count(*) from {t}").fetchone()[0])
+                      safe=[x for x in cols if any(k in x.lower() for k in ('created','updated','expires','expiry','role','user','email','last')) and 'token' not in x.lower()]
+                      if safe:
+                          q='select '+','.join(safe)+f' from {t} order by rowid desc limit 8'
+                          for row in c.execute(q):
+                              print(dict(row))
+                  except Exception as e:
+                      print('ERR',t,type(e).__name__,str(e))
+          PY
+          echo
+          echo "=== PRODUCTION SAFETY ==="
+          echo "PROD_STATUS=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PROD_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+
+      - name: Commit diagnostic
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ia-session-expiry-current.txt
+          git commit -m "diag: capture IA session expiry" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
