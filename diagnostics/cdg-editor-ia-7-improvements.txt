@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-03T05:54:25+00:00
+TIMESTAMP=2026-09-03T05:58:32+00:00
 PRODUCTION_BEFORE=active
 TEST_BEFORE=active
 /tmp/patch_cdg_editor_ia_7_improvements.py:531: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
@@ -16,9 +16,9 @@ PROJECT_WORDS=573
 TIMED_WORDS=573
 VOICE_GAPS=3
 VOICE_GAP={"start": 155.6, "end": 173.4, "duration": 17.8, "kind": "untranscribed_voice", "score": 1.0, "peak_db": -10.4, "threshold_db": -40.6}
-VOICE_GAP={"start": 270.8, "end": 289.8, "duration": 19.0, "kind": "untranscribed_voice", "score": 1.0, "peak_db": -10.8, "threshold_db": -40.6}
+VOICE_GAP={"start": 270.4, "end": 289.8, "duration": 19.4, "kind": "untranscribed_voice", "score": 1.0, "peak_db": -10.8, "threshold_db": -40.6}
 VOICE_GAP={"start": 486.8, "end": 488.2, "duration": 1.4, "kind": "untranscribed_voice", "score": 0.79, "peak_db": -28.6, "threshold_db": -40.6}
-ELAPSED=9.627
+ELAPSED=10.368
 === CENTERING TEST ===
 SECOND_STANZA_ROWS=[2, 3]
 === FRONTEND MARKERS ===
