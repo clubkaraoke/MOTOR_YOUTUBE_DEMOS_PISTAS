@@ -1,1 +1,5 @@
-curl: (22) The requested URL returned error: 500
+{"error":"Renderer CDG: DJGABO_PROGRESS:4:Leyendo estilo y proyecto\u2026\nERROR  No encuentro Impact ni una fuente alternativa del sistema.\n","ok":false}
+
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+AssertionError: {'error': 'Renderer CDG: DJGABO_PROGRESS:4:Leyendo estilo y proyecto…\nERROR  No encuentro Impact ni una fuente alternativa del sistema.\n', 'ok': False}
