@@ -1,0 +1,10 @@
+TIMESTAMP=2026-09-03T07:42:21+00:00
+PROD_BEFORE=active
+TEST_BEFORE=active
+/tmp/patch_cdg_diagnostic_json_button.py:10: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+PATCH_DIAGNOSTIC_JSON_BUTTON=OK
+TEST_AFTER=active
+PROD_AFTER=active
+PROD_HTTP=200
+DEPLOY_DIAGNOSTIC_JSON=OK
