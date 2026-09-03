@@ -75,6 +75,26 @@ def _audio_path(sid: str, meta: dict | None = None) -> Path | None:
     return p if p.is_file() else None
 
 
+def _resolve_render_font() -> Path:
+    candidates = [
+        Path("/usr/local/share/fonts/impact.ttf"),
+        Path("/usr/share/fonts/truetype/msttcorefonts/Impact.ttf"),
+        Path("/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"),
+        Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p
+    for base in (Path("/usr/local/share/fonts"), Path("/usr/share/fonts")):
+        if base.is_dir():
+            for p in base.rglob("*.ttf"):
+                if p.is_file():
+                    return p
+    raise RuntimeError("No encuentro una fuente TTF para el renderer del laboratorio.")
+
+
 def _ffprobe_duration(path: Path) -> float:
     cmd = [
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
@@ -758,6 +778,10 @@ def render(sid):
         shutil.rmtree(out)
     out.mkdir(parents=True)
     style = json.loads((RENDERER / "style.json").read_text(encoding="utf-8"))
+    lab_font = _resolve_render_font()
+    style["font"] = str(lab_font)
+    style["font_fallback"] = str(lab_font)
+    style["font_family"] = "lab-resolved"
     style["lines_per_page"] = render_plan["lines_per_screen"]
     style["intro_duration_seconds"] = 0.0
     style["intro_short_duration_seconds"] = 0.0
