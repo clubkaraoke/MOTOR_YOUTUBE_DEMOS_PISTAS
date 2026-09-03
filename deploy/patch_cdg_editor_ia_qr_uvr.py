@@ -6,6 +6,8 @@ import shutil
 ROOT=Path('/opt/djgabo-cdg-ia-test')
 SERVER=ROOT/'server.py'
 PANEL=ROOT/'panel.html'
+VENDOR_QR=ROOT/'vendor'/'jsQR.js'
+SRC_VENDOR_QR=Path('/tmp/jsQR.js')
 
 def replace_once(text, old, new, label):
     if old not in text:
@@ -17,6 +19,11 @@ for p in (SERVER,PANEL):
     if not p.is_file():
         raise SystemExit('MISSING: '+str(p))
     shutil.copy2(p,p.with_name(p.name+'.bak_qr_uvr_'+stamp))
+
+if not SRC_VENDOR_QR.is_file():
+    raise SystemExit('MISSING: /tmp/jsQR.js')
+VENDOR_QR.parent.mkdir(parents=True,exist_ok=True)
+shutil.copy2(SRC_VENDOR_QR,VENDOR_QR)
 
 server=SERVER.read_text(encoding='utf-8')
 if "/api/ai/qr-import" not in server:
@@ -120,6 +127,23 @@ def ai_qr_import():
 
 '''
     server=replace_once(server,anchor,block+anchor,'server qr endpoint')
+    SERVER.write_text(server,encoding='utf-8')
+
+server=SERVER.read_text(encoding='utf-8')
+if "@app.get('/vendor/jsQR.js')" not in server:
+    route_anchor="@app.post('/api/instrumentals/auto-match')\ndef auto_match_instrumental_api():"
+    if route_anchor not in server:
+        raise SystemExit('ANCHOR_NOT_FOUND: vendor qr route')
+    vendor_route="""@app.get('/vendor/jsQR.js')
+def vendor_jsqr():
+    \"\"\"Lector QR integrado al IA TEST; evita depender de BarcodeDetector del navegador.\"\"\"
+    p=Path(__file__).resolve().parent/'vendor'/'jsQR.js'
+    if not p.is_file():
+        abort(404)
+    return send_file(str(p),mimetype='application/javascript',conditional=True)
+
+"""
+    server=server.replace(route_anchor,vendor_route+route_anchor,1)
     SERVER.write_text(server,encoding='utf-8')
 
 panel=PANEL.read_text(encoding='utf-8')
@@ -239,8 +263,8 @@ function cargarJsQrCompat(){
   if(typeof window.jsQR==='function')return Promise.resolve(window.jsQR);
   if(_jsQrCompatPromise)return _jsQrCompatPromise;
   const fuentes=[
-    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
-    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+    '/cdg-editor-ia/vendor/jsQR.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
   ];
   _jsQrCompatPromise=new Promise((resolve,reject)=>{
     let i=0;
@@ -382,8 +406,8 @@ function cargarJsQrCompat(){
   if(typeof window.jsQR==='function')return Promise.resolve(window.jsQR);
   if(_jsQrCompatPromise)return _jsQrCompatPromise;
   const fuentes=[
-    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
-    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+    '/cdg-editor-ia/vendor/jsQR.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
   ];
   _jsQrCompatPromise=new Promise((resolve,reject)=>{
     let i=0;
