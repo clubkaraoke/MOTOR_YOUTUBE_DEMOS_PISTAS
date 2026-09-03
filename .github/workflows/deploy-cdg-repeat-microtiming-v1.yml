@@ -56,10 +56,10 @@ jobs:
           if [ -z "$DB_PATH" ]; then
             if [ -n "$DATA_PATH" ]; then DB_PATH="$DATA_PATH/local.db"; else DB_PATH="$ROOT/data/local.db"; fi
           fi
-          if [ ! -f "$DB_PATH" ]; then
+          if ! sudo test -f "$DB_PATH"; then
             echo "DB_PRIMARY_MISSING=$DB_PATH"
             for cand in "$ROOT/data/local.db" "$ROOT/DATA/local.db" /var/lib/djgabo-cdg/local.db /opt/djgabo-cdg-data/local.db; do
-              if [ -f "$cand" ]; then DB_PATH="$cand"; break; fi
+              if sudo test -f "$cand"; then DB_PATH="$cand"; break; fi
             done
           fi
           STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -71,7 +71,7 @@ jobs:
           echo "DB_PATH=$DB_PATH"
           test -f "$SERVER"
           test -f "$EDITOR"
-          test -f "$DB_PATH"
+          sudo test -f "$DB_PATH"
 
           # Staging: no toca producción.
           STAGE=/tmp/djgabo-repeat-microtiming-stage
