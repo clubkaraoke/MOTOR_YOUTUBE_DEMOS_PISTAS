@@ -1,0 +1,148 @@
+TIMESTAMP=2026-09-03T05:49:47+00:00
+TEST_SERVICE=active
+PROD_SERVICE=active
+
+=== LIVE EDITOR CONFIG / SPOKEN LOGIC ===
+1546:                   spokenMin:6.0, spokenLead:4.0, spokenJoin:0.75},
+1756:  const join=PV.cfg.instrumental.spokenJoin ?? .75;
+1768:function pvInstrumentalState(t){
+1781:    const longSpoken=overlaps.some(([a,b])=>(b-a)>=(c.spokenMin??4));
+1782:    const regularGap=gap>=c.minGap && !hasSpoken;
+1783:    if(!longSpoken && !regularGap) continue;
+1787:    const lead=longSpoken?(c.spokenLead??3):c.lead;
+1795:    return {remain,phase,spoken:longSpoken};
+3884:    if(st.spoken_instrumental_min_seconds!=null) PV.cfg.instrumental.spokenMin=+st.spoken_instrumental_min_seconds;
+3885:    if(st.spoken_instrumental_lead_seconds!=null) PV.cfg.instrumental.spokenLead=+st.spoken_instrumental_lead_seconds;
+3886:    if(st.spoken_block_join_seconds!=null) PV.cfg.instrumental.spokenJoin=+st.spoken_block_join_seconds;
+
+=== LIVE RENDERER SPOKEN LOGIC ===
+89:            if w.get("spoken"):
+184:        words = [w for w in seg.get("words", []) if not w.get("spoken")]
+267:def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals: list[tuple[float, float]] | None = None) -> list[list[dict]]:
+280:    lead = float(style.get("instrumental_lead_seconds", 4.0))
+282:    spoken_min = float(style.get("spoken_instrumental_min_seconds", 6.0))
+283:    spoken_lead = float(style.get("spoken_instrumental_lead_seconds", 4.0))
+284:    spoken_join = float(style.get("spoken_block_join_seconds", 0.75))
+286:    spoken_intervals = spoken_intervals or []
+291:    merged_spoken: list[list[float]] = []
+292:    for sa, sb in sorted(spoken_intervals):
+293:        if not merged_spoken or sa - merged_spoken[-1][1] > spoken_join:
+294:            merged_spoken.append([sa, sb])
+296:            merged_spoken[-1][1] = max(merged_spoken[-1][1], sb)
+316:        # La próxima página cantada queda libre `spoken_lead` segundos antes.
+319:            for sa, sb in merged_spoken
+323:        has_spoken = bool(overlaps)
+324:        long_spoken = any((sb - sa) >= spoken_min for sa, sb in overlaps)
+325:        regular_gap = gap >= min_gap and not has_spoken
+327:        if label and n_dots > 0 and (long_spoken or regular_gap):
+328:            use_lead = spoken_lead if long_spoken else lead
+335:            min_span = 0.6 if long_spoken else 1.0
+455:    spoken_intervals = []
+458:            if w.get("spoken") and w.get("start_time") is not None:
+461:                spoken_intervals.append((st, max(st + 0.05, en)))
+466:    visual = build_instrumentals(visual, style, spoken_intervals)
+
+=== LIVE STYLE ===
+instrumental_dot='●'
+instrumental_dots=4
+instrumental_graphics=True
+instrumental_label='INSTRUMENTAL'
+instrumental_lead_seconds=4.0
+instrumental_min_gap=6.0
+instrumental_phase_prefix='assets/instrumental_phase_'
+instrumental_span_seconds=6.0
+smart_page_gap_seconds=2.0
+spoken_block_join_seconds=0.75
+spoken_instrumental_lead_seconds=4.0
+spoken_instrumental_min_seconds=6.0
+
+=== LATEST IA_TEST JOB / SEGMENTS 105-120 ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB LET-0078 Amor Rebelde - Mix Cuanto te amo updated 03/09/2026 05:45
+L105: kind=lyric start=346.48 end=347.54 all_spoken=False any_spoken=False text='¿Para qué quiero'
+  W 1 '¿Para' spoken= False start= 346.48 end= 346.92
+  W 2 'qué' spoken= False start= 347.02 end= 347.16
+  W 3 'quiero' spoken= False start= 347.2 end= 347.54
+L106: kind=lyric start=347.6 end=349.96 all_spoken=False any_spoken=False text='todo lo que yo tengo?'
+  W 1 'todo' spoken= False start= 347.6 end= 348.04
+  W 2 'lo' spoken= False start= 348.18 end= 348.32
+  W 3 'que' spoken= False start= 348.46 end= 348.64
+  W 4 'yo' spoken= False start= 348.68 end= 348.78
+  W 5 'tengo?' spoken= False start= 348.9 end= 349.96
+L107: kind=lyric start=350.96 end=352.5 all_spoken=False any_spoken=False text='Si no tengo tu amor,'
+  W 1 'Si' spoken= False start= 350.96 end= 351.12
+  W 2 'no' spoken= False start= 351.26 end= 351.38
+  W 3 'tengo' spoken= False start= 351.48 end= 351.74
+  W 4 'tu' spoken= False start= 351.86 end= 351.96
+  W 5 'amor,' spoken= False start= 352.0 end= 352.5
+L108: kind=lyric start=352.66 end=354.48 all_spoken=False any_spoken=False text='mejor me muero.'
+  W 1 'mejor' spoken= False start= 352.66 end= 353.12
+  W 2 'me' spoken= False start= 353.2 end= 353.32
+  W 3 'muero.' spoken= False start= 353.38 end= 354.48
+L109: kind=lyric start=355.3 end=358.76 all_spoken=False any_spoken=False text='Cuando te vi sabía que te quería.'
+  W 1 'Cuando' spoken= False start= 355.3 end= 355.9
+  W 2 'te' spoken= False start= 355.98 end= 356.12
+  W 3 'vi' spoken= False start= 356.16 end= 356.32
+  W 4 'sabía' spoken= False start= 356.38 end= 357.04
+  W 5 'que' spoken= False start= 357.12 end= 357.2
+  W 6 'te' spoken= False start= 357.3 end= 357.44
+  W 7 'quería.' spoken= False start= 357.54 end= 358.76
+L110: kind=lyric start=359.94 end=360.98 all_spoken=False any_spoken=False text='Desde hace mucho'
+  W 1 'Desde' spoken= False start= 359.94 end= 360.34
+  W 2 'hace' spoken= False start= 360.38 end= 360.62
+  W 3 'mucho' spoken= False start= 360.7 end= 360.98
+L111: kind=lyric start=361.08 end=363.76 all_spoken=False any_spoken=False text='tiempo sin conocerte.'
+  W 1 'tiempo' spoken= False start= 361.08 end= 361.58
+  W 2 'sin' spoken= False start= 361.68 end= 361.86
+  W 3 'conocerte.' spoken= False start= 361.94 end= 363.76
+L112: kind=lyric start=364.4 end=366.02 all_spoken=False any_spoken=False text='Yo sé que si llegaste'
+  W 1 'Yo' spoken= False start= 364.4 end= 364.64
+  W 2 'sé' spoken= False start= 364.74 end= 364.88
+  W 3 'que' spoken= False start= 364.9 end= 365.04
+  W 4 'si' spoken= False start= 365.12 end= 365.28
+  W 5 'llegaste' spoken= False start= 365.32 end= 366.02
+L113: kind=lyric start=366.12 end=367.96 all_spoken=False any_spoken=False text='fue por mi mente.'
+  W 1 'fue' spoken= False start= 366.12 end= 366.32
+  W 2 'por' spoken= False start= 366.42 end= 366.64
+  W 3 'mi' spoken= False start= 366.66 end= 366.8
+  W 4 'mente.' spoken= False start= 366.82 end= 367.96
+L114: kind=lyric start=368.94 end=370.04 all_spoken=False any_spoken=False text='Te conocí en mis'
+  W 1 'Te' spoken= False start= 368.94 end= 369.14
+  W 2 'conocí' spoken= False start= 369.22 end= 369.76
+  W 3 'en' spoken= False start= 369.82 end= 369.85
+  W 4 'mis' spoken= False start= 369.86 end= 370.04
+L115: kind=lyric start=370.06 end=372.42 all_spoken=False any_spoken=False text='sueños antes de verte.'
+  W 1 'sueños' spoken= False start= 370.06 end= 370.58
+  W 2 'antes' spoken= False start= 370.62 end= 370.92
+  W 3 'de' spoken= False start= 371.0 end= 371.12
+  W 4 'verte.' spoken= False start= 371.18 end= 372.42
+L116: kind=lyric start=373.14 end=374.44 all_spoken=False any_spoken=False text='Cómo te quiero,'
+  W 1 'Cómo' spoken= False start= 373.14 end= 373.3
+  W 2 'te' spoken= False start= 373.4 end= 373.519
+  W 3 'quiero,' spoken= False start= 373.58 end= 374.44
+L117: kind=lyric start=375.36 end=378.36 all_spoken=False any_spoken=False text='cómo te extraño, cómo quisiera'
+  W 1 'cómo' spoken= False start= 375.36 end= 375.58
+  W 2 'te' spoken= False start= 375.64 end= 375.7
+  W 3 'extraño,' spoken= False start= 375.74 end= 377.1
+  W 4 'cómo' spoken= False start= 377.6 end= 377.78
+  W 5 'quisiera' spoken= False start= 377.84 end= 378.36
+L118: kind=lyric start=378.4 end=381.32 all_spoken=False any_spoken=False text='decirte siempre cuánto te amo.'
+  W 1 'decirte' spoken= False start= 378.4 end= 378.9
+  W 2 'siempre' spoken= False start= 378.98 end= 379.46
+  W 3 'cuánto' spoken= False start= 379.54 end= 379.98
+  W 4 'te' spoken= False start= 380.08 end= 380.239
+  W 5 'amo.' spoken= False start= 380.359 end= 381.32
+L119: kind=lyric start=382.08 end=386.1 all_spoken=False any_spoken=False text='Ojos azules como es el cielo,'
+  W 1 'Ojos' spoken= False start= 382.08 end= 382.34
+  W 2 'azules' spoken= False start= 382.42 end= 383.86
+  W 3 'como' spoken= False start= 384.28 end= 384.44
+  W 4 'es' spoken= False start= 384.46 end= 384.53
+  W 5 'el' spoken= False start= 384.58 end= 384.68
+  W 6 'cielo,' spoken= False start= 384.72 end= 386.1
+L120: kind=lyric start=386.54 end=387.8 all_spoken=False any_spoken=False text='esta mi tierra que tanto'
+  W 1 'esta' spoken= False start= 386.54 end= 386.78
+  W 2 'mi' spoken= False start= 386.82 end= 386.92
+  W 3 'tierra' spoken= False start= 386.96 end= 387.3
+  W 4 'que' spoken= False start= 387.36 end= 387.46
+  W 5 'tanto' spoken= False start= 387.52 end= 387.8
+SPOKEN_GROUPS_JOIN_0.75
