@@ -1,0 +1,100 @@
+name: Deploy CDG sustained word end once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-sustained-word-end-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_sustained_word_end.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy to IA TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_sustained_word_end.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_sustained_word_end.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-sustained-word-end-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+
+          sudo python3 /tmp/patch_cdg_sustained_word_end.py
+
+          sudo -u djgabo-cdg grep -Fq "function repairSustainedLineEndsFromVoiceGaps()" "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq "repairSustainedLineEndsFromVoiceGaps();" "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq 'w.ai_end_extension_source="voice_gap_tail"' "$ROOT/editor_v1/index.html"
+          echo "STATIC_MARKERS=PASS"
+
+          if command -v node >/dev/null 2>&1; then
+            sudo -u djgabo-cdg python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          Path('/tmp/cdg-sustained-end.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+            node --check /tmp/cdg-sustained-end.js
+            echo "EDITOR_JS_SYNTAX=PASS"
+          fi
+
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/sustained-end-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PROD_HTTP=$prod_http"
+          test "$prod_http" = 200
+          echo "DEPLOY_SUSTAINED_WORD_END=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-sustained-word-end-deploy.txt ]; then
+            git add diagnostics/cdg-sustained-word-end-deploy.txt
+            git commit -m "diag: verify sustained word end fix" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
