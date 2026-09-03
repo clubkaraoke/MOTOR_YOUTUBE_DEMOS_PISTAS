@@ -96,12 +96,18 @@ jobs:
           PYEXE="$(sudo readlink -f /proc/$(sudo systemctl show -p MainPID --value djgabo-cdg)/exe)"
           echo "PYEXE=$PYEXE"
           sudo "$PYEXE" - <<'PY'
-          import importlib.util,sys
+          import importlib.util,sys,types
+          # La prueba usa render_pages explícito y no necesita rasterizar fuente.
+          pil=types.ModuleType("PIL")
+          imagefont=types.ModuleType("PIL.ImageFont")
+          imagefont.FreeTypeFont=object
+          pil.ImageFont=imagefont
+          sys.modules["PIL"]=pil
+          sys.modules["PIL.ImageFont"]=imagefont
           p="/tmp/djgabo-authoritative-pages-stage/renderer/normalize.py"
           spec=importlib.util.spec_from_file_location("nstage",p)
           n=importlib.util.module_from_spec(spec);sys.modules["nstage"]=n;spec.loader.exec_module(n)
-          from PIL import ImageFont
-          font=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",18)
+          font=object()
           words=[]
           segs=[]
           t=10.0
