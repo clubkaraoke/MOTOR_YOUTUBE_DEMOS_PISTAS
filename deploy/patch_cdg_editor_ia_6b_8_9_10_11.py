@@ -128,7 +128,7 @@ def ai_align_block(jid):
         return jsonify(ok=False,error='Alineación IA de bloque disponible sólo en el clon TEST.'),403
     d=request.get_json() or {}
     try:
-        session(d.get('token'),'ADMIN')
+        session(d.get('token'))
         words=d.get('words') or []
         if not isinstance(words,list) or not words:
             raise ValueError('Selecciona primero las palabras del bloque.')
