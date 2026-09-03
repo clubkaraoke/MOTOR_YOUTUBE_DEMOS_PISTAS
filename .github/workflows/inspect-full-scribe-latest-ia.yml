@@ -1,0 +1,86 @@
+name: Inspect full Scribe transcript latest IA job
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-full-scribe-latest-ia.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Run raw Scribe on latest IA job
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/latest-ia-scribe-full.txt <<'REMOTE'
+          set -euo pipefail
+          cd /opt/djgabo-cdg-ia-test
+          sudo -u djgabo-cdg env \
+            HOME=/var/lib/djgabo-cdg-ia-test \
+            DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia \
+            DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test \
+            DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config \
+            DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db \
+            DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs \
+            DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output \
+            DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache \
+            /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import sqlite3, json, requests
+          from pathlib import Path
+          db=sqlite3.connect('/var/lib/djgabo-cdg-ia-test/local.db'); db.row_factory=sqlite3.Row
+          r=db.execute("select id,artist,title,voice_filename,lyrics_corrected,project_json from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          if not r: raise SystemExit('NO_IA_JOB')
+          voice=Path('/var/lib/djgabo-cdg-ia-test/jobs')/r['id']/r['voice_filename']
+          with voice.open('rb') as fh:
+              rr=requests.post('http://127.0.0.1:8097/api/elevenlabs/transcribe',
+                  files={'audio':(voice.name,fh,'audio/mpeg')},
+                  data={'lyrics':'','language_code':'spa'},
+                  timeout=(30,1200))
+          rr.raise_for_status()
+          d=rr.json()
+          words=d.get('words') or []
+          print('JOB='+r['id'])
+          print('ARTIST='+r['artist'])
+          print('TITLE='+r['title'])
+          print('CURRENT_MASTER_WORDS='+str(len((r['lyrics_corrected'] or '').split())))
+          print('SCRIBE_WORDS='+str(len(words)))
+          print('SCRIBE_TEXT_BEGIN')
+          print(str((d.get('scribe') or {}).get('text') or ''))
+          print('SCRIBE_TEXT_END')
+          print('WORDS_BEGIN')
+          for w in words:
+              print(f"{w.get('start')}\t{w.get('end')}\t{w.get('text')}")
+          print('WORDS_END')
+          PY
+          REMOTE
+      - name: Save report
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/latest-ia-scribe-full.txt
+          git commit -m "diag: capture full Scribe transcript latest IA test job" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
