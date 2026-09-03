@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CDG Render Lab</title>
+<style>
+:root{--bg:#0b0e13;--panel:#141922;--panel2:#0f141c;--line:#263040;--text:#eef3f8;--muted:#8fa0b4;--accent:#f2a900;--good:#54d59a;--bad:#ff6b6b}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#0b0e13e8;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;gap:12px}
+.logo{font-weight:900;letter-spacing:.4px}.tag{font-size:11px;padding:4px 8px;border-radius:999px;background:#2b2411;color:#ffd66c;border:1px solid #6c5516}.spacer{flex:1}
+button,.btn{border:1px solid var(--line);background:#1b2230;color:var(--text);border-radius:10px;padding:10px 12px;font-weight:750;cursor:pointer}
+button.primary{background:var(--accent);color:#17120a;border-color:#d59400}button.good{background:#173829;border-color:#285b43;color:#bdf5d8}button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1500px;margin:0 auto;padding:16px;display:grid;grid-template-columns:370px minmax(520px,1fr) 420px;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}.card h2{font-size:14px;margin:0 0 12px;color:#dbe5f0}.card h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:14px 0 8px}
+label{display:block;color:var(--muted);font-size:12px;margin:8px 0 5px}input,select,textarea{width:100%;background:#0c1118;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit}
+input[type=file]{padding:8px}.row{display:flex;gap:8px}.row>*{flex:1}.muted{color:var(--muted);font-size:12px}.status{margin-top:10px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-height:38px;white-space:pre-wrap}.status.good{color:var(--good)}.status.bad{color:var(--bad)}
+.qrWrap{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}.qr{width:150px;height:150px;background:white;border-radius:10px;padding:6px}
+audio{width:100%;margin-top:8px}
+.previewShell{background:#050608;border:1px solid #303847;border-radius:14px;padding:12px}.screen{position:relative;width:100%;aspect-ratio:3/2;max-height:650px;margin:auto;background:#000;border-radius:7px;overflow:hidden}
+canvas{width:100%;height:100%;display:block}.previewInfo{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:12px}.pill{padding:4px 7px;border:1px solid var(--line);border-radius:999px;background:#0c1118}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.controls label{margin:0}.controls input,.controls select{margin-top:5px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+textarea{height:500px;font:12px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}.jsonTop{display:flex;gap:8px;align-items:center;margin-bottom:8px}.jsonTop select{width:auto;flex:1}
+.log{margin-top:10px;max-height:170px;overflow:auto;background:#080c12;border:1px solid var(--line);border-radius:9px;padding:9px;white-space:pre-wrap;font:11px/1.4 ui-monospace,monospace;color:#aebbd0}
+.hidden{display:none!important}
+@media(max-width:1150px){main{grid-template-columns:1fr}.card{min-width:0}textarea{height:320px}.qrWrap{grid-template-columns:130px 1fr}.qr{width:130px;height:130px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">CDG RENDER LAB</div>
+  <div class="tag">AISLADO · SIN DROPBOX</div>
+  <div class="spacer"></div>
+  <button id="btnNew">Nueva prueba</button>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>1 · Audio</h2>
+      <label>Artista</label><input id="artist" placeholder="Opcional">
+      <label>Título</label><input id="title" placeholder="Opcional">
+      <h3>Subir desde PC</h3>
+      <input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac">
+      <button id="btnUpload" class="primary" style="width:100%;margin-top:8px">SUBIR AUDIO</button>
+      <h3>o subir por QR</h3>
+      <div class="qrWrap">
+        <img id="qr" class="qr" alt="QR">
+        <div>
+          <div class="muted">Escanéalo con el celular y sube el audio. Este QR sólo sirve para esta prueba.</div>
+          <div id="phoneUrl" class="muted" style="margin-top:8px;word-break:break-all"></div>
+        </div>
+      </div>
+      <div id="uploadStatus" class="status">Creando sesión…</div>
+      <audio id="audio" controls preload="metadata"></audio>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>2 · ElevenLabs Scribe v2</h2>
+      <div class="muted">Usa la misma ruta de Scribe ya validada. No hay proyecto maestro, Sheet, Drive ni Dropbox.</div>
+      <button id="btnScribe" class="good" style="width:100%;margin-top:10px" disabled>SINCRONIZAR CON ELEVENLABS</button>
+      <div id="scribeStatus" class="status">Esperando audio.</div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>4 · Crear CDG</h2>
+      <button id="btnRender" class="primary" style="width:100%" disabled>CREAR CDG DE PRUEBA</button>
+      <div id="renderStatus" class="status">Esperando JSON.</div>
+      <a id="downloadCdg" class="btn hidden" style="display:block;text-align:center;margin-top:8px;text-decoration:none" href="#">DESCARGAR CDG</a>
+      <div id="renderLog" class="log hidden"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>3 · Preview del mismo plan que va al renderer</h2>
+      <div class="controls">
+        <label>Líneas
+          <select id="lines"><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select>
+        </label>
+        <label>Modo
+          <select id="mode"><option value="page" selected>Page by page</option><option value="overwrite">Overwrite</option></select>
+        </label>
+        <label>Read-ahead
+          <input id="lead" type="number" step=".1" min="0" max="12" value="3.0">
+        </label>
+        <label>Clear seguro
+          <input id="safeGap" type="number" step=".1" min="1" max="12" value="4.0">
+        </label>
+      </div>
+      <div class="previewShell">
+        <div class="screen"><canvas id="cv" width="576" height="384"></canvas></div>
+        <div class="previewInfo">
+          <span id="pTime" class="pill">0.000 s</span>
+          <span id="pMode" class="pill">—</span>
+          <span id="pVisible" class="pill">0 líneas</span>
+          <span id="pNext" class="pill">siguiente —</span>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="btnPlan" disabled>Recalcular plan</button>
+        <button id="btnBack5">−5 s</button>
+        <button id="btnFwd5">+5 s</button>
+      </div>
+      <div class="muted" style="margin-top:8px">El barrido usa START/END del JSON. Cambiar líneas o modo sólo recalcula presentación; no modifica la sincronización musical.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>JSON</h2>
+      <div class="jsonTop">
+        <select id="jsonKind"><option value="project">Proyecto + render_plan</option><option value="raw">Scribe RAW</option></select>
+        <button id="btnReloadJson" disabled>Recargar</button>
+      </div>
+      <textarea id="json" spellcheck="false" placeholder="Aquí aparecerá el JSON…"></textarea>
+      <div class="toolbar">
+        <button id="btnApplyJson" disabled>Aplicar JSON editado</button>
+        <button id="btnDownloadJson" disabled>Descargar JSON</button>
+      </div>
+      <div id="jsonStatus" class="status">Todavía no hay JSON.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+let SID="", PROJECT=null, PLAN=null, pollTimer=null, lastAudioName="";
+const $=s=>document.querySelector(s);
+const api=(p,opt)=>fetch(p,opt).then(async r=>{let d;try{d=await r.json()}catch(_){d={ok:r.ok}} if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));return d});
+const esc=s=>String(s??"");
+
+function settings(){
+  return {
+    lines_per_screen:Number($("#lines").value||6),
+    mode:$("#mode").value,
+    read_ahead_seconds:Number($("#lead").value||3),
+    safe_clear_gap_seconds:Number($("#safeGap").value||4)
+  };
+}
+function setStatus(el,msg,kind=""){
+  el.className="status"+(kind?" "+kind:"");el.textContent=msg;
+}
+async function newSession(){
+  clearInterval(pollTimer);PROJECT=null;PLAN=null;lastAudioName="";
+  $("#audio").removeAttribute("src");$("#audio").load();
+  $("#json").value="";$("#downloadCdg").classList.add("hidden");$("#renderLog").classList.add("hidden");
+  const d=await api("api/session/new",{method:"POST"});
+  SID=d.sid;localStorage.setItem("cdg_render_lab_sid",SID);
+  $("#qr").src=d.qr_url+"?v="+Date.now();$("#phoneUrl").textContent=d.phone_url;
+  setStatus($("#uploadStatus"),"Sesión lista. Sube audio desde PC o escanea el QR.");
+  $("#btnScribe").disabled=true;$("#btnPlan").disabled=true;$("#btnRender").disabled=true;
+  $("#btnReloadJson").disabled=true;$("#btnApplyJson").disabled=true;$("#btnDownloadJson").disabled=true;
+  pollTimer=setInterval(checkSession,1800);await checkSession();
+}
+async function restoreSession(sid){
+  SID=sid;
+  try{
+    const d=await api("api/session/"+SID);
+    const phone="";$("#qr").src="api/qr/"+SID+".png?v="+Date.now();$("#phoneUrl").textContent="QR restaurado";
+    $("#artist").value=d.session.artist||"";$("#title").value=d.session.title||"";
+    pollTimer=setInterval(checkSession,1800);await checkSession();
+    if(d.session.has_project) await loadProject();
+  }catch(_){await newSession()}
+}
+async function checkSession(){
+  if(!SID)return;
+  try{
+    const d=await api("api/session/"+SID),s=d.session;
+    if(s.audio_name){
+      const label="✓ "+(s.audio_original_name||s.audio_name)+" · "+Number(s.duration||0).toFixed(2)+" s";
+      setStatus($("#uploadStatus"),label,"good");
+      $("#btnScribe").disabled=false;
+      if(lastAudioName!==s.audio_name){
+        lastAudioName=s.audio_name;$("#audio").src="media/"+SID+"?v="+Date.now();$("#audio").load();
+      }
+    }
+    if(s.has_project && !PROJECT)await loadProject();
+  }catch(e){}
+}
+$("#btnNew").onclick=newSession;
+$("#btnUpload").onclick=async()=>{
+  const f=$("#file").files[0];if(!f)return setStatus($("#uploadStatus"),"Selecciona un audio.","bad");
+  $("#btnUpload").disabled=true;setStatus($("#uploadStatus"),"Subiendo "+f.name+"…");
+  const fd=new FormData();fd.append("audio",f);
+  try{await api("api/upload/"+SID,{method:"POST",body:fd});await checkSession()}
+  catch(e){setStatus($("#uploadStatus"),e.message,"bad")}finally{$("#btnUpload").disabled=false}
+};
+$("#btnScribe").onclick=async()=>{
+  $("#btnScribe").disabled=true;setStatus($("#scribeStatus"),"ElevenLabs Scribe v2 está sincronizando…");
+  try{
+    await api("api/session/"+SID+"/meta",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({artist:$("#artist").value,title:$("#title").value})});
+    const d=await api("api/scribe/"+SID,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({artist:$("#artist").value,title:$("#title").value})});
+    PROJECT=d.project;setStatus($("#scribeStatus"),"✓ "+d.words+" palabras recibidas con START/END.","good");
+    await recalcPlan();refreshJson("project");$("#btnPlan").disabled=false;$("#btnRender").disabled=false;$("#btnReloadJson").disabled=false;$("#btnApplyJson").disabled=false;$("#btnDownloadJson").disabled=false;
+  }catch(e){setStatus($("#scribeStatus"),e.message,"bad")}finally{$("#btnScribe").disabled=false}
+};
+async function loadProject(){
+  try{
+    const r=await fetch("api/project/"+SID);if(!r.ok)return;PROJECT=await r.json();
+    const ls=PROJECT.lab_settings||{};
+    if(ls.lines_per_screen)$("#lines").value=String(ls.lines_per_screen);
+    if(ls.mode)$("#mode").value=ls.mode;
+    if(ls.read_ahead_seconds!=null)$("#lead").value=ls.read_ahead_seconds;
+    if(ls.safe_clear_gap_seconds!=null)$("#safeGap").value=ls.safe_clear_gap_seconds;
+    PLAN=PROJECT.render_plan||null;
+    $("#btnPlan").disabled=false;$("#btnRender").disabled=false;$("#btnReloadJson").disabled=false;$("#btnApplyJson").disabled=false;$("#btnDownloadJson").disabled=false;
+    setStatus($("#scribeStatus"),"✓ JSON restaurado.","good");refreshJson("project");
+  }catch(e){}
+}
+async function recalcPlan(){
+  if(!PROJECT)return;
+  const d=await api("api/plan/"+SID,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(settings())});
+  PROJECT=d.project;PLAN=d.render_plan;refreshJson("project");
+}
+$("#btnPlan").onclick=async()=>{try{await recalcPlan();setStatus($("#jsonStatus"),"✓ Plan recalculado sin mover START/END.","good")}catch(e){setStatus($("#jsonStatus"),e.message,"bad")}};
+for(const id of ["#lines","#mode","#lead","#safeGap"]){
+  $(id).addEventListener("change",()=>{if(PROJECT)recalcPlan().catch(e=>setStatus($("#jsonStatus"),e.message,"bad"))});
+}
+async function refreshJson(kind=$("#jsonKind").value){
+  if(!SID)return;
+  try{
+    if(kind==="raw"){
+      const r=await fetch("api/scribe-raw/"+SID);if(!r.ok)throw new Error("No hay Scribe RAW.");$("#json").value=JSON.stringify(await r.json(),null,2);
+      $("#btnApplyJson").disabled=true;
+    }else{
+      const r=await fetch("api/project/"+SID);if(!r.ok)throw new Error("No hay proyecto.");PROJECT=await r.json();PLAN=PROJECT.render_plan||PLAN;$("#json").value=JSON.stringify(PROJECT,null,2);$("#btnApplyJson").disabled=false;
+    }
+    setStatus($("#jsonStatus"),kind==="raw"?"Scribe RAW · sólo lectura":"Proyecto editable + render_plan");
+  }catch(e){setStatus($("#jsonStatus"),e.message,"bad")}
+}
+$("#jsonKind").onchange=()=>refreshJson();
+$("#btnReloadJson").onclick=()=>refreshJson();
+$("#btnApplyJson").onclick=async()=>{
+  if($("#jsonKind").value!=="project")return;
+  try{
+    const obj=JSON.parse($("#json").value);
+    await api("api/project/"+SID,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(obj)});
+    PROJECT=obj;await recalcPlan();setStatus($("#jsonStatus"),"✓ JSON aplicado. Plan regenerado.","good");
+  }catch(e){setStatus($("#jsonStatus"),"JSON inválido: "+e.message,"bad")}
+};
+$("#btnDownloadJson").onclick=()=>{
+  const blob=new Blob([$("#json").value],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=(SID||"cdg-render-lab")+"-"+$("#jsonKind").value+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+$("#btnRender").onclick=async()=>{
+  $("#btnRender").disabled=true;$("#downloadCdg").classList.add("hidden");setStatus($("#renderStatus"),"Renderizando CDG en el laboratorio…");
+  try{
+    const d=await api("api/render/"+SID,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(settings())});
+    setStatus($("#renderStatus"),"✓ CDG listo · "+Math.round(d.size/1024)+" KB","good");
+    $("#downloadCdg").href=d.download_url;$("#downloadCdg").classList.remove("hidden");
+    $("#renderLog").textContent=d.log_tail||"";$("#renderLog").classList.remove("hidden");
+    PLAN=d.render_plan||PLAN;await refreshJson("project");
+  }catch(e){setStatus($("#renderStatus"),e.message,"bad")}finally{$("#btnRender").disabled=false}
+};
+$("#btnBack5").onclick=()=>{$("#audio").currentTime=Math.max(0,($("#audio").currentTime||0)-5)};
+$("#btnFwd5").onclick=()=>{$("#audio").currentTime=Math.min($("#audio").duration||1e9,($("#audio").currentTime||0)+5)};
+
+const cv=$("#cv"),cx=cv.getContext("2d");
+function wordMap(){
+  const m=new Map();
+  for(const seg of (PROJECT?.segments||[]))for(const w of (seg.words||[]))m.set(String(w.id),w);
+  return m;
+}
+function drawPreview(){
+  requestAnimationFrame(drawPreview);
+  cx.fillStyle="#000";cx.fillRect(0,0,cv.width,cv.height);
+  const t=Number($("#audio").currentTime||0);$("#pTime").textContent=t.toFixed(3)+" s";
+  if(!PROJECT||!PLAN){cx.fillStyle="#7f8da0";cx.font="28px system-ui";cx.textAlign="center";cx.fillText("Esperando JSON",cv.width/2,cv.height/2);return}
+  const lpp=Number(PLAN.lines_per_screen||6),wm=wordMap();
+  const visible=(PLAN.lines||[]).filter(e=>t>=Number(e.display_at)&&t<Number(e.remove_at));
+  $("#pVisible").textContent=visible.length+" líneas visibles";$("#pMode").textContent=PLAN.mode||"—";
+  const next=(PLAN.lines||[]).find(e=>Number(e.sweep_start)>t);$("#pNext").textContent=next?"siguiente "+(Number(next.sweep_start)-t).toFixed(2)+" s":"siguiente —";
+  const margin=34,usable=cv.height-margin*2,lineH=usable/lpp;
+  const fontSize=Math.max(20,Math.min(34,lineH*.55));cx.font="800 "+fontSize+"px Arial, sans-serif";cx.textBaseline="middle";
+  for(const ev of visible){
+    const slot=Math.max(1,Math.min(lpp,Number(ev.slot||1))),y=margin+(slot-.5)*lineH;
+    const words=(ev.word_ids||[]).map(id=>wm.get(String(id))).filter(Boolean);
+    const space=cx.measureText(" ").width,total=words.reduce((a,w)=>a+cx.measureText(w.text).width,0)+space*Math.max(0,words.length-1);
+    let x=(cv.width-total)/2;
+    for(const w of words){
+      const txt=String(w.text||""),ww=cx.measureText(txt).width,st=Number(w.start_time),en=Math.max(st+.01,Number(w.end_time??st+.45));
+      cx.fillStyle="#fff";cx.fillText(txt,x,y);
+      if(t>=st){
+        const frac=Math.max(0,Math.min(1,(t-st)/(en-st)));
+        if(frac>0){cx.save();cx.beginPath();cx.rect(x,y-lineH*.35,ww*frac,lineH*.70);cx.clip();cx.fillStyle="#f2a900";cx.fillText(txt,x,y);cx.restore()}
+      }
+      x+=ww+space;
+    }
+  }
+}
+drawPreview();
+
+(async()=>{
+  const old=localStorage.getItem("cdg_render_lab_sid");
+  if(old)await restoreSession(old);else await newSession();
+})();
+</script>
+</body></html>
