@@ -1,0 +1,8 @@
+TIMESTAMP=2026-09-03T06:14:56+00:00
+PROD_BEFORE=active
+TEST_BEFORE=active
+/tmp/patch_cdg_repeat_block_alignment.py:18: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+PATCH_REPEAT_BLOCK_ALIGNMENT=OK
+=== STATIC CHECKS ===
+grep: /opt/djgabo-cdg-ia-test/server.py: Permission denied
