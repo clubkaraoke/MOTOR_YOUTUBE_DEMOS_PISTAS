@@ -740,10 +740,24 @@ body.phase2 #now{display:none!important}
 #btnAiFull:hover{border-color:#4fd1c5;color:#fff;background:rgba(79,209,197,.14)}
 #btnAiFull.busy{opacity:.6;pointer-events:none}
 
+
+/* DJGABO_POST_EXPORT_CHOICE_V1 */
+#postExportChoice{position:fixed;inset:0;z-index:100005;background:rgba(0,0,0,.76);display:flex;align-items:center;justify-content:center;padding:22px}
+#postExportChoice[hidden]{display:none!important}
+#postExportCard{width:min(560px,94vw);background:#171922;border:1px solid #3b4251;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,.58);padding:18px}
+#postExportCard h3{margin:0 0 7px;font:800 18px/1.2 Arial,sans-serif;color:#f4f5f7}
+#postExportCard p{margin:0 0 16px;font:12px/1.5 var(--mono);color:#aeb6c5}
+#postExportActions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#postExportActions button{min-height:62px;border-radius:9px;border:1px solid #3b4251;background:#232733;color:#f1efea;padding:10px 12px;font:800 12px/1.35 Arial,sans-serif;cursor:pointer;text-align:left}
+#postExportActions button small{display:block;margin-top:4px;color:#9da7b7;font:10px/1.35 var(--mono);font-weight:500}
+#postExportNext{border-color:rgba(79,209,197,.55)!important;background:rgba(79,209,197,.09)!important}
+#postExportStay{border-color:rgba(242,169,0,.5)!important;background:rgba(242,169,0,.07)!important}
+#postExportActions button:hover{filter:brightness(1.15)}
+@media(max-width:620px){#postExportActions{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
-<div id="CDG_EDITOR_IA_TEST_BADGE" style="position:fixed;top:8px;right:10px;z-index:99999;background:#7c3aed;color:white;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 10px;font:700 11px/1.1 Arial,sans-serif;letter-spacing:.08em;box-shadow:0 4px 18px rgba(0,0,0,.3)">IA TEST · NO PRODUCCIÓN</div>
 
 <header>
   <div id="songName"><span class="art">—</span></div>
@@ -762,6 +776,22 @@ body.phase2 #now{display:none!important}
     <div id="diagJsonHead"><b>DIAGNÓSTICO JSON</b><button id="btnDiagClose" type="button">✕</button></div>
     <div id="diagJsonBody"><textarea id="diagJsonText" spellcheck="false"></textarea></div>
     <div id="diagJsonFoot"><button id="btnDiagCopy" type="button">Copiar JSON</button><button id="btnDiagDownload" type="button">Descargar JSON</button><button id="btnDiagClose2" type="button">Cerrar</button></div>
+  </div>
+</div>
+
+
+<div id="postExportChoice" hidden>
+  <div id="postExportCard" role="dialog" aria-modal="true" aria-labelledby="postExportTitle">
+    <h3 id="postExportTitle">✅ CDG exportado correctamente</h3>
+    <p>¿Qué quieres hacer ahora?</p>
+    <div id="postExportActions">
+      <button id="postExportNext" type="button">Seguir flujo
+        <small>Abrir el siguiente trabajo pendiente para continuar editando.</small>
+      </button>
+      <button id="postExportStay" type="button">Quedarme en este trabajo
+        <small>Seguir aquí para revisar Karaoke, CDG, diagnóstico y hacer pruebas.</small>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1857,7 +1887,7 @@ function pvInstrumentalState(t){
   const spoken=pvMergedSpokenIntervals();
   for(let i=0;i<sung.length;i++){
     const next=sung[i], prev=i?sung[i-1]:null;
-    const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);
+    const base=prev?(prev.end_time??prev.start_time):Math.max(0,pvOpeningDecision().end+.25);
     const gap=next.start_time-base;
     const overlaps=spoken
       .map(([a,b])=>[Math.max(a,base),Math.min(b,next.start_time)])
@@ -1906,7 +1936,7 @@ function _diagInstrumentalDecisions(){
   const out=[];
   for(let i=0;i<sung.length;i++){
     const next=sung[i],prev=i?sung[i-1]:null;
-    const base=prev?(prev.end_time??prev.start_time):Math.max(0,S.cfg.introDuration+.25);
+    const base=prev?(prev.end_time??prev.start_time):Math.max(0,pvOpeningDecision().end+.25);
     const gap=Number(next.start_time)-Number(base);
     const overlaps=spoken.map(([a,b])=>[Math.max(a,base),Math.min(b,next.start_time)]).filter(([a,b])=>b>a);
     const hasSpoken=overlaps.length>0;
@@ -1917,21 +1947,127 @@ function _diagInstrumentalDecisions(){
     const longSpoken=hasSpoken && gap>=(c.spokenMin??6);
     const regularGap=gap>=c.minGap && !hasSpoken && !hasUntranscribedVoice;
     if(!(longSpoken||regularGap) && gap<1.5) continue;
+    const shouldShow=!!(longSpoken||regularGap);
+    const lead=longSpoken?(c.spokenLead??4):c.lead;
+    const hideAt=Number(next.start_time)-Number(lead);
+    const LABEL_SLOT=.55;
+    const avail=hideAt-(Number(base)+.4);
+    const useLabel=shouldShow && avail>=1.0+LABEL_SLOT;
+    const useSpan=shouldShow ? Math.min(Number(c.span||6),avail-(useLabel?LABEL_SLOT:0)) : 0;
+    const minSpan=longSpoken?.6:1.0;
+    const rendererWillInsert=shouldShow && useSpan>=minSpan;
+    const dotsEnd=rendererWillInsert?hideAt:null;
+    const dotsStart=rendererWillInsert?dotsEnd-useSpan:null;
+    const spacerAt=rendererWillInsert?Number(base)+.3:null;
+    const labelAt=rendererWillInsert?dotsStart-LABEL_SLOT:null;
+    const firstSynthetic=rendererWillInsert?spacerAt:null;
     out.push({
       prev:{line:_diagLineNoForWord(prev),text:prev?.text||null,start:prev?.start_time??null,end:prev?.end_time??null},
       next:{line:_diagLineNoForWord(next),text:next?.text||null,start:next?.start_time??null,end:next?.end_time??null},
+      base_seconds:+Number(base).toFixed(3),
       gap_seconds:+gap.toFixed(3),
       has_spoken:hasSpoken,
       spoken_overlap_seconds:+overlaps.reduce((a,[x,y])=>a+(y-x),0).toFixed(3),
       untranscribed_voice_overlap_seconds:+voiceOverlaps.reduce((a,[x,y])=>a+(y-x),0).toFixed(3),
       has_untranscribed_voice:hasUntranscribedVoice,
       rule:longSpoken?"HABLADO>=6s":regularGap?"PAUSA_REGULAR>=6s":hasUntranscribedVoice?"VOZ_SIN_TEXTO_SUPRIME_INSTRUMENTAL":"NO_INSTRUMENTAL",
-      should_show_instrumental:!!(longSpoken||regularGap),
-      lead_seconds:longSpoken?(c.spokenLead??4):c.lead
+      should_show_instrumental:shouldShow,
+      lead_seconds:+Number(lead).toFixed(3),
+      preview_show_from_seconds:shouldShow?+Number(base+.2).toFixed(3):null,
+      hide_at_seconds:shouldShow?+Number(hideAt).toFixed(3):null,
+      renderer_inserted:rendererWillInsert,
+      renderer_first_synthetic_sync_seconds:firstSynthetic==null?null:+Number(firstSynthetic).toFixed(3),
+      renderer_label_at_seconds:labelAt==null?null:+Number(labelAt).toFixed(3),
+      renderer_dots_start_seconds:dotsStart==null?null:+Number(dotsStart).toFixed(3),
+      renderer_dots_end_seconds:dotsEnd==null?null:+Number(dotsEnd).toFixed(3),
+      renderer_span_seconds:rendererWillInsert?+Number(useSpan).toFixed(3):0
     });
   }
   return out;
 }
+/* DJGABO_KARAOKE_TOTAL_TIMELINE_V1
+   La pestaña Karaoke representa TODO el timeline que debería terminar en CDG:
+   OPENING -> INSTRUMENTAL -> KARAOKE -> ENDING. El JSON expone además el
+   posible intro_delay interno de cdgmaker para detectar desplazamientos. */
+function pvOpeningDecision(){
+  const allTimed=(S.words||[]).filter(w=>w.start_time!==null).slice().sort((a,b)=>Number(a.start_time)-Number(b.start_time));
+  const sung=(S.words||[]).filter(w=>!w.spoken&&w.start_time!==null).slice().sort((a,b)=>Number(a.start_time)-Number(b.start_time));
+  const firstTimed=allTimed.length?Number(allTimed[0].start_time):null;
+  const firstSung=sung.length?Number(sung[0].start_time):null;
+  const normal=Number(S.cfg.introDuration||6);
+  const short=Number(S.cfg.introShort||3);
+  const skipBefore=3, shortBefore=6;
+  let duration=normal, rule="AUTO_NORMAL";
+  if(firstTimed===null){ duration=normal; rule="SIN_PRIMER_TIMING"; }
+  else if(firstTimed<skipBefore){ duration=0; rule="AUTO_SKIP_<3S"; }
+  else if(firstTimed<shortBefore){ duration=short; rule="AUTO_SHORT_3_6S"; }
+  return {
+    start:0,end:duration,duration,rule,
+    first_timed_word_seconds:firstTimed,
+    first_sung_word_seconds:firstSung,
+    normal_seconds:normal,short_seconds:short,
+    skip_before_seconds:skipBefore,short_before_seconds:shortBefore
+  };
+}
+function pvEndingDecision(){
+  const outroDuration=8;
+  const audioDuration=Math.max(0,Number(S.duration||S.audio?.duration||0));
+  return {
+    preview_start:Math.max(0,audioDuration-outroDuration),
+    preview_end:audioDuration,
+    duration:Math.min(outroDuration,audioDuration),
+    renderer_outro_duration_seconds:outroDuration,
+    basis:"preview basado en duración del audio; renderer garantiza 8 s al final"
+  };
+}
+function pvTimelineDiagnostic(){
+  const opening=pvOpeningDecision();
+  const instrumentals=_diagInstrumentalDecisions();
+  const inserted=instrumentals.filter(x=>x.renderer_inserted&&x.renderer_first_synthetic_sync_seconds!=null);
+  const allTimed=(S.words||[]).filter(w=>w.start_time!==null).map(w=>Number(w.start_time)).filter(Number.isFinite);
+  const firstActual=allTimed.length?Math.min(...allTimed):null;
+  const firstSynthetic=inserted.length?Math.min(...inserted.map(x=>Number(x.renderer_first_synthetic_sync_seconds))):null;
+  const candidates=[firstActual,firstSynthetic].filter(v=>v!==null&&Number.isFinite(v));
+  const firstComposerSync=candidates.length?Math.min(...candidates):null;
+  const firstBuffer=3;
+  const threshold=opening.duration+firstBuffer;
+  const predictedIntroDelay=(firstComposerSync!==null&&firstComposerSync<threshold)?threshold:0;
+  const ending=pvEndingDecision();
+  const now=Number(S.audio?.currentTime||0);
+  let phase="KARAOKE";
+  if(opening.duration>0&&now>=opening.start&&now<opening.end) phase="OPENING";
+  else if(ending.preview_end>0&&now>=ending.preview_start&&now<=ending.preview_end) phase="ENDING";
+  else if(pvInstrumentalState(now)) phase="INSTRUMENTAL";
+  return {
+    current_time_seconds:+now.toFixed(3),
+    current_phase:phase,
+    opening,
+    instrumental_events:instrumentals,
+    ending,
+    composer_probe:{
+      first_syllable_buffer_seconds:firstBuffer,
+      first_actual_timed_word_seconds:firstActual,
+      first_synthetic_instrumental_sync_seconds:firstSynthetic,
+      first_sync_seen_by_composer_seconds:firstComposerSync,
+      intro_plus_buffer_threshold_seconds:+threshold.toFixed(3),
+      predicted_intro_delay_seconds:+predictedIntroDelay.toFixed(3),
+      predicted_external_audio_cdg_shift_seconds:+predictedIntroDelay.toFixed(3),
+      warning:predictedIntroDelay>0
+        ?"RIESGO: cdgmaker agregaría intro_delay porque el primer sync (posiblemente INSTRUMENTAL sintético) cae antes de OPENING+BUFFER. Con audio externo/original, el CDG puede quedar desplazado."
+        :"Sin intro_delay predicho por esta regla."
+    }
+  };
+}
+function pvTimelineState(t){
+  const opening=pvOpeningDecision();
+  const ending=pvEndingDecision();
+  if(opening.duration>0&&t>=opening.start&&t<opening.end) return {phase:"OPENING",opening};
+  if(ending.preview_end>0&&t>=ending.preview_start&&t<=ending.preview_end) return {phase:"ENDING",ending};
+  const inst=pvInstrumentalState(t);
+  if(inst) return {phase:"INSTRUMENTAL",instrumental:inst};
+  return {phase:"KARAOKE"};
+}
+
 function buildDiagnosticJsonPayload(){
   const words=(S.words||[]).map((w,i)=>({
     index:i,
@@ -1950,7 +2086,7 @@ function buildDiagnosticJsonPayload(){
     ai_end_extension_seconds:w.ai_end_extension_seconds??null
   }));
   return {
-    diagnostic_version:"CDG_IA_TEST_DIAG_V1",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V2",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -1966,6 +2102,7 @@ function buildDiagnosticJsonPayload(){
     merged_spoken_intervals:pvMergedSpokenIntervals(),
     instrumental_config:PV.cfg.instrumental,
     instrumental_decisions:_diagInstrumentalDecisions(),
+    timeline:pvTimelineDiagnostic(),
     ai_block_alignments:S.doc?.ai?.block_alignments||[],
     words
   };
@@ -2080,7 +2217,22 @@ function pvDraw(){
   if(!PV.plan){ try{ PV.plan = pvPlan(); }catch(e){ console.warn("Preview plan error",e); PV.plan=null; } }
   pvx.fillStyle = "#000"; pvx.fillRect(0, 0, PV.VW, PV.VH);
   const info = $("#pvInfo");
-  const instState=pvInstrumentalState(S.audio.currentTime); if(instState){ pvDrawInstrumental(instState); info.textContent="INSTRUMENTAL · entrada de voz en "+instState.remain.toFixed(1)+" s"; return; }
+  const now=Number(S.audio.currentTime||0);
+  const timelineState=pvTimelineState(now);
+  if(timelineState.phase==="OPENING"){
+    pvDrawIntro();
+    const o=timelineState.opening;
+    info.textContent="KARAOKE · OPENING "+o.start.toFixed(2)+"–"+o.end.toFixed(2)+" s · dura "+o.duration.toFixed(2)+" s · "+o.rule;
+    return;
+  }
+  if(timelineState.phase==="ENDING"){
+    pvDrawOutro();
+    const e=timelineState.ending;
+    info.textContent="KARAOKE · ENDING "+e.preview_start.toFixed(2)+"–"+e.preview_end.toFixed(2)+" s · "+e.duration.toFixed(2)+" s";
+    return;
+  }
+  const instState=timelineState.phase==="INSTRUMENTAL"?timelineState.instrumental:null;
+  if(instState){ pvDrawInstrumental(instState); info.textContent="KARAOKE · INSTRUMENTAL · entrada de voz en "+instState.remain.toFixed(1)+" s"; return; }
 
   if(!PV.plan){
     info.textContent = S.words.length ? "Marca una línea completa para ver la pantalla" : "—";
@@ -3679,6 +3831,42 @@ async function guardarProyecto(){
   S.dirty = false; setStatus("Proyecto guardado", "good"); setTimeout(()=>setStatus(""), 2500);
 }
 
+
+let POST_EXPORT_DONE=null;
+function hidePostExportChoice(){
+  const m=$("#postExportChoice"); if(m)m.hidden=true;
+}
+function showPostExportChoice(done){
+  POST_EXPORT_DONE=done||{};
+  const m=$("#postExportChoice"); if(!m)return;
+  m.hidden=false;
+  const next=$("#postExportNext");
+  const nextId=POST_EXPORT_DONE?.next_job_id||"";
+  if(next){
+    next.innerHTML=nextId
+      ? 'Seguir flujo<small>Abrir el siguiente trabajo pendiente para continuar editando.</small>'
+      : 'Seguir flujo<small>Volver al panel y continuar con el siguiente trabajo disponible.</small>';
+    setTimeout(()=>next.focus(),20);
+  }
+}
+function continuePostExportFlow(){
+  const done=POST_EXPORT_DONE||{};
+  hidePostExportChoice();
+  if(window.parent!==window){
+    window.parent.postMessage({
+      type:'panel:export-success',
+      job_id:PANEL_JOB_ID,
+      next_job_id:done.next_job_id||''
+    },location.origin);
+  }else{
+    toast("Exportación terminada. Vuelve al panel para continuar.",2600);
+  }
+}
+function stayOnCurrentPostExport(){
+  hidePostExportChoice();
+  toast("Te quedas en este trabajo para hacer pruebas.",2200);
+}
+
 /* --- crear CDG (servidor) --- */
 async function crearCdg(saltarAvisos){
   if(!S.doc) return;
@@ -3701,10 +3889,14 @@ async function crearCdg(saltarAvisos){
       if(st.status==='done')done=st;
     }
     setRenderProgress(100,'✅ Exportado con éxito, Valeria','CDG ✓ / Exportado ✓');
-    const sub=$("#renderBusySub");if(sub)sub.textContent='Continúa con la siguiente sincronización. El sistema abrirá el siguiente trabajo automáticamente.';
+    const sub=$("#renderBusySub");if(sub)sub.textContent='Exportación terminada.';
     setStatus("CDG ✓ · Exportado ✓","good");toast("✅ Exportado con éxito, Valeria",3200);S.dirty=false;
-    if(window.parent!==window) window.parent.postMessage({type:'panel:export-success',job_id:PANEL_JOB_ID,next_job_id:done.next_job_id||''},location.origin);
-    setTimeout(hideRenderBusy,1500);return;
+    // Si el render vino desde la pestaña CDG (actualizar preview final), no
+    // interrumpimos con el modal. Si fue Exportar CDG normal, el usuario decide.
+    if(window.DJGABO_CDG_PREVIEW_RENDERING){
+      setTimeout(hideRenderBusy,700);return;
+    }
+    setTimeout(()=>{hideRenderBusy();showPostExportChoice(done);},700);return;
   }catch(err){
     const msg=err.message||'Error al exportar';setRenderProgress(0,'Error al exportar · Reintentar','ERROR');setStatus("Error al exportar · Reintentar","bad");toast(msg.slice(0,420),5200);console.error('CREAR CDG:',err);
     const sub=$("#renderBusySub");if(sub)sub.textContent=msg.slice(0,300);setTimeout(hideRenderBusy,4200);
@@ -3740,6 +3932,9 @@ function mostrarAvisos(issues){
     : "Revisión antes de generar";
   $("#checks").hidden = false;
 }
+
+$("#postExportNext").onclick=continuePostExportFlow;
+$("#postExportStay").onclick=stayOnCurrentPostExport;
 $("#btnFix").onclick = () => { $("#checks").hidden = true; };
 $("#btnAnyway").onclick = () => { $("#checks").hidden = true; crearCdg(true); };
 
@@ -4602,5 +4797,9 @@ resize(); loop();
 })();
 </script>
 
+<!-- PROD_FINAL_CDG_PREVIEW_V1 · motor basado en CDG_PLAYER_ONLINE -->
+<script src="/api/vendor/cdg-final-preview.js"></script>
+<!-- DJGABO_KARAOKE_TOTAL_TIMELINE_V1 -->
+<!-- DJGABO_POST_EXPORT_CHOICE_V1 -->
 </body>
 </html>
