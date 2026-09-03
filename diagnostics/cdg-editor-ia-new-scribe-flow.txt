@@ -1,0 +1,35 @@
+set -euo pipefail
+echo "TIMESTAMP=$(date -Is)"
+echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+curl -fsS http://127.0.0.1:8097/api/health > /tmp/ia-lab-health.json
+python3 - <<'PY'
+import json
+d=json.load(open('/tmp/ia-lab-health.json'))
+assert d.get('ok') is True, d
+assert d.get('elevenlabs_configured') is True, d
+print('SCRIBE_LAB=READY',d.get('elevenlabs_model'))
+PY
+sudo python3 /tmp/patch_cdg_editor_ia_new_scribe_flow.py
+sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
+sudo systemctl restart djgabo-cdg-ia-test
+for i in $(seq 1 40); do
+  if curl -fsS http://127.0.0.1:8775/healthz >/tmp/health.json; then break; fi
+  sleep 2
+done
+python3 - <<'PY'
+import json
+d=json.load(open('/tmp/health.json'))
+assert d.get('ok') is True, d
+print('TEST_HEALTH=OK')
+PY
+curl -fsS http://127.0.0.1:8775/ > /tmp/panel.html
+grep -q 'Crear y sincronizar con IA' /tmp/panel.html
+grep -q 'Letra maestra · OPCIONAL' /tmp/panel.html
+code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/api/ai/create-job)
+test "$code" = "405"
+echo "AI_ROUTE=READY"
+echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+PUBLIC_HTTP=302
