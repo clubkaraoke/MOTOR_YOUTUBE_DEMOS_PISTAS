@@ -46,10 +46,13 @@ jobs:
           import re, pathlib
           s=pathlib.Path('/tmp/so-preflight/editor_v1/index.html').read_text(encoding='utf-8')
           blocks=re.findall(r'<script[^>]*>(.*?)</script>',s,re.S|re.I)
-          pathlib.Path('/tmp/so-preflight/editor-inline.js').write_text('\n'.join(blocks),encoding='utf-8')
+          target=next((b for b in blocks if 'DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1' in b),None)
+          if target is None:
+              raise SystemExit('No encontré el bloque JS del smart overwrite')
+          pathlib.Path('/tmp/so-preflight/editor-smart-overwrite.js').write_text(target,encoding='utf-8')
           print('SCRIPT_BLOCKS='+str(len(blocks)))
           PY
-          node --check /tmp/so-preflight/editor-inline.js
+          node --check /tmp/so-preflight/editor-smart-overwrite.js
           echo "REPO_PREFLIGHT=PASS"
 
       - name: Configure SSH
