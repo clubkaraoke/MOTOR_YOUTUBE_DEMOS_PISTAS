@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/inspect-cdg-editor-ia-test-service.yml"
+      - "deploy/trigger-cdg-editor-ia-test.txt"
 
 permissions:
   contents: write
