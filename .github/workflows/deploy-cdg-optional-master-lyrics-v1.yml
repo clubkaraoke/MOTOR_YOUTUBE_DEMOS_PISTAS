@@ -1,0 +1,100 @@
+name: Deploy optional master lyrics V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-optional-master-lyrics-v1.yml"
+      - "deploy/cdg_optional_master_lyrics_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_optional_master_lyrics_v1/patch_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production server
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_optional_master_lyrics_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_optional_master_lyrics_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-optional-master-lyrics-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          SERVER="$ROOT/server.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/optional_master_lyrics_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          sudo mkdir -p "$BACKUP"
+          sudo cp "$SERVER" "$BACKUP/server.py"
+          echo "BACKUP=$BACKUP"
+
+          sudo rm -rf /tmp/djgabo-optional-master-stage
+          sudo mkdir -p /tmp/djgabo-optional-master-stage
+          sudo cp "$SERVER" /tmp/djgabo-optional-master-stage/server.py
+          sudo python3 /tmp/patch_optional_master_lyrics_v1.py --root /tmp/djgabo-optional-master-stage
+          sudo python3 -m py_compile /tmp/djgabo-optional-master-stage/server.py
+          sudo grep -Fq 'DJGABO_OPTIONAL_MASTER_LYRICS_V1' /tmp/djgabo-optional-master-stage/server.py
+          sudo grep -Fq "reserve_lyrics=str(lyrics or '').strip() or '[PENDIENTE IA]'" /tmp/djgabo-optional-master-stage/server.py
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_optional_master_lyrics_v1.py --root "$ROOT"
+          sudo python3 -m py_compile "$SERVER"
+          sudo grep -Fq 'DJGABO_OPTIONAL_MASTER_LYRICS_V1' "$SERVER"
+
+          sudo systemctl restart djgabo-cdg
+          ok=0
+          for i in $(seq 1 40); do
+            code="$(curl -sS -o /tmp/root-optional-master.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
+            if [ "$code" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/server.py" diagnostics/cdg-prod-current-server.py
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-optional-master-lyrics-v1-deploy.txt diagnostics/cdg-prod-current-server.py 2>/dev/null || true
+          git commit -m "diag: record optional master lyrics deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
