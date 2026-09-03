@@ -83,7 +83,7 @@ jobs:
             'lines_per_page':6,
           }
           visual=[
-            [{'id':'a','text':'NO.','start_time':98.62,'end_time':99.24}],
+            [{'id':'a','text':'NO.','start_time':0.0,'end_time':99.24}],
             [{'id':'b','text':'TU','start_time':105.26,'end_time':105.44}],
           ]
           out1=normalize.build_instrumentals([list(map(dict,x)) for x in visual],style,[],[])
