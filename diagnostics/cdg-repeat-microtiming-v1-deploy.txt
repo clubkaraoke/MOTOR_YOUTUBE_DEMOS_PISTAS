@@ -1,5 +1,65 @@
-DB_PRIMARY_MISSING=/var/lib/djgabo-cdg/local.db
-TIMESTAMP=2026-09-03T13:13:50+00:00
+TIMESTAMP=2026-09-03T13:14:51+00:00
 SERVICE_BEFORE=active
 HTTP_BEFORE=200
 DB_PATH=/var/lib/djgabo-cdg/local.db
+SERVER=PATCHED
+SERVER_MARK=DJGABO_REPEAT_MICROTIMING_V1
+EDITOR=PATCHED
+EDITOR_MARK=DJGABO_REPEAT_MICROTIMING_DIAG_V1
+PATCH=OK
+REPEAT_MICROTIMING_TEST=PASS
+AY_REPAIRED= [(106.94, 107.18), (107.19, 107.43), (107.44, 107.64)]
+MIGRATION_DRY_RUN_BEGIN
+MODE=DRY_RUN
+JOBS_CHANGED=1
+RUNS_REPAIRED=5
+JOB=LET-0083 RUNS=5
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0098","text":"AY,","start":106.94,"end":107.22},{"id":"w0099","text":"AY,","start":107.42,"end":107.43},{"id":"w0100","text":"AY,","start":107.44,"end":107.64}]
+  REPAIRED=[{"id":"w0098","start":106.94,"end":107.18},{"id":"w0099","start":107.19,"end":107.43},{"id":"w0100","start":107.44,"end":107.64}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0177","text":"AY,","start":180.02,"end":180.22},{"id":"w0178","text":"AY,","start":180.45,"end":180.5},{"id":"w0179","text":"AY,","start":180.46,"end":180.7}]
+  REPAIRED=[{"id":"w0177","start":180.02,"end":180.22},{"id":"w0178","start":180.24,"end":180.45},{"id":"w0179","start":180.46,"end":180.7}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0188","text":"AY,","start":189.88,"end":190.24},{"id":"w0189","text":"AY,","start":190.3,"end":190.31},{"id":"w0190","text":"AY,","start":190.44,"end":190.45}]
+  REPAIRED=[{"id":"w0188","start":189.88,"end":190.15},{"id":"w0189","start":190.16,"end":190.356},{"id":"w0190","start":190.44,"end":190.636}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0199","text":"AY,","start":219.64,"end":219.9},{"id":"w0200","text":"AY,","start":220.2,"end":220.3},{"id":"w0201","text":"AY,","start":220.31,"end":220.36}]
+  REPAIRED=[{"id":"w0199","start":219.64,"end":219.9},{"id":"w0200","start":219.975,"end":220.3},{"id":"w0201","start":220.31,"end":220.44}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0210","text":"AY,","start":229.68,"end":229.94},{"id":"w0211","text":"AY,","start":230.16,"end":230.17},{"id":"w0212","text":"AY,","start":230.18,"end":230.38}]
+  REPAIRED=[{"id":"w0210","start":229.68,"end":229.92},{"id":"w0211","start":229.93,"end":230.17},{"id":"w0212","start":230.18,"end":230.38}]
+MIGRATION_DRY_RUN_END
+STAGE=PASS
+BACKUP=/opt/djgabo-cdg/backups/repeat_microtiming_v1_20260903-131451
+SERVER=PATCHED
+SERVER_MARK=DJGABO_REPEAT_MICROTIMING_V1
+EDITOR=PATCHED
+EDITOR_MARK=DJGABO_REPEAT_MICROTIMING_DIAG_V1
+PATCH=OK
+MIGRATION_APPLY_BEGIN
+MODE=APPLY
+JOBS_CHANGED=1
+RUNS_REPAIRED=5
+JOB=LET-0083 RUNS=5
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0098","text":"AY,","start":106.94,"end":107.22},{"id":"w0099","text":"AY,","start":107.42,"end":107.43},{"id":"w0100","text":"AY,","start":107.44,"end":107.64}]
+  REPAIRED=[{"id":"w0098","start":106.94,"end":107.18},{"id":"w0099","start":107.19,"end":107.43},{"id":"w0100","start":107.44,"end":107.64}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0177","text":"AY,","start":180.02,"end":180.22},{"id":"w0178","text":"AY,","start":180.45,"end":180.5},{"id":"w0179","text":"AY,","start":180.46,"end":180.7}]
+  REPAIRED=[{"id":"w0177","start":180.02,"end":180.22},{"id":"w0178","start":180.24,"end":180.45},{"id":"w0179","start":180.46,"end":180.7}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0188","text":"AY,","start":189.88,"end":190.24},{"id":"w0189","text":"AY,","start":190.3,"end":190.31},{"id":"w0190","text":"AY,","start":190.44,"end":190.45}]
+  REPAIRED=[{"id":"w0188","start":189.88,"end":190.15},{"id":"w0189","start":190.16,"end":190.356},{"id":"w0190","start":190.44,"end":190.636}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0199","text":"AY,","start":219.64,"end":219.9},{"id":"w0200","text":"AY,","start":220.2,"end":220.3},{"id":"w0201","text":"AY,","start":220.31,"end":220.36}]
+  REPAIRED=[{"id":"w0199","start":219.64,"end":219.9},{"id":"w0200","start":219.975,"end":220.3},{"id":"w0201","start":220.31,"end":220.44}]
+  TOKEN=ay COUNT=3 METHOD=repeat_locked_first_last_start
+  ORIGINAL=[{"id":"w0210","text":"AY,","start":229.68,"end":229.94},{"id":"w0211","text":"AY,","start":230.16,"end":230.17},{"id":"w0212","text":"AY,","start":230.18,"end":230.38}]
+  REPAIRED=[{"id":"w0210","start":229.68,"end":229.92},{"id":"w0211","start":229.93,"end":230.17},{"id":"w0212","start":230.18,"end":230.38}]
+MIGRATION_APPLY_END
+curl: (7) Failed to connect to 127.0.0.1 port 8765 after 0 ms: Couldn't connect to server
+EDITOR_HTTP=200
+SERVICE_AFTER=active
+HTTP_AFTER=200
+DEPLOY=OK

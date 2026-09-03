@@ -2171,10 +2171,15 @@ function buildDiagnosticJsonPayload(){
     ai_match_type:w.ai_match_type||null,
     ai_loss:w.ai_loss??null,
     ai_end_extended:!!w.ai_end_extended,
-    ai_end_extension_seconds:w.ai_end_extension_seconds??null
+    ai_end_extension_seconds:w.ai_end_extension_seconds??null,
+    ai_timing_repaired:!!w.ai_timing_repaired,
+    ai_timing_repair:w.ai_timing_repair||null,
+    ai_timing_repair_token:w.ai_timing_repair_token||null,
+    ai_original_start:w.ai_original_start??null,
+    ai_original_end:w.ai_original_end??null
   }));
   return {
-    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V5",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V6",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -2184,7 +2189,8 @@ function buildDiagnosticJsonPayload(){
       words:words.length,
       timed:words.filter(w=>w.start!=null).length,
       spoken:words.filter(w=>w.spoken).length,
-      voice_gaps:(S.doc?.ai?.voice_gaps||[]).length
+      voice_gaps:(S.doc?.ai?.voice_gaps||[]).length,
+      repeat_microtiming_repairs:(S.doc?.ai?.repeat_microtiming_repairs||[]).length
     },
     voice_gaps:S.doc?.ai?.voice_gaps||[],
     merged_spoken_intervals:pvMergedSpokenIntervals(),
@@ -2194,6 +2200,7 @@ function buildDiagnosticJsonPayload(){
     render_timeline:buildRenderTimelineDecision(),
     render_pages:buildRenderPagesDecision(),
     ai_block_alignments:S.doc?.ai?.block_alignments||[],
+    repeat_microtiming_repairs:S.doc?.ai?.repeat_microtiming_repairs||[],
     words
   };
 }
@@ -4896,5 +4903,6 @@ resize(); loop();
 <!-- DJGABO_RENDER_TIMELINE_V1 -->
 <!-- DJGABO_AUTHORITATIVE_PAGES_V1 -->
 <!-- DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2 -->
+<!-- DJGABO_REPEAT_MICROTIMING_DIAG_V1 -->
 </body>
 </html>

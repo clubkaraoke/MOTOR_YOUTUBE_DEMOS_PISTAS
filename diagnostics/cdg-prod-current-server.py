@@ -2511,7 +2511,7 @@ def _ai_project_from_words(artist,title,voice_name,duration,lyrics,ai_words,sour
             txt=str(item.get('master_text') or item.get('text') or '').strip()
             if not txt: continue
             a=item.get('start'); b=item.get('end')
-            words.append({
+            word={
                 'id':f'w{wi:04d}','text':txt,
                 'start_time':round(float(a),6) if a is not None else None,
                 'end_time':round(float(b),6) if b is not None else None,
@@ -2520,7 +2520,16 @@ def _ai_project_from_words(artist,title,voice_name,duration,lyrics,ai_words,sour
                 'ai_status':str(item.get('qa_status') or ''),
                 'scribe_text':item.get('scribe_text'),
                 'ai_match_type':str(item.get('match_type') or ''),
-            })
+            }
+            if item.get('timing_repaired'):
+                word['ai_timing_repaired']=True
+                word['ai_timing_repair']=str(item.get('timing_repair') or 'repeat_microtiming_v1')
+                word['ai_timing_repair_token']=str(item.get('timing_repair_token') or '')
+                word['ai_original_start']=item.get('timing_original_start')
+                word['ai_original_end']=item.get('timing_original_end')
+                if not word['ai_match_type'] or word['ai_match_type']=='scribe_raw':
+                    word['ai_match_type']='scribe_repeat_repaired'
+            words.append(word)
             wi+=1
         if words:
             segments.append({'id':f's{si:04d}','kind':'lyric','text':' '.join(w['text'] for w in words),'words':words}); si+=1
@@ -2633,6 +2642,8 @@ def _ai_sync_existing_task(task_id,jid,use_existing_lyrics=True):
                          eta_seconds=8,estimate=True)
             payload=rr.json(); ai_words=payload.get('words') or []
             if not ai_words: raise ValueError('Scribe v2 no devolvió palabras con tiempos.')
+            _ai_task_set(task_id,status='running',progress=82,stage='Revisando repeticiones y microtimings…',eta_seconds=7,estimate=True)
+            ai_words,repeat_micro_repairs=_ai_repair_repeated_microtimings(ai_words)
             source_mode='compare_master' if master_lyrics else 'scribe_only'
             _ai_task_set(task_id,progress=86,stage='Organizando líneas y estrofas…',eta_seconds=5,estimate=True)
             project=_ai_project_from_words(
@@ -2654,6 +2665,8 @@ def _ai_sync_existing_task(task_id,jid,use_existing_lyrics=True):
             ai['voice_gaps']=gaps
             ai['scribe_word_count']=len(ai_words)
             ai['coverage_check']='audio_energy_vs_scribe'
+            ai['repeat_microtiming_version']='REPEAT_MICROTIMING_V1'
+            ai['repeat_microtiming_repairs']=repeat_micro_repairs
             diffs=sum(1 for w in ai_words if str(w.get('qa_status') or '').lower() not in ('','green') or str(w.get('match_type') or '').lower() in ('missing','substitution','mismatch'))
             flagged=sum(1 for w in ai_words if str(w.get('qa_status') or '').lower() not in ('','green'))
             ai['lyrics_diff_count']=diffs
@@ -2665,7 +2678,7 @@ def _ai_sync_existing_task(task_id,jid,use_existing_lyrics=True):
                     (json.dumps(project,ensure_ascii=False),final_lyrics,final_lyrics,EST_C,now(),jid)
                 )
                 log(c,jid,'ELEVENLABS · SINCRONIZAR LETRA COMPLETA',
-                    source_mode+' · '+str(len(ai_words))+' palabras · diferencias='+str(diffs))
+                    source_mode+' · '+str(len(ai_words))+' palabras · diferencias='+str(diffs)+' · microtiming_repairs='+str(len(repeat_micro_repairs)))
             try:
                 folder=JOBS/jid
                 if folder.is_dir():
@@ -2679,7 +2692,8 @@ def _ai_sync_existing_task(task_id,jid,use_existing_lyrics=True):
             _ai_task_set(task_id,status='done',progress=100,stage='Sincronización completada',
                          eta_seconds=0,estimate=False,
                          result={'idTrabajo':jid,'words':len(ai_words),'flagged':flagged,
-                                 'diff_count':diffs,'voice_gaps':len(gaps),'source_mode':source_mode})
+                                 'diff_count':diffs,'voice_gaps':len(gaps),'source_mode':source_mode,
+                                 'repeat_microtiming_repairs':len(repeat_micro_repairs)})
     except Exception as e:
         app.logger.exception('AI full sync %s',jid)
         _ai_task_set(task_id,status='error',progress=100,stage='Error al sincronizar',
@@ -2991,25 +3005,186 @@ def _ai_norm_repeat_token(text):
     return re.sub(r'[^a-z0-9]+','',txt)
 
 
+def _ai_repair_repeated_microtimings(words, min_run=3, tiny_seconds=0.060):
+    """Repara sólo microtimings imposibles dentro de corridas repetidas.
+
+    Contrato:
+      - sólo corridas adyacentes de 3+ tokens iguales normalizados;
+      - sólo actúa si hay <=60 ms o inicios prácticamente colapsados;
+      - conserva el START del primer repetido y el START del último cuando cabe;
+      - conserva el END del último si era válido;
+      - nunca mueve la primera palabra posterior al bloque;
+      - no toca ninguna palabra fuera de la repetición.
+
+    Ejemplo: AY 106.94 / AY 107.42(10ms) / AY 107.44
+    -> mantiene 106.94 y 107.44, redistribuye el AY central.
+    """
+    seq=list(words or [])
+    repairs=[]
+    if len(seq)<min_run:
+        return seq,repairs
+
+    def tok(item):
+        return _ai_norm_repeat_token(
+            item.get('master_text') or item.get('text') or item.get('scribe_text') or ''
+        )
+
+    i=0
+    while i<len(seq):
+        t=tok(seq[i])
+        if not t:
+            i+=1; continue
+        j=i+1
+        while j<len(seq) and tok(seq[j])==t:
+            j+=1
+        count=j-i
+        if count<min_run:
+            i=j; continue
+
+        run=seq[i:j]
+        parsed=[]
+        valid=True
+        for w in run:
+            try:
+                a=float(w.get('start')); b=float(w.get('end'))
+            except Exception:
+                valid=False; break
+            if b<a:
+                valid=False; break
+            parsed.append((a,b))
+        if not valid:
+            i=j; continue
+
+        durations=[max(0.0,b-a) for a,b in parsed]
+        starts=[a for a,_ in parsed]
+        collapsed=any((starts[k]-starts[k-1])<=0.030 for k in range(1,count))
+        tiny=any(d<=tiny_seconds for d in durations)
+        if not (tiny or collapsed):
+            i=j; continue
+
+        first_start=starts[0]
+        last_start=starts[-1]
+        last_end=parsed[-1][1]
+        onset_span=last_start-first_start
+
+        # Preferimos bloquear los dos onsets exteriores. Si ElevenLabs también
+        # colapsó toda la corrida, usamos el END exterior como segundo ancla.
+        min_step=0.090
+        if onset_span>=min_step*(count-1):
+            step=onset_span/(count-1)
+            new_starts=[first_start+step*k for k in range(count)]
+            method='repeat_locked_first_last_start'
+        else:
+            usable_end=last_end
+            if j<len(seq):
+                try:
+                    next_start=float(seq[j].get('start'))
+                    if next_start>first_start+.10:
+                        usable_end=min(usable_end,next_start-.020) if usable_end>first_start else next_start-.020
+                except Exception:
+                    pass
+            span=usable_end-first_start
+            if span<min_step*count:
+                i=j; continue
+            step=span/count
+            new_starts=[first_start+step*k for k in range(count)]
+            method='repeat_locked_outer_bounds'
+
+        original=[]
+        for k,w in enumerate(run):
+            oa,ob=parsed[k]
+            original.append({
+                'index':i+k,
+                'text':str(w.get('text') or w.get('master_text') or ''),
+                'start':round(oa,6),'end':round(ob,6),
+            })
+
+        new_times=[]
+        for k,w in enumerate(run):
+            ns=new_starts[k]
+            if k<count-1:
+                cap=new_starts[k+1]-.010
+                local_step=max(.001,new_starts[k+1]-ns)
+                desired_min=min(.20,max(.10,local_step*.70))
+                ne=max(parsed[k][1],ns+desired_min)
+                ne=min(cap,ne)
+            else:
+                ne=last_end
+                if ne<=ns+.060:
+                    ext_cap=None
+                    if j<len(seq):
+                        try:
+                            ext=float(seq[j].get('start'))
+                            if ext>ns+.08: ext_cap=ext-.020
+                        except Exception:
+                            pass
+                    target=ns+min(.20,max(.10,step*.70))
+                    ne=min(ext_cap,target) if ext_cap is not None else target
+            if ne<=ns+.050:
+                # Si ni siquiera caben 50 ms, preferimos no tocar esta corrida.
+                new_times=[]; break
+            new_times.append((ns,ne))
+
+        if not new_times:
+            i=j; continue
+
+        for k,w in enumerate(run):
+            oa,ob=parsed[k]; ns,ne=new_times[k]
+            w['timing_original_start']=round(oa,6)
+            w['timing_original_end']=round(ob,6)
+            w['start']=round(ns,6)
+            w['end']=round(ne,6)
+            w['timing_repaired']=True
+            w['timing_repair']='repeat_microtiming_v1'
+            w['timing_repair_token']=t
+
+        repairs.append({
+            'version':'REPEAT_MICROTIMING_V1',
+            'token':t,
+            'count':count,
+            'start_index':i,
+            'end_index':j-1,
+            'method':method,
+            'trigger':'tiny_or_collapsed',
+            'original':original,
+            'repaired':[
+                {'index':i+k,'start':round(a,6),'end':round(b,6)}
+                for k,(a,b) in enumerate(new_times)
+            ],
+        })
+        i=j
+
+    return seq,repairs
+
+
 def _ai_repeat_profile(clean):
     toks=[_ai_norm_repeat_token(x.get('text')) for x in clean]
     toks=[x for x in toks if x]
     n=len(toks)
-    if n<6:
-        return {'repetitive':False,'unique_ratio':1.0,'dominant_ratio':0.0,'adjacent_ratio':0.0}
+    if not n:
+        return {'repetitive':False,'unique_ratio':1.0,'dominant_ratio':0.0,'adjacent_ratio':0.0,'max_run':0}
     counts={}
     for t in toks: counts[t]=counts.get(t,0)+1
     unique_ratio=len(counts)/max(1,n)
     dominant_ratio=max(counts.values())/max(1,n)
     adjacent=sum(1 for i in range(1,n) if toks[i]==toks[i-1])/max(1,n-1)
-    repetitive=(n>=8 and (unique_ratio<=0.45 or dominant_ratio>=0.34 or adjacent>=0.28))
+    max_run=1; run=1
+    for i in range(1,n):
+        if toks[i]==toks[i-1]:
+            run+=1; max_run=max(max_run,run)
+        else:
+            run=1
+    # DJGABO_REPEAT_MICROTIMING_V1
+    # La protección antigua cubría bloques repetitivos largos (Amor Rebelde).
+    # Ahora 3 sílabas iguales seguidas también cuentan como repetición.
+    repetitive=(max_run>=3) or (n>=8 and (unique_ratio<=0.45 or dominant_ratio>=0.34 or adjacent>=0.28))
     return {
         'repetitive':bool(repetitive),
         'unique_ratio':round(unique_ratio,4),
         'dominant_ratio':round(dominant_ratio,4),
         'adjacent_ratio':round(adjacent,4),
+        'max_run':int(max_run),
     }
-
 
 def _ai_alignment_quality(aligned, strict_repeat=False):
     n=len(aligned or [])
@@ -3268,7 +3443,7 @@ def ai_align_block(jid):
                     'No aplicaré timings ambiguos; ajusta el texto del bloque y vuelve a intentar.'
                 )
 
-            quality=_ai_alignment_quality(aligned)
+            quality=_ai_alignment_quality(aligned, strict_repeat=profile['repetitive'])
             strategy='full'
             engine='elevenlabs-forced-alignment'
             calls=1; chunks=1
