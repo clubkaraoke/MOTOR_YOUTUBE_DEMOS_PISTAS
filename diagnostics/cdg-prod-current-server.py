@@ -363,11 +363,22 @@ def _sheet_managed(job):
 def master_reserve(jid, artist, title, voice_name, lyrics, size_bytes=0, duration=0):
     """Reserva el LET-XXXX en el Sheet antes de confirmar el alta en OVH.
 
-    Si Google no confirma la fila, el backend no crea un registro huérfano.
+    La LETRA MAESTRA es opcional en el panel. El Web App histórico todavía
+    valida el campo lyrics como dato no vacío al reservar una fila; por eso,
+    cuando aún no hay letra, enviamos un marcador temporal SOLO al puente.
+    El trabajo local conserva lyrics_moises="" y master_sync/IA reemplaza este
+    marcador con el valor real cuando corresponda.
     """
+    # DJGABO_OPTIONAL_MASTER_LYRICS_V1
+    artist=str(artist or '').strip()
+    title=str(title or '').strip()
+    voice_name=Path(str(voice_name or '')).name.strip()
+    if not artist or not title or not voice_name:
+        raise ValueError('Faltan Artista, Título o archivo de Voz para registrar el trabajo maestro.')
+    reserve_lyrics=str(lyrics or '').strip() or '[PENDIENTE IA]'
     return drive_bridge_call('master_reserve',{
-        'id':str(jid),'artist':str(artist),'title':str(title),
-        'voiceName':Path(str(voice_name)).name,'lyrics':str(lyrics),
+        'id':str(jid),'artist':artist,'title':title,
+        'voiceName':voice_name,'lyrics':reserve_lyrics,
         'sizeBytes':int(size_bytes or 0),'duration':float(duration or 0)
     },timeout=120)
 
@@ -3514,6 +3525,12 @@ def retry_cdg_dropbox(jid):
         pub=publish_job_to_dropbox(jid)
         return jsonify(ok=True,dropbox_folder=pub.get('folder',''),dropbox_status=pub.get('status',''),uploaded_cdg=pub.get('uploaded_cdg'),uploaded_wav=pub.get('uploaded_wav'))
     except Exception as e: return jsonify(ok=False,error=str(e)),502
+
+# PROD_FINAL_CDG_PREVIEW_V1
+# Rutas del preview del archivo CDG REAL + Voz + WAV, registradas aparte para
+# no mezclar el motor de reproduccion con el backend historico.
+from cdg_preview_routes import register_cdg_preview_routes
+register_cdg_preview_routes(app, globals())
 
 if __name__=='__main__':
     print('\nCONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765\n')
