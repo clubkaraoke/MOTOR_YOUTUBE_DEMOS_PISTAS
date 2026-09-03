@@ -1,13 +1,13 @@
-TIMESTAMP=2026-09-03T10:47:08+00:00
+TIMESTAMP=2026-09-03T10:47:58+00:00
 SERVICE_BEFORE=active
 HTTP_BEFORE=200
-BACKUP=/opt/djgabo-cdg/backups/karaoke_total_timeline_20260903-104708
-Traceback (most recent call last):
-  File "/tmp/patch_cdg_karaoke_total_timeline_v1.py", line 232, in <module>
-    main()
-  File "/tmp/patch_cdg_karaoke_total_timeline_v1.py", line 27, in main
-    text=replace_once(
-         ^^^^^^^^^^^^^
-  File "/tmp/patch_cdg_karaoke_total_timeline_v1.py", line 12, in replace_once
-    raise RuntimeError(f"{label}: esperaba 1 coincidencia y encontre {n}")
-RuntimeError: pvInstrumentalState base opening: esperaba 1 coincidencia y encontre 2
+BACKUP=/opt/djgabo-cdg/backups/karaoke_total_timeline_20260903-104758
+PATCH=OK
+MARKER=DJGABO_KARAOKE_TOTAL_TIMELINE_V1
+STAGE=PASS
+PATCH=OK
+MARKER=DJGABO_KARAOKE_TOTAL_TIMELINE_V1
+EDITOR_HTTP=200
+SERVICE_AFTER=active
+HTTP_AFTER=200
+DEPLOY=OK
