@@ -360,6 +360,92 @@ document.getElementById('btnQrInstrumental').addEventListener('click',()=>import
     )
     PANEL.write_text(panel,encoding='utf-8')
 
+# Upgrade for installations that already had the QR buttons but still used BarcodeDetector-only logic.
+old_decoder=r'''async function decodificarQrBlob(blob){
+  if(typeof BarcodeDetector==='undefined'){
+    throw new Error('El lector QR del navegador no está disponible en este equipo. Prueba con Chrome actualizado.');
+  }
+  let formatos=[];
+  try{formatos=await BarcodeDetector.getSupportedFormats();}catch(_){}
+  if(formatos.length&&!formatos.includes('qr_code'))throw new Error('Este navegador no admite QR en BarcodeDetector.');
+  const detector=new BarcodeDetector({formats:['qr_code']});
+  const bmp=await createImageBitmap(blob);
+  try{
+    const codigos=await detector.detect(bmp);
+    const valor=codigos&&codigos[0]&&String(codigos[0].rawValue||'').trim();
+    if(!valor)throw new Error('No pude leer el QR de la imagen copiada.');
+    return valor;
+  }finally{try{bmp.close&&bmp.close();}catch(_){}}
+}'''
+new_decoder=r'''let _jsQrCompatPromise=null;
+function cargarJsQrCompat(){
+  if(typeof window.jsQR==='function')return Promise.resolve(window.jsQR);
+  if(_jsQrCompatPromise)return _jsQrCompatPromise;
+  const fuentes=[
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+  ];
+  _jsQrCompatPromise=new Promise((resolve,reject)=>{
+    let i=0;
+    const intentar=()=>{
+      if(i>=fuentes.length)return reject(new Error('No pude cargar el lector QR compatible. Revisa la conexión a Internet y vuelve a intentar.'));
+      const s=document.createElement('script');
+      s.src=fuentes[i++];s.async=true;
+      s.onload=()=>typeof window.jsQR==='function'?resolve(window.jsQR):intentar();
+      s.onerror=()=>{try{s.remove();}catch(_){}intentar();};
+      document.head.appendChild(s);
+    };
+    intentar();
+  });
+  return _jsQrCompatPromise;
+}
+async function decodificarQrConJsQr(blob){
+  const jsQRfn=await cargarJsQrCompat();
+  const bmp=await createImageBitmap(blob);
+  try{
+    const canvas=document.createElement('canvas');
+    canvas.width=bmp.width;canvas.height=bmp.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(bmp,0,0);
+    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=jsQRfn(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+    const valor=code&&String(code.data||'').trim();
+    if(!valor)throw new Error('No pude leer el QR de la imagen copiada. Intenta copiar el QR nuevamente desde UVR.');
+    return valor;
+  }finally{try{bmp.close&&bmp.close();}catch(_){}}
+}
+async function decodificarQrBlob(blob){
+  if(typeof BarcodeDetector!=='undefined'){
+    try{
+      let formatos=[];
+      try{formatos=await BarcodeDetector.getSupportedFormats();}catch(_){}
+      if(!formatos.length||formatos.includes('qr_code')){
+        const detector=new BarcodeDetector({formats:['qr_code']});
+        const bmp=await createImageBitmap(blob);
+        try{
+          const codigos=await detector.detect(bmp);
+          const valor=codigos&&codigos[0]&&String(codigos[0].rawValue||'').trim();
+          if(valor)return valor;
+        }finally{try{bmp.close&&bmp.close();}catch(_){}}
+      }
+    }catch(_){}
+  }
+  return await decodificarQrConJsQr(blob);
+}'''
+
+panel=PANEL.read_text(encoding='utf-8')
+changed=False
+if old_decoder in panel:
+    panel=panel.replace(old_decoder,new_decoder,1)
+    changed=True
+old_clip="throw new Error('Este navegador no permite leer imágenes del portapapeles. Usa Chrome actualizado y abre el panel por HTTPS.');"
+new_clip="throw new Error('Este navegador no permite leer imágenes del portapapeles. Abre el panel por HTTPS y habilita el permiso del portapapeles.');"
+if old_clip in panel:
+    panel=panel.replace(old_clip,new_clip,1)
+    changed=True
+if changed:
+    PANEL.write_text(panel,encoding='utf-8')
+
 print('QR_UVR_PATCH=OK')
 print('SERVER_MARKER',"/api/ai/qr-import" in SERVER.read_text(encoding='utf-8'))
 print('PANEL_MARKER','id="btnQrVoz"' in PANEL.read_text(encoding='utf-8'))
