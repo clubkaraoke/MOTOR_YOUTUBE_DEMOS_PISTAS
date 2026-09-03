@@ -2,6 +2,7 @@ name: Deploy CDG IA ElevenLabs Scribe LAB once
 # trigger-engine-selector-fix
 # trigger-ui-fix-no-master
 # trigger-secret-refresh
+# trigger-forced-alignment-20260902
 
 on:
   workflow_dispatch:
@@ -76,6 +77,7 @@ jobs:
             node --check "$STAGE/static/app.js"
           fi
           grep -q 'api/elevenlabs/transcribe' "$STAGE/app/main.py"
+          grep -q 'api/elevenlabs/forced-align' "$STAGE/app/main.py"
           grep -q 'scribeBtn' "$STAGE/static/index.html"
           grep -q 'ElevenLabs Scribe v2' "$STAGE/static/app.js"
 
@@ -130,6 +132,9 @@ jobs:
           echo
           cat /tmp/scribe-health.json
           echo
+          forced_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8097/api/elevenlabs/forced-align)"
+          test "$forced_code" = "405"
+          echo "FORCED_ALIGN_ROUTE=READY"
 
           echo "=== MAPPER REGRESSION ==="
           sudo docker exec -i cdg-ia-sync-test python - <<'PY'
