@@ -1,0 +1,350 @@
+=== SIN ROL MARKUP ===
+62-.hbtn.spoken.on::before{content:"● ";color:#ff6a5a}
+63-.hbtn.roleFemale{color:#e9a6c9;border-color:rgba(255,79,163,.38);background:rgba(255,79,163,.06)}
+64-.hbtn.roleMale{color:#9ccfe8;border-color:rgba(50,183,255,.38);background:rgba(50,183,255,.06)}
+65-.hbtn.roleDuet{color:#b7db9c;border-color:rgba(126,217,87,.38);background:rgba(126,217,87,.06)}
+66-.hbtn.roleFemale.on{color:#fff;border-color:#FF4FA3;background:#822a56;font-weight:700;box-shadow:0 0 0 1px rgba(255,79,163,.3) inset}
+67-.hbtn.roleMale.on{color:#fff;border-color:#32B7FF;background:#175879;font-weight:700;box-shadow:0 0 0 1px rgba(50,183,255,.3) inset}
+68-.hbtn.roleDuet.on{color:#fff;border-color:#7ED957;background:#396c23;font-weight:700;box-shadow:0 0 0 1px rgba(126,217,87,.3) inset}
+69-/* LOCAL_06: el color visual del rol es independiente de locked.
+70:   SIN ROL=amarillo · HOMBRE=azul · MUJER=rosa · DUO=verde · HABLADO=rojo. */
+71-.chip{--roleColor:#E8C34C}
+72-.chip.roleFemale{--roleColor:#FF4FA3}
+73-.chip.roleMale{--roleColor:#32B7FF}
+74-.chip.roleDuet{--roleColor:#7ED957}
+75-.chip.spoken{--roleColor:#E85D5D}
+76-
+77-/* ---------- espacio de trabajo: tres paneles ---------- */
+78-#workspace{flex:1 1 auto;min-height:0;display:flex;overflow:hidden;background:var(--ink)}
+79-
+80-#leftPane{flex:0 0 34%;min-width:200px;display:flex;flex-direction:column;overflow:hidden}
+81-#centerPane{flex:1 1 auto;min-width:280px;display:flex;flex-direction:column;
+82-  background:var(--panel);overflow:hidden}
+--
+806-        <span class="slot cur">—</span>
+807-        <span class="slot next"></span>
+808-      </div>
+809-      <div id="lineEcho"></div>
+810-      <div id="hint">Espacio = siguiente palabra&nbsp;&nbsp;·&nbsp;&nbsp;P = pantalla</div>
+811-    </div>
+812-    <div id="lyricsDrawer">
+813-      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+814:      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><button class="hbtn" id="btnAiBlock" title="Alinear sólo la selección con ElevenLabs Forced Alignment">✨ IA BLOQUE</button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Manual = SPACE · IA BLOQUE = sólo la selección</span></div>
+815-      <div id="aiQaBar" class="aiQaBar" hidden></div>
+816-      <div id="lyricsInner"></div>
+817-    </div>
+818-  </div>
+819-  <div class="split" id="splitRight"></div>
+820-  <aside id="preview">
+821-    <div class="pvHead">Vista de pantalla · editor visual</div>
+822-    <div class="pvTabs"><button class="pvTab on" data-pvmode="lyrics">Karaoke</button><button class="pvTab" data-pvmode="intro">Opening</button><button class="pvTab" data-pvmode="outro">Ending</button></div>
+823-    <div id="pvBox"><canvas id="pv"></canvas></div>
+824-    <div id="pvInfo">—</div>
+825-    <div id="pvDesigner">
+826-      <div class="pvCtlGroup on" data-group="lyrics">
+--
+2219-   Flujo para Valeria, sin modos que cambien el clic normal:
+2220-   1) Selecciona con el Motor V1 de siempre (clic, Shift+clic para rango, o
+2221-      Ctrl+clic/arrastrar para selección libre). Nada de esto se toca ni se
+2222-      intercepta: sigue navegando/reproduciendo exactamente igual que antes.
+2223-   2) Pulsa HOMBRE/MUJER/DUO/HABLADO: la selección actual se pinta al instante
+2224-      (0ms, sin animación) y el botón queda ARMADO (iluminado).
+2225-   3) Mientras el botón siga armado, CUALQUIER selección nueva que haga se
+2226-      pinta sola con ese rol — si esa selección YA tenía el mismo rol, se
+2227:      quita (vuelve a SIN ROL); si no, se aplica. Así corrige de más sin
+2228-      tocar lo que ya estaba bien.
+2229-   4) Pulsar el mismo botón armado lo apaga; no toca nada de lo ya pintado.
+2230-      Pulsar otro botón de rol cambia el armado al nuevo.
+2231-   No toca start_time/end_time/audio en ningún punto. */
+2232-function clearWordSelection(){
+2233-  S.sel=-1; S.selStart=-1; S.selEnd=-1; S.range=null; S.rangeSource=null;
+2234-}
+2235-function wordRole(w){
+2236-  if(!w) return "none";
+2237-  if(w.spoken) return "hablado";
+2238-  if(w.vocal_role==="male") return "hombre";
+2239-  if(w.vocal_role==="female") return "mujer";
+--
+2245-  if(role==="hablado"){
+2246-    w.spoken=true; w.vocal_role=null;
+2247-  }else{
+2248-    w.spoken=false;
+2249-    w.vocal_role=role==="hombre"?"male":role==="mujer"?"female":role==="duo"?"duet":null;
+2250-  }
+2251-}
+2252-function roleLabel(role){
+2253:  return ({none:"SIN ROL",hombre:"HOMBRE",mujer:"MUJER",duo:"DUO",hablado:"HABLADO"})[role]||"NORMAL";
+2254-}
+2255-function renderRoleButtons(){
+2256-  [["#btnRoleNone","none"],["#btnMale","hombre"],["#btnFemale","mujer"],["#btnDuet","duo"],["#btnSpoken2","hablado"]]
+2257-    .forEach(([id,r])=>$(id)?.classList.toggle("on",S.armedRole===r));
+2258-  $("#vocalRoles")?.classList.toggle("armed",!!S.armedRole);
+=== STICKY CSS ===
+180-.chip.roleDuet{color:#9ae17d;background:rgba(126,217,87,.10)}
+181-.chip.spoken{color:#ff7777;background:rgba(232,93,93,.13)}
+182-/* Botones de rol SIEMPRE visibles mientras se hace scroll en las letras:
+183-   quedan pegados arriba del panel, sin tapar el texto ni requerir subir. */
+184:#vocalRoles{position:sticky;top:0;z-index:5;background:var(--bg-elevated)}
+185-.chip.rolePick{outline:2px solid #f4f7f5;outline-offset:2px;background:rgba(255,255,255,.065)}
+186-/* Brillo en vivo siguiendo el audio: se ve por encima de cualquier rol/color. */
+187-.chip.playHi{
+188-  background:#fff!important;color:#111!important;
+189-  box-shadow:0 0 0 1px #fff,0 0 16px 3px rgba(255,255,255,.85);
+190-  transition:background .08s linear,box-shadow .08s linear;
+191-}
+192-/* Aviso permanente mientras un rol está ARMADO: imposible que Valeria no lo note. */
+=== PURPLE/BACKGROUND NEAR TOOLBAR ===
+11-  /* Tema CONTROL_EDITOR_LETRAS_KARAOKE_DJGABO.
+12-     Se mantienen los alias originales para que el motor V1 siga intacto. */
+13-  --bg-base:#12141A; --bg-surface:#1B1E26; --bg-elevated:#232733;
+14-  --border:#2E3340;
+15:  --amber:#8B5CF6; --amber-dim:rgba(139,92,246,.16);
+16:  --teal:#4FD1C5; --teal-dim:rgba(79,209,197,.14);
+17:  --danger:#E85D5D; --danger-dim:rgba(232,93,93,.14);
+18:  --orange:#F0A860; --yellow:#E8C34C; --blue:#5C9DE8; --green:#5BC98C;
+19:  --text-1:#F1EFEA; --text-2:#9AA0AC; --text-3:#5C6270;
+20-
+21-  --ink:var(--bg-base); --panel:var(--bg-surface); --panel2:var(--bg-elevated); --line:var(--border);
+22-  --text:var(--text-1); --dim:var(--text-2); --dimmer:var(--text-3);
+23:  --mark:var(--amber); --markSoft:var(--amber-dim); --markEdge:rgba(139,92,246,.55);
+24-  --wave:var(--teal); --waveHi:#7BE1D8; --good:var(--green);
+25-  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+26-  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+27-  --display:"Space Grotesk",var(--sans);
+28-}
+29-*{box-sizing:border-box;margin:0;padding:0}
+30-html,body{height:100%;overflow:hidden}
+31-body{
+--
+53-}
+54-.hbtn:hover{color:var(--text);border-color:var(--line);background:var(--panel2)}
+55-.hbtn.go{border-color:var(--mark);color:#fff;background:var(--mark)}
+56-.hbtn.go:hover{background:#A075F8;border-color:#A075F8}
+57:.hbtn.roleNone{color:#e8c34c;border-color:rgba(232,195,76,.42);background:rgba(232,195,76,.07)}
+58:.hbtn.roleNone.on{color:#111;border-color:#E8C34C;background:#E8C34C;font-weight:700;box-shadow:0 0 0 1px rgba(232,195,76,.30) inset}
+59:.hbtn .roleKey{opacity:.55;font:600 9px/1 var(--mono);margin-left:4px}
+60:.hbtn.spoken{color:#eaa29a;border-color:rgba(232,93,93,.42);background:rgba(232,93,93,.07)}
+61:.hbtn.spoken.on{color:#fff;border-color:#E85D5D;background:#7a2d24;font-weight:700;box-shadow:0 0 0 1px rgba(232,93,93,.35) inset}
+62-.hbtn.spoken.on::before{content:"● ";color:#ff6a5a}
+63:.hbtn.roleFemale{color:#e9a6c9;border-color:rgba(255,79,163,.38);background:rgba(255,79,163,.06)}
+64:.hbtn.roleMale{color:#9ccfe8;border-color:rgba(50,183,255,.38);background:rgba(50,183,255,.06)}
+65:.hbtn.roleDuet{color:#b7db9c;border-color:rgba(126,217,87,.38);background:rgba(126,217,87,.06)}
+66:.hbtn.roleFemale.on{color:#fff;border-color:#FF4FA3;background:#822a56;font-weight:700;box-shadow:0 0 0 1px rgba(255,79,163,.3) inset}
+67:.hbtn.roleMale.on{color:#fff;border-color:#32B7FF;background:#175879;font-weight:700;box-shadow:0 0 0 1px rgba(50,183,255,.3) inset}
+68:.hbtn.roleDuet.on{color:#fff;border-color:#7ED957;background:#396c23;font-weight:700;box-shadow:0 0 0 1px rgba(126,217,87,.3) inset}
+69-/* LOCAL_06: el color visual del rol es independiente de locked.
+70-   SIN ROL=amarillo · HOMBRE=azul · MUJER=rosa · DUO=verde · HABLADO=rojo. */
+71:.chip{--roleColor:#E8C34C}
+72:.chip.roleFemale{--roleColor:#FF4FA3}
+73:.chip.roleMale{--roleColor:#32B7FF}
+74:.chip.roleDuet{--roleColor:#7ED957}
+75:.chip.spoken{--roleColor:#E85D5D}
+76-
+77-/* ---------- espacio de trabajo: tres paneles ---------- */
+78-#workspace{flex:1 1 auto;min-height:0;display:flex;overflow:hidden;background:var(--ink)}
+79-
+80-#leftPane{flex:0 0 34%;min-width:200px;display:flex;flex-direction:column;overflow:hidden}
+81-#centerPane{flex:1 1 auto;min-width:280px;display:flex;flex-direction:column;
+82-  background:var(--panel);overflow:hidden}
+83-#preview{flex:0 0 27%;min-width:190px;background:var(--bg-base);
+--
+128-.slot{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+129-.slot.prev,.slot.next{font-size:19px;color:var(--dimmer);font-weight:600}
+130-.slot.cur{
+131-  font-size:40px;color:var(--mark);line-height:1;
+132:  text-shadow:0 0 28px rgba(139,92,246,.22);
+133-}
+134-#now.stalled .slot.cur{color:var(--danger);text-shadow:none}
+135-#now.done .slot.cur{color:var(--wave)}
+136-#lineEcho{
+137-  font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.02em;
+138-  white-space:nowrap;overflow:hidden;max-width:96%;text-align:center;
+139-}
+140-#lineEcho .on{color:var(--text);border-bottom:1px solid var(--mark);padding-bottom:1px}
+--
+163-.lrow{white-space:nowrap}
+164-.lrow.brk{height:10px}
+165-.chip{
+166-  display:inline-block;padding:1px 4px;margin-right:2px;border-radius:2px;
+167:  color:rgba(232,195,76,.48);cursor:pointer;user-select:none;-webkit-user-select:none;
+168-}
+169-#lyricsInner::selection{background:transparent;color:inherit}
+170:.chip.timed{color:#F2B705;background:rgba(242,183,5,.07)}
+171-/* La marca inferior depende de TIMED + ROL, nunca de locked. */
+172:.chip.timed{box-shadow:inset 0 -2px 0 var(--roleColor,#E8C34C)}
+173-.chip.locked{ /* estado lógico de timing; sin autoridad visual sobre el rol */ }
+174:.chip.sel{outline:2px solid #f4f7f5;outline-offset:1px;background:rgba(255,255,255,.06);color:var(--text)}
+175:.chip.spoken{color:#ff7777;background:rgba(232,93,93,.13)}
+176:.chip.spoken.sel{outline-color:#f4f7f5;background:rgba(255,255,255,.06)}
+177-/* V05: el rol es un estado visual persistente e independiente de locked/selección. */
+178:.chip.roleMale{color:#83d2ff;background:rgba(50,183,255,.10)}
+179:.chip.roleFemale{color:#ff8cc3;background:rgba(255,79,163,.10)}
+180:.chip.roleDuet{color:#9ae17d;background:rgba(126,217,87,.10)}
+181:.chip.spoken{color:#ff7777;background:rgba(232,93,93,.13)}
+182-/* Botones de rol SIEMPRE visibles mientras se hace scroll en las letras:
+183-   quedan pegados arriba del panel, sin tapar el texto ni requerir subir. */
+184-#vocalRoles{position:sticky;top:0;z-index:5;background:var(--bg-elevated)}
+185:.chip.rolePick{outline:2px solid #f4f7f5;outline-offset:2px;background:rgba(255,255,255,.065)}
+186-/* Brillo en vivo siguiendo el audio: se ve por encima de cualquier rol/color. */
+187-.chip.playHi{
+188-  background:#fff!important;color:#111!important;
+189:  box-shadow:0 0 0 1px #fff,0 0 16px 3px rgba(255,255,255,.85);
+190-  transition:background .08s linear,box-shadow .08s linear;
+191-}
+192-/* Aviso permanente mientras un rol está ARMADO: imposible que Valeria no lo note. */
+193:#vocalRoles.armed{background:linear-gradient(rgba(139,92,246,.14),rgba(139,92,246,.14)),var(--bg-elevated);box-shadow:inset 0 0 0 1px rgba(139,92,246,.45)}
+194-#vocalRoles::after{content:"";display:none}
+195-#vocalRoles.armed::after{
+196-  content:"ARMADO · toda selección nueva se pinta sola";
+197-  display:inline-block;margin-left:6px;font:700 9px/1 var(--mono);letter-spacing:.06em;
+198-  text-transform:uppercase;color:#a78bfa;
+199-}
+200:.roleLineBtn{
+201-  display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;
+202-  min-width:25px;height:20px;margin:0 6px 0 0;padding:0 4px;border:1px solid var(--line);border-radius:4px;
+203-  color:var(--dimmer);background:transparent;font:700 8px/1 var(--mono);cursor:pointer;
+204-}
+205:.roleLineBtn:hover{border-color:#a78bfa;color:#a78bfa}
+206:.roleLineBtn.role-none{border-color:rgba(232,195,76,.46);color:#E8C34C}
+207:.roleLineBtn.role-hombre{border-color:rgba(50,183,255,.65);color:#32B7FF}
+208:.roleLineBtn.role-mujer{border-color:rgba(255,79,163,.65);color:#FF4FA3}
+209:.roleLineBtn.role-duo{border-color:rgba(126,217,87,.65);color:#7ED957}
+210:.roleLineBtn.role-hablado{border-color:rgba(232,93,93,.68);color:#E85D5D}
+211:.chip:hover{background:rgba(255,255,255,.09)}
+212-
+213-/* ---------- transport ---------- */
+214-#transport{
+215-  flex:0 0 68px;border-top:1px solid var(--line);background:var(--bg-surface);
+216-  display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px;
+217-}
+218-.tbtn{
+219-  display:flex;flex-direction:column;align-items:center;gap:3px;
+--
+257-body.phase2 #phaseIntroCopy{display:none}
+258-#btnResync{display:none;border:1px solid var(--markEdge);color:var(--mark);background:var(--amber-dim);padding:6px 10px;border-radius:4px;font:700 11px var(--sans);margin-left:auto}
+259-#btnResync.show{display:inline-flex}
+260-#editHint{display:flex;align-items:center;gap:10px}
+261:.chip.provisional{outline:1px dashed rgba(241,239,234,.46);outline-offset:2px}
+262-
+263-/* ---------- overlays ---------- */
+264-.veil{
+265:  position:fixed;inset:0;background:rgba(11,13,12,.93);z-index:20;
+266-  display:flex;align-items:center;justify-content:center;padding:24px;
+267-}
+268-.veil[hidden]{display:none}
+269-.card{
+270-  width:min(620px,100%);background:var(--bg-surface);border:1px solid var(--line);
+271:  border-radius:12px;padding:22px;box-shadow:0 16px 40px rgba(0,0,0,.30);
+272-}
+273-#settings{padding:18px}
+274-#settings .card{width:min(700px,96vw);height:min(86vh,760px);padding:0;overflow:hidden;display:flex;flex-direction:column}
+275-.settingsHead{flex:0 0 auto;padding:16px 18px 10px;border-bottom:1px solid var(--line)}
+276-.settingsHead .sub{margin-bottom:0!important}
+277-.settingsBody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 18px 10px}
+278-.settingsFoot{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 18px;border-top:1px solid var(--line);background:var(--panel)}
+279-#settings .setrow{margin-bottom:8px}
+--
+304-.driveLoad{padding:4px 2px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+305-.driveLoadTop{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+306-.driveLoadStage{color:#c9b8ff;text-align:left;font-weight:700}
+307-.driveLoadPct{font-family:var(--mono);font-size:12px;color:var(--text);min-width:44px;text-align:right}
+308:.driveLoadTrack{height:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+309-.driveLoadFill{height:100%;width:0%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd);transition:width .16s ease-out}
+310-.driveLoadFill.indeterminate{width:34%!important;animation:driveLoadSweep 1.05s ease-in-out infinite}
+311-@keyframes driveLoadSweep{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
+312-.driveLoadBytes{font-family:var(--mono);font-size:10px;color:var(--dimmer);text-align:left}
+313:.onlineLoadOverlay{position:absolute;inset:0;z-index:18;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,10,14,.88);backdrop-filter:blur(2px)}
+314-.onlineLoadOverlay[hidden]{display:none!important}
+315:.onlineLoadCard{width:min(390px,calc(100% - 28px));padding:20px;border:1px solid #53457d;border-radius:12px;background:#171922;box-shadow:0 18px 55px rgba(0,0,0,.5)}
+316-.onlineLoadHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+317-.onlineLoadTitle{font:700 14px/1.35 var(--sans);color:#eee9ff}
+318-.onlineLoadPct{font:700 18px var(--mono);color:#c4b5fd;white-space:nowrap}
+319:.onlineLoadTrack{height:11px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid var(--line)}
+320-.onlineLoadFill{height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#c4b5fd);transition:width .22s ease-out}
+321-.onlineLoadDetail{margin-top:10px;font:11px/1.45 var(--mono);color:var(--dim)}
+322:.onlineLoadWarning{margin-top:13px;padding:9px 10px;border-radius:7px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);font:700 11px/1.4 var(--sans);color:#f6c86b}
+323-.onlineLoadRetry{margin-top:14px;border:1px solid #8b5cf6;border-radius:7px;padding:8px 13px;color:#eee9ff;background:#2c2050;font-weight:700;cursor:pointer}
+324-.rowbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center}
+325-.ghost{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);padding:9px 14px;border:1px solid var(--line);border-radius:6px}
+326-.ghost:hover{color:var(--text);background:var(--bg-elevated)}
+327-.primary{
+328-  font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none;
+329-  background:var(--mark);color:#fff;padding:10px 16px;border-radius:6px;border:1px solid var(--mark);
+330-}
+--
+367-#lyricsDrawer.edit .lrow:hover .rowTools{display:flex}
+368-.rowTools button{
+369-  font-size:11px;color:var(--dimmer);padding:1px 5px;border-radius:2px;line-height:1.6;
+370-}
+371:.rowTools button:hover{color:var(--text);background:rgba(255,255,255,.08)}
+372-.rowTools button.del:hover{color:var(--danger)}
+373-#lyricsDrawer.edit .chip{cursor:text}
+374-.chip input{
+375-  background:var(--ink);border:1px solid var(--mark);border-radius:2px;color:var(--text);
+376-  font:inherit;padding:0 3px;width:9ch;
+377-}
+378-#editHint{
+379-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--dimmer);
+--
+393-  padding:9px 16px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+394-  z-index:30;opacity:0;transition:opacity .18s;pointer-events:none;
+395-}
+396-#toast.show{opacity:1}
+397:#renderBusy{position:fixed;inset:0;background:rgba(11,13,12,.72);display:flex;align-items:center;justify-content:center;z-index:45}
+398-#renderBusy[hidden]{display:none}
+399:#renderBusy .renderProg{height:10px;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:12px}
+400-#renderBusy .renderProgFill{height:100%;width:0%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd);transition:width .18s linear}
+401-#renderBusy .renderProgMeta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;font:11px var(--mono);color:var(--dimmer)}
+402:.busyCard{min-width:290px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+403-.busyRow{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+404:.busySpin{width:20px;height:20px;border:3px solid rgba(139,92,246,.22);border-top-color:var(--mark);border-radius:999px;animation:spin .9s linear infinite}
+405-.busyTitle{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mark)}
+406-.busyMsg{font-size:13px;color:var(--text);line-height:1.45}
+407-.busySub{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.05em;margin-top:6px}
+408-@keyframes spin{to{transform:rotate(360deg)}}
+409-kbd{
+410-  font-family:var(--mono);font-size:10px;border:1px solid var(--dimmer);
+411-  border-radius:2px;padding:1px 4px;color:var(--dim);
+412-}
+--
+414-
+415-.lineEditWrap{display:flex;align-items:center;gap:7px;width:100%;padding:3px 0}
+416-.lineEditInput{flex:1;min-width:0;background:var(--bg-base);border:1px solid var(--markEdge);color:var(--text);font:600 14px/1.35 var(--sans);padding:8px 10px;border-radius:7px;outline:none}
+417-.lineEditInput:focus{border-color:var(--mark);box-shadow:0 0 0 2px var(--amber-dim)}
+418:.lineDeleteBtn{border:1px solid #633;background:#211;color:#ffaaaa;border-radius:7px;padding:7px 9px;cursor:pointer}
+419:#btnSpoken.on{border-color:#E85D5D;color:#ff8f7d;background:rgba(232,93,93,.13);box-shadow:0 0 0 1px rgba(232,93,93,.18) inset}
+420:.chip.spoken{color:#ff7666!important;background:rgba(232,93,93,.12)!important;border-color:rgba(232,93,93,.55)!important}
+421-.chip .inlineWordInput,.inlineWordInput{min-width:180px;width:min(320px,38vw);max-width:420px;background:var(--bg-base);border:1px solid var(--mark);color:var(--text);font:700 14px/1.25 var(--sans);padding:6px 8px;border-radius:6px;outline:none;box-shadow:0 0 0 2px var(--amber-dim)}
+422-
+423-#setLines{width:78px}
+424-.settingsSectionTitle{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+425-
+426-.phaseRail{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:8px;margin:4px 0 18px}
+427-.phaseStep{border:1px solid var(--line);background:var(--bg-elevated);border-radius:8px;padding:10px 12px;min-width:0}
+428-.phaseStep b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+--
+466-body.panelEmbed header{background:#1B1E26;border-bottom-color:#2E3340}
+467-body.panelEmbed{background:#12141A}
+468-body.panelEmbed #workspace{height:calc(100vh - 47px)}
+469-/* SINCRONIZAR — regla visual aprobada:
+470:   sin indicador de próxima palabra. Selección y roles conservan su comportamiento original. */
+471-body.phase2 #now{display:none!important}
+472-
+473-
+474-/* =========================================================
+475-   DJGABO_MOBILE_EDITOR_V2
+476-   Móvil/tablet vertical: una vista legible por vez.
+=== RECENT BACKUPS ===
+2026-09-03 06:33:33.1132821580 index.html.bak_repeat_cleanup_20260903-063333
+2026-09-03 06:32:52.2741764250 index.html.bak_repeat_cleanup_20260903-063252
+2026-09-03 06:32:52.2741764250 index.html.bak_repeat_align_20260903-063333
+2026-09-03 06:32:11.4950667580 index.html.bak_repeat_cleanup_20260903-063211
+2026-09-03 06:32:11.4950667580 index.html.bak_repeat_align_20260903-063252
+2026-09-03 06:19:23.2505748140 index.html.bak_repeat_cleanup_20260903-062147
+2026-09-03 06:19:23.2505748140 index.html.bak_repeat_align_20260903-063211
+2026-09-03 06:19:23.2505748140 index.html.bak_repeat_align_20260903-063111
+2026-09-03 06:19:23.2505748140 index.html.bak_repeat_align_20260903-063110
+2026-09-03 06:14:56.6130664960 index.html.bak_repeat_align_20260903-061923
+2026-09-03 06:13:41.7391326460 index.html.bak_repeat_align_20260903-061456
+2026-09-03 05:45:16.6931889540 index.html.bak_spoken_visible_gap_20260903-055306
+find: Failed to restore initial working directory: /home/ubuntu: Permission denied
