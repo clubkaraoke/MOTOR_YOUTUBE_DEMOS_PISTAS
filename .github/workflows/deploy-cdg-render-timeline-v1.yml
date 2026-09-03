@@ -1,0 +1,177 @@
+name: Deploy CDG authoritative render timeline V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-render-timeline-v1.yml"
+      - "deploy/cdg_render_timeline_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_render_timeline_v1/patch_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch renderer/editor/composer in production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_render_timeline_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_render_timeline_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-render-timeline-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          NORMALIZE="$ROOT/renderer/normalize.py"
+          RENDER="$ROOT/renderer/render.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/render_timeline_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          PID="$(sudo systemctl show -p MainPID --value djgabo-cdg)"
+          test -n "$PID"
+          PYEXE="$(sudo readlink -f /proc/$PID/exe)"
+          COMPOSER="$(cd "$ROOT/renderer" && "$PYEXE" -c 'import cdgmaker.composer as c; print(c.__file__)')"
+          echo "PYEXE=$PYEXE"
+          echo "COMPOSER=$COMPOSER"
+          test -f "$COMPOSER"
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/cdgmaker"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$BACKUP/renderer/normalize.py"
+          sudo cp "$RENDER" "$BACKUP/renderer/render.py"
+          sudo cp "$COMPOSER" "$BACKUP/cdgmaker/composer.py"
+          echo "BACKUP=$BACKUP"
+
+          # Staging: no tocar producción si cualquier anchor o prueba falla.
+          sudo rm -rf /tmp/djgabo-render-timeline-stage
+          sudo mkdir -p /tmp/djgabo-render-timeline-stage/editor_v1 /tmp/djgabo-render-timeline-stage/renderer
+          sudo cp "$EDITOR" /tmp/djgabo-render-timeline-stage/editor_v1/index.html
+          sudo cp "$NORMALIZE" /tmp/djgabo-render-timeline-stage/renderer/normalize.py
+          sudo cp "$RENDER" /tmp/djgabo-render-timeline-stage/renderer/render.py
+          sudo cp "$COMPOSER" /tmp/djgabo-render-timeline-stage/composer.py
+
+          sudo python3 /tmp/patch_cdg_render_timeline_v1.py             --root /tmp/djgabo-render-timeline-stage             --composer /tmp/djgabo-render-timeline-stage/composer.py
+
+          sudo python3 -m py_compile             /tmp/djgabo-render-timeline-stage/renderer/normalize.py             /tmp/djgabo-render-timeline-stage/renderer/render.py             /tmp/djgabo-render-timeline-stage/composer.py
+
+          # Pruebas de política: 4 s => sin opening; 7 s => 3 s; Laura 16.34 => 6 s.
+          sudo "$PYEXE" - <<'PY'
+          import importlib.util
+          p="/tmp/djgabo-render-timeline-stage/renderer/normalize.py"
+          spec=importlib.util.spec_from_file_location("norm_stage",p)
+          n=importlib.util.module_from_spec(spec); spec.loader.exec_module(n)
+          style={"intro_duration_seconds":6.0,"intro_short_duration_seconds":3.0,"first_syllable_buffer_seconds":3.0}
+          def doc(t, explicit=None):
+              d={"segments":[{"words":[{"id":"w0","text":"VOZ","start_time":t,"end_time":t+0.4}]}]}
+              if explicit is not None:
+                  d["render_timeline"]={
+                    "version":"CDG_RENDER_TIMELINE_V1",
+                    "first_real_voice_seconds":t,
+                    "first_sung_vocal_seconds":t,
+                    "opening":{
+                      "enabled":explicit>0,
+                      "render_screen":explicit>0,
+                      "duration_seconds":explicit,
+                      "first_syllable_buffer_seconds":3.0,
+                      "rule":"TEST"
+                    }
+                  }
+              return d
+          assert n.resolve_render_timeline(doc(4.0),style)["opening"]["duration_seconds"]==0.0
+          assert n.resolve_render_timeline(doc(7.0),style)["opening"]["duration_seconds"]==3.0
+          assert n.resolve_render_timeline(doc(16.34),style)["opening"]["duration_seconds"]==6.0
+          # JSON manda incluso si el fallback habría decidido 6.
+          x=n.resolve_render_timeline(doc(16.34,0.0),style)
+          assert x["opening"]["duration_seconds"]==0.0
+          assert x["policy"]["json_is_source_of_truth"] is True
+          print("POLICY_TEST=PASS")
+          PY
+
+          STAGE=/tmp/djgabo-render-timeline-stage
+          sudo grep -Fq 'CDG_RENDER_TIMELINE_V1' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V3' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'out.render_timeline = buildRenderTimelineDecision()' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_RENDER_TIMELINE_NORMALIZER_V1' "$STAGE/renderer/normalize.py"
+          sudo grep -Fq 'norm.render_timeline["opening"]["duration_seconds"]' "$STAGE/renderer/render.py"
+          sudo grep -Fq 'DJGABO_NO_INTRO_DELAY_V1' "$STAGE/composer.py"
+          sudo grep -Fq 'self.audio = song' "$STAGE/composer.py"
+          if sudo grep -Fq 'Adding {self.intro_delay} frames of silence' "$STAGE/composer.py"; then
+            echo "ERROR=legacy intro_delay logic remains in staged composer"
+            exit 1
+          fi
+          echo "STAGE=PASS"
+
+          # Aplicar sobre producción.
+          sudo python3 /tmp/patch_cdg_render_timeline_v1.py --root "$ROOT" --composer "$COMPOSER"
+          sudo python3 -m py_compile "$NORMALIZE" "$RENDER" "$COMPOSER"
+
+          sudo grep -Fq 'CDG_RENDER_TIMELINE_V1' "$EDITOR"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V3' "$EDITOR"
+          sudo grep -Fq 'DJGABO_RENDER_TIMELINE_NORMALIZER_V1' "$NORMALIZE"
+          sudo grep -Fq 'DJGABO_RENDER_TIMELINE_RENDERER_V1' "$RENDER"
+          sudo grep -Fq 'DJGABO_NO_INTRO_DELAY_V1' "$COMPOSER"
+          if sudo grep -Fq 'Adding {self.intro_delay} frames of silence' "$COMPOSER"; then
+            echo "ERROR=legacy intro_delay logic remains in production composer"
+            exit 1
+          fi
+
+          # Frontend y servicio deben seguir disponibles. No reiniciamos:
+          # cada render se ejecuta en un proceso nuevo y cargará estos archivos.
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-render-timeline.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'CDG_RENDER_TIMELINE_V1' /tmp/editor-render-timeline.html
+          grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V3' /tmp/editor-render-timeline.html
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          # Guardar snapshots exactos de producción para auditoría.
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/editor_v1/index.html" diagnostics/cdg-prod-current-index.html
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/renderer/normalize.py" diagnostics/cdg-prod-current-normalize.py
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/renderer/render.py" diagnostics/cdg-prod-current-render.py
+          COMPOSER_REMOTE="$(ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'ROOT=/opt/djgabo-cdg; PID=$(sudo systemctl show -p MainPID --value djgabo-cdg); PYEXE=$(sudo readlink -f /proc/$PID/exe); cd "$ROOT/renderer"; "$PYEXE" -c "import cdgmaker.composer as c; print(c.__file__)"')"
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:$COMPOSER_REMOTE" diagnostics/cdg-prod-current-composer.py
+
+      - name: Save deploy report and production snapshots
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-render-timeline-v1-deploy.txt                   diagnostics/cdg-prod-current-index.html                   diagnostics/cdg-prod-current-normalize.py                   diagnostics/cdg-prod-current-render.py                   diagnostics/cdg-prod-current-composer.py 2>/dev/null || true
+          git commit -m "diag: record authoritative render timeline deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
