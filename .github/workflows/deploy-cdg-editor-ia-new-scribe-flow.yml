@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           mkdir -p diagnostics
           scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_new_scribe_flow.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_new_scribe_flow.py"
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 | tee diagnostics/cdg-editor-ia-new-scribe-flow.txt <<'REMOTE'
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE' 2>&1 | tee diagnostics/cdg-editor-ia-new-scribe-flow.txt
           set -euo pipefail
           echo "TIMESTAMP=$(date -Is)"
           echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
