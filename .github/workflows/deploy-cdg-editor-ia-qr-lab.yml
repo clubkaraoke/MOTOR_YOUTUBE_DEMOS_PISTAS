@@ -1,0 +1,96 @@
+name: Deploy CDG IA QR Lab
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/trigger-cdg-editor-ia-qr-lab.txt"
+      - "deploy/patch_cdg_editor_ia_qr_lab.py"
+      - "deploy/qr_test.html"
+      - "deploy/vendor/jsQR.js"
+      - ".github/workflows/deploy-cdg-editor-ia-qr-lab.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_editor_ia_qr_lab.py
+          node -e "const q=require('./deploy/vendor/jsQR.js'); if(typeof q!=='function') process.exit(2); console.log('JSQR_NODE=OK')"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Upload QR lab
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_qr_lab.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_qr_lab.py"
+          scp -P "$OVH_PORT" deploy/vendor/jsQR.js "$OVH_USER@$OVH_HOST:/tmp/jsQR.js"
+          scp -P "$OVH_PORT" deploy/qr_test.html "$OVH_USER@$OVH_HOST:/tmp/qr_test.html"
+
+      - name: Apply and test on OVH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          sudo python3 /tmp/patch_cdg_editor_ia_qr_lab.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
+          sudo systemctl restart djgabo-cdg-ia-test
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8775/healthz >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+          code=$(curl -sS -o /tmp/jsqr.js -w '%{http_code}' http://127.0.0.1:8775/vendor/jsQR.js)
+          test "$code" = "200"
+          grep -q 'webpackUniversalModuleDefinition' /tmp/jsqr.js
+          echo "QR_READER_HTTP=$code"
+
+          code=$(curl -sS -o /tmp/qr-lab.html -w '%{http_code}' http://127.0.0.1:8775/qr-test)
+          test "$code" = "200"
+          grep -q 'QR LAB · IA TEST' /tmp/qr-lab.html
+          grep -q '/cdg-editor-ia/vendor/jsQR.js' /tmp/qr-lab.html
+          echo "QR_LAB_HTTP=$code"
+
+          UVR='https://a111p.uvronline.app/s/Me5saf9v_MymH2xvJ4RIK3czxbzgvlHt/LV/mp3'
+          curl -sS --max-time 120 -o /tmp/uvr-check.json             -X POST http://127.0.0.1:8775/api/qr-lab/check             -H 'Content-Type: application/json'             --data-binary "{\"url\":\"$UVR\"}"
+          cat /tmp/uvr-check.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/uvr-check.json'))
+          assert d.get('ok') is True, d
+          assert int(d.get('bytes_received') or 0)>0, d
+          print('OVH_UVR_DOWNLOAD=OK')
+          print('CONTENT_TYPE='+str(d.get('content_type')))
+          print('BYTES_RECEIVED='+str(d.get('bytes_received')))
+          PY
+
+          grep -q '<script src="/cdg-editor-ia/vendor/jsQR.js"></script>' /opt/djgabo-cdg-ia-test/panel.html
+          echo "PANEL_PRELOAD=OK"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
