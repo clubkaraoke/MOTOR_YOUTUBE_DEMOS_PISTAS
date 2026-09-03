@@ -18,7 +18,7 @@ from flask import Flask, Response, abort, jsonify, request, send_file
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.getenv("CDG_RENDER_LAB_DATA", "/var/lib/djgabo-cdg-render-lab"))
 SESSIONS = DATA / "sessions"
-RENDERER = ROOT / "renderer"
+RENDERER = Path(os.getenv("CDG_RENDER_LAB_RENDERER", str(ROOT.parent / "renderer")))
 PUBLIC_BASE = os.getenv("CDG_RENDER_LAB_PUBLIC_BASE", "https://panel.kitkaraoke.com/cdg-render-lab").rstrip("/")
 SCRIBE_URL = os.getenv("CDG_RENDER_LAB_SCRIBE_URL", "http://127.0.0.1:8097/api/elevenlabs/transcribe")
 MAX_UPLOAD = int(os.getenv("CDG_RENDER_LAB_MAX_UPLOAD", str(800 * 1024 * 1024)))
