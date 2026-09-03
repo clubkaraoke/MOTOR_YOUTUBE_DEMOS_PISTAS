@@ -1,1 +1,1 @@
-deploy 6B 8 9 10 11 retry permissions
+deploy 6B 8 9 10 11 retry real end sweep
