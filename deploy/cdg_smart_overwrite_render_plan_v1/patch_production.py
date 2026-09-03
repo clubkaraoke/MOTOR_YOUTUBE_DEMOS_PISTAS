@@ -190,8 +190,9 @@ function pvPlan(){'''
 
   // PAGE LOCK: la página anterior se limpia completa y la nueva se dibuja
 '''
-    end='''  return {lines, geom, syl, draw, erase, lpp, clearMode:"page"};
-}'''
+    end='''
+
+let pvT;'''
     new=r'''  const n = lines.length;
   const draw = new Array(n).fill(0), erase = new Array(n).fill(0);
   const renderPlan=buildRenderPlanDecision();
