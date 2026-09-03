@@ -1,0 +1,134 @@
+name: Deploy CDG instrumental page boundary V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-instrumental-page-boundary-v2.yml"
+      - "deploy/cdg_instrumental_page_boundary_v2/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_instrumental_page_boundary_v2/patch_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production safely
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_instrumental_page_boundary_v2/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_instrumental_page_boundary_v2.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-instrumental-page-boundary-v2-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          NORMALIZE="$ROOT/renderer/normalize.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/instrumental_page_boundary_v2_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test -f "$EDITOR"
+          test -f "$NORMALIZE"
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$BACKUP/renderer/normalize.py"
+          echo "BACKUP=$BACKUP"
+
+          STAGE=/tmp/djgabo-instrumental-page-v2-stage
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1" "$STAGE/renderer"
+          sudo cp "$EDITOR" "$STAGE/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$STAGE/renderer/normalize.py"
+
+          sudo python3 /tmp/patch_cdg_instrumental_page_boundary_v2.py --root "$STAGE"
+          sudo python3 -m py_compile "$STAGE/renderer/normalize.py"
+
+          sudo grep -Fq 'DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_RENDER_PAGES_V2' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V5' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'instrumental_boundaries_locked:true' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'next:{id:next?.id||null' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_NORMALIZER_V2' "$STAGE/renderer/normalize.py"
+          sudo grep -Fq 'Paginado V1 detectado' "$STAGE/renderer/normalize.py"
+
+          # Reproduce el patrón exacto del fallo:
+          # página lírica centrada con vacío inicial + instrumental antes de la
+          # primera línea. V1 dejaba A/B/C + D de la página siguiente.
+          python3 - <<'PY'
+          lpp=6
+          page1=[[],["A"],["B"],["C"],[],[]]
+          page2=[["D"],["E"],["F"],["G"],["H"],["I"]]
+          # V2 inserta una página instrumental ANTES del bloque completo.
+          inst=[[],[],["INSTRUMENTAL"],["DOTS"],[],[]]
+          out=inst+page1+page2
+          assert len(out)%lpp==0
+          assert out[6:12]==page1
+          assert out[12:18]==page2
+          assert out[12][0]=="D"
+          print("PAGE_SLOT_TEST=PASS")
+          PY
+
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_cdg_instrumental_page_boundary_v2.py --root "$ROOT"
+          sudo python3 -m py_compile "$NORMALIZE"
+
+          sudo grep -Fq 'DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2' "$EDITOR"
+          sudo grep -Fq 'DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_NORMALIZER_V2' "$NORMALIZE"
+          sudo grep -Fq 'CDG_RENDER_PAGES_V2' "$EDITOR"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V5' "$EDITOR"
+
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-page-v2.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2' /tmp/editor-page-v2.html
+          grep -Fq 'CDG_RENDER_PAGES_V2' /tmp/editor-page-v2.html
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/editor_v1/index.html' > diagnostics/cdg-prod-current-index.html
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/normalize.py' > diagnostics/cdg-prod-current-normalize.py
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-instrumental-page-boundary-v2-deploy.txt                   diagnostics/cdg-prod-current-index.html                   diagnostics/cdg-prod-current-normalize.py 2>/dev/null || true
+          git commit -m "diag: record instrumental page boundary V2 deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
