@@ -39,6 +39,10 @@ jobs:
           set -euo pipefail
           P=/opt/djgabo-cdg
           T=/opt/djgabo-cdg-ia-test
+          echo "=== PROD PANEL MODAL NUEVA ==="
+          sudo -u djgabo-cdg grep -n -A150 -B20 'id="modalNueva"' "$P/panel.html" | head -210 || true
+          echo "=== TEST PANEL MODAL NUEVA ==="
+          sudo -u djgabo-cdg grep -n -A170 -B20 'id="modalNueva"' "$T/panel.html" | head -240 || true
           echo "=== PROD PANEL NUEVA CANCION HANDLER ==="
           sudo -u djgabo-cdg grep -n -A240 -B25 "btnEnviarNueva.*addEventListener" "$P/panel.html" | head -320 || true
           echo "=== PROD SERVER CREATE JOB ==="
