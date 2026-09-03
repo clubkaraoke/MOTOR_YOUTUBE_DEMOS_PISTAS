@@ -71,7 +71,9 @@ jobs:
           PY
           curl -fsS -F 'audio=@/tmp/cdg-render-lab-render.wav' "http://127.0.0.1:$PORT/api/upload/$SID" >/dev/null
           curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/cdg-render-lab-project.json "http://127.0.0.1:$PORT/api/project/$SID" >/dev/null
-          curl -fsS -H 'Content-Type: application/json' -d '{"lines_per_screen":3,"mode":"page","read_ahead_seconds":2.5,"safe_clear_gap_seconds":4}' "http://127.0.0.1:$PORT/api/render/$SID" >/tmp/cdg-render-lab-render-result.json
+          curl -sS -H 'Content-Type: application/json' -d '{"lines_per_screen":3,"mode":"page","read_ahead_seconds":2.5,"safe_clear_gap_seconds":4}' "http://127.0.0.1:$PORT/api/render/$SID" >/tmp/cdg-render-lab-render-result.json
+          cat /tmp/cdg-render-lab-render-result.json
+          echo
           python3 - <<'PY'
           import json
           d=json.load(open('/tmp/cdg-render-lab-render-result.json'))
