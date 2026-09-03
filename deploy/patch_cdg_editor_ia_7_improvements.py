@@ -130,11 +130,11 @@ def _finalize_ai_job(jid,artist,title,voice_name,voice_original,inst_name,durati
     tmp_folder.rename(final_folder)
     with db() as c:
         t=now()
-        c.execute('''INSERT INTO jobs(
-          id,artist,title,status,created,updated,voice_filename,voice_original_filename,
-          voice_drive_status,instrumental_filename,lyrics_moises,lyrics_corrected,duration,size_bytes,
-          project_json,dropbox_status,timings_drive_status,sheet_master_status,origin
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+        c.execute(
+        'INSERT INTO jobs(id,artist,title,status,created,updated,voice_filename,voice_original_filename,'
+        'voice_drive_status,instrumental_filename,lyrics_moises,lyrics_corrected,duration,size_bytes,'
+        'project_json,dropbox_status,timings_drive_status,sheet_master_status,origin) '
+        'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         (jid,artist,title,EST_C,t,t,voice_name,Path(voice_original).name,'TEST_LOCAL',inst_name,
          final_lyrics,final_lyrics,duration,(final_folder/voice_name).stat().st_size,
          json.dumps(project,ensure_ascii=False),'TEST_LOCAL','TEST_LOCAL','TEST_LOCAL','IA_TEST'))
