@@ -1,0 +1,106 @@
+name: Deploy CDG repeat adaptive v5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-repeat-adaptive-v5.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_repeat_adaptive_v5.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy to IA TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_repeat_adaptive_v5.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_repeat_adaptive_v5.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-repeat-adaptive-v5.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+
+          sudo python3 /tmp/patch_cdg_repeat_adaptive_v5.py
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py"
+
+          sudo -u djgabo-cdg grep -Fq "def _ai_alignment_quality(aligned, strict_repeat=False):" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -Fq "repeat_short_word" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -Fq "_ai_alignment_quality(aligned, strict_repeat=True)" "$ROOT/server.py"
+          echo "STATIC_MARKERS=PASS"
+
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test             DJGABO_TEST_MODE=1             DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import server
+          clean=[{'start':i*.30,'end':i*.30+.18} for i in range(8)]
+          q=server._ai_alignment_quality(clean,strict_repeat=True)
+          assert q['ok'] is True, q
+
+          bad=[{'start':i*.30,'end':i*.30+.18} for i in range(8)]
+          bad[3]['end']=bad[3]['start']+.03
+          q2=server._ai_alignment_quality(bad,strict_repeat=True)
+          assert q2['ok'] is False and 'repeat_short_word' in q2['reasons'], q2
+
+          q3=server._ai_alignment_quality(bad,strict_repeat=False)
+          assert 'repeat_short_word' not in q3['reasons'], q3
+          print('ADAPTIVE_8_4_2_QUALITY=PASS')
+          print('STRICT_REPEAT_SHORT=PASS',q2)
+          PY
+
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/repeat-v5-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PROD_HTTP=$prod_http"
+          test "$prod_http" = 200
+          echo "DEPLOY_REPEAT_ADAPTIVE_V5=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-repeat-adaptive-v5.txt ]; then
+            git add diagnostics/cdg-repeat-adaptive-v5.txt
+            git commit -m "diag: verify repeat adaptive v5" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
