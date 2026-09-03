@@ -1,0 +1,126 @@
+name: Deploy CDG repeat-block alignment once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-repeat-block-alignment-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_repeat_block_alignment.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Apply adaptive alignment to TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_repeat_block_alignment.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_repeat_block_alignment.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-repeat-block-alignment-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = "active"
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+
+          sudo python3 /tmp/patch_cdg_repeat_block_alignment.py
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py"
+
+          echo "=== STATIC CHECKS ==="
+          grep -q "_ai_repeat_profile" "$ROOT/server.py"
+          grep -q "_ai_alignment_quality" "$ROOT/server.py"
+          grep -q "_ai_align_repeat_chunks" "$ROOT/server.py"
+          grep -q "repeat_chunks" "$ROOT/server.py"
+          grep -q 'session(d.get('''token'''))' "$ROOT/server.py"
+          grep -q 'repetition recalculada por subbloques de audio' "$ROOT/editor_v1/index.html"
+
+          if command -v node >/dev/null 2>&1; then
+            sudo -u djgabo-cdg python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          Path('/tmp/cdg-repeat-align.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+            node --check /tmp/cdg-repeat-align.js
+            echo "EDITOR_JS_SYNTAX=OK"
+          fi
+
+          echo "=== UNIT CHECKS ==="
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import server
+          rep=[{'text':'LA','id':str(i)} for i in range(40)]
+          normal=[{'text':x,'id':str(i)} for i,x in enumerate('cuando te vi sabia que te queria desde hace mucho tiempo'.split())]
+          rp=server._ai_repeat_profile(rep)
+          np=server._ai_repeat_profile(normal)
+          assert rp['repetitive'] is True, rp
+          assert np['repetitive'] is False, np
+
+          good=[{'start':i*.35,'end':i*.35+.20} for i in range(20)]
+          bad=[{'start':i*.35,'end':i*.35+.20} for i in range(5)]
+          bad += [{'start':1.75,'end':1.751} for _ in range(12)]
+          bad += [{'start':1.76,'end':5.8},{'start':5.81,'end':6.0},{'start':6.01,'end':6.2}]
+          qg=server._ai_alignment_quality(good)
+          qb=server._ai_alignment_quality(bad)
+          assert qg['ok'] is True, qg
+          assert qb['ok'] is False and ('same_timestamp_cluster' in qb['reasons'] or 'tiny_cluster' in qb['reasons']), qb
+          print('REPEAT_PROFILE=PASS',rp)
+          print('NORMAL_PROFILE=PASS',np)
+          print('GOOD_ALIGNMENT=PASS',qg)
+          print('COLLAPSED_ALIGNMENT_DETECTED=PASS',qb)
+          PY
+
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/test-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PROD_HTTP=$prod_http"
+          test "$prod_http" = "200"
+          echo "DEPLOY_REPEAT_BLOCK_ALIGNMENT=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-repeat-block-alignment-deploy.txt
+          git commit -m "diag: deploy repeat-block alignment" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
