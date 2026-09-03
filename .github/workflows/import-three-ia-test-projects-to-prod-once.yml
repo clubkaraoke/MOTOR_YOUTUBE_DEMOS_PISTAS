@@ -1,0 +1,89 @@
+name: Import three IA test projects to production once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/import-three-ia-test-projects-to-prod-once.yml"
+      - "deploy/migrate_three_ia_test_projects_to_prod.py"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Import projects and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/migrate_three_ia_test_projects_to_prod.py "$OVH_USER@$OVH_HOST:/tmp/migrate_three_ia_test_projects_to_prod.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/import-three-ia-test-projects.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)" = 200
+
+          sudo python3 /tmp/migrate_three_ia_test_projects_to_prod.py
+
+          echo "=== DB VERIFY ==="
+          sudo python3 - <<'PY'
+import sqlite3, json, pathlib
+db='/var/lib/djgabo-cdg/local.db'
+con=sqlite3.connect(db); con.row_factory=sqlite3.Row
+for jid in ('LET-0078','LET-0079','LET-0080'):
+    r=con.execute('select id,artist,title,status,origin,render_status,dropbox_status from jobs where id=?',(jid,)).fetchone()
+    if not r: raise SystemExit('MISSING '+jid)
+    p=pathlib.Path('/var/lib/djgabo-cdg/jobs')/jid/'proyecto.timings.json'
+    if not p.is_file(): raise SystemExit('MISSING PROJECT '+jid)
+    doc=json.loads(p.read_text(encoding='utf-8'))
+    words=[w for s in doc.get('segments',[]) for w in s.get('words',[])]
+    timed=sum(w.get('start_time') is not None for w in words)
+    print(json.dumps(dict(r),ensure_ascii=False), 'words=',len(words),'timed=',timed)
+    if not words or timed!=len(words): raise SystemExit('INCOMPLETE TIMINGS '+jid)
+con.close()
+PY
+
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)" = 200
+          echo "IMPORT_VERIFY=OK"
+          REMOTE
+
+      - name: Commit report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/import-three-ia-test-projects.txt ]; then
+            git add diagnostics/import-three-ia-test-projects.txt
+            git commit -m "diag: record IA test project import" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
