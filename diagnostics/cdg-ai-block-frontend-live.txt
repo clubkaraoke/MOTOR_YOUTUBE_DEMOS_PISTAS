@@ -1,0 +1,31 @@
+    const r=await fetch('/cdg-editor-ia/api/jobs/'+encodeURIComponent(PANEL_JOB_ID)+'/ai-align-block',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:PANEL_TOKEN,words:textWords,clip_start:clipStart,clip_end:clipEnd})
+    });
+    let j={};try{j=await r.json()}catch(_){}
+    if(!r.ok||j.ok===false)throw new Error(j.error||('Error '+r.status));
+    push(docSnapshot());
+    const byId=new Map((j.updates||[]).map(x=>[x.id,x]));
+    for(const w of selected){
+      const u=byId.get(w.id);if(!u)continue;
+      w.start_time=Number(u.start);w.end_time=Number(u.end);w.locked=false;w.provisional=false;
+      w.ai_status="green";w.ai_match_type="forced_alignment_block";w.ai_loss=u.loss;
+    }
+    S.doc.ai=S.doc.ai||{};S.doc.ai.block_alignments=S.doc.ai.block_alignments||[];
+    S.doc.ai.block_alignments.push({engine:j.engine||"elevenlabs-forced-alignment",strategy:j.strategy||"full",quality:j.quality||null,repetition:j.repetition||null,calls:j.calls||1,chunks:j.chunks||1,at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});
+    const a=Number(j.clip_start),b=Number(j.clip_end);
+    S.doc.ai.voice_gaps=(S.doc.ai.voice_gaps||[]).filter(g=>{
+      const ov=Math.max(0,Math.min(b,Number(g.end))-Math.max(a,Number(g.start))),gd=Math.max(.01,Number(g.end)-Number(g.start));
+      return ov/gd<0.45;
+    });
+    reindex();S.dirty=true;pvInvalidate();paintNow();paintLyrics();paintCounter();draw();scheduleSave();
+    const ft=selected[0]?.start_time;if(ft!==null&&ft!==undefined){centerOn(ft);S.audio.currentTime=Math.max(0,ft-.5);}
+    setStatus("Bloque sincronizado con ElevenLabs","good");
+    const repeatMsg=j.strategy==="repeat_chunks"?" · repetición recalculada por subbloques de audio":"";
+    toast("✓ "+selected.length+" palabras sincronizadas con IA"+repeatMsg+" · el resto no se tocó",4200);
+  }catch(err){
+    setStatus("No se pudo sincronizar el bloque","bad");toast((err.message||String(err)).slice(0,420),5000);
+  }finally{
+    btn.classList.remove("busy");btn.textContent=old;setTimeout(()=>setStatus(""),2600);
+  }
+}
