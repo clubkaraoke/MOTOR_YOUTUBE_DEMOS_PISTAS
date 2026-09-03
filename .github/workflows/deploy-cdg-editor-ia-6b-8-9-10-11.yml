@@ -66,13 +66,13 @@ jobs:
           sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py" "$ROOT/renderer/normalize.py" "$ROOT/renderer/render.py"
 
           echo "=== STATIC ASSERTIONS ==="
-          sudo -u djgabo-cdg grep -q "ai-align-block" "$ROOT/server.py"
-          sudo -u djgabo-cdg grep -q "balanced_visual_v3" "$ROOT/server.py"
-          sudo -u djgabo-cdg grep -q 'id="btnAiBlock"' "$ROOT/editor_v1/index.html"
-          sudo -u djgabo-cdg grep -q 'fallbackEnd=(w)=>' "$ROOT/editor_v1/index.html"
-          sudo -u djgabo-cdg grep -q 'smartPageGap:2.0' "$ROOT/editor_v1/index.html"
-          sudo -u djgabo-cdg grep -q 'spokenMin:6.0, spokenLead:4.0' "$ROOT/editor_v1/index.html"
-          sudo -u djgabo-cdg grep -q 'smart_page_breaks' "$ROOT/renderer/normalize.py"
+          echo "CHECK=server_route"; sudo -u djgabo-cdg grep -q "ai-align-block" "$ROOT/server.py"
+          echo "CHECK=server_layout"; sudo -u djgabo-cdg grep -q "balanced_visual_v3" "$ROOT/server.py"
+          echo "CHECK=editor_button"; sudo -u djgabo-cdg grep -q 'id="btnAiBlock"' "$ROOT/editor_v1/index.html"
+          echo "CHECK=editor_real_end"; sudo -u djgabo-cdg grep -q 'fallbackEnd=(w)=>' "$ROOT/editor_v1/index.html"
+          echo "CHECK=editor_smart_page"; sudo -u djgabo-cdg grep -q 'smartPageGap:2.0' "$ROOT/editor_v1/index.html"
+          echo "CHECK=editor_spoken_rule"; sudo -u djgabo-cdg grep -q 'spokenMin:6.0, spokenLead:4.0' "$ROOT/editor_v1/index.html"
+          echo "CHECK=renderer_smart_break"; sudo -u djgabo-cdg grep -q 'smart_page_breaks' "$ROOT/renderer/normalize.py"
 
           if command -v node >/dev/null 2>&1; then
             sudo -u djgabo-cdg python3 - <<'PY'
