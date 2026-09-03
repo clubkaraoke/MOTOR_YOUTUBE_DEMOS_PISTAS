@@ -1,0 +1,80 @@
+name: Inspect CDG IA block live once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-ai-block-live-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect live IA block route
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-ai-block-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "TEST=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD=$(sudo systemctl is-active djgabo-cdg)"
+          echo "=== ROUTE LOCATION ==="
+          sudo -u djgabo-cdg grep -n "def ai_align_block" "$ROOT/server.py" || true
+          line=$(sudo -u djgabo-cdg grep -n "def ai_align_block" "$ROOT/server.py" | head -1 | cut -d: -f1 || true)
+          if [ -n "$line" ]; then
+            start=$((line-8)); [ "$start" -lt 1 ] && start=1
+            end=$((line+135))
+            sudo -u djgabo-cdg sed -n "${start},${end}p" "$ROOT/server.py"
+          fi
+          echo
+          echo "=== PYTHON IMPORTS ==="
+          sudo -u djgabo-cdg sed -n '1,45p' "$ROOT/server.py"
+          echo
+          echo "=== LATEST BLOCK ALIGNMENTS ==="
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import json, server
+          with server.db() as c:
+              r=c.execute("select id,artist,title,project_json,updated from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          if not r:
+              print('NO_JOB'); raise SystemExit
+          row=dict(r); doc=json.loads(row.get('project_json') or '{}')
+          print('JOB',row['id'],row['artist'],'-',row['title'],'updated',row['updated'])
+          print('BLOCK_ALIGNMENTS',json.dumps((doc.get('ai') or {}).get('block_alignments') or [],ensure_ascii=False,indent=2))
+          PY
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-ai-block-live.txt
+          git commit -m "diag: inspect live IA block route" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
