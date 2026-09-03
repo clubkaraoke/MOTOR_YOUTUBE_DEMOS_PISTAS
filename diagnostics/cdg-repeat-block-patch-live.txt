@@ -1,0 +1,37 @@
+TEST=active
+PROD=active
+=== SERVER MARKERS ===
+1565:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+1589:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+1601:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2199:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2225:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2254:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2292:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2299:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+2348:        session(d.get('token'),'ADMIN')
+3113:    d=request.get_json() or {}; role=session(d.get('token')); lyrics=str(d.get('lyrics',''))
+3121:    d=request.get_json() or {}; session(d.get('token')); proj=d.get('project')
+3138:def _ai_repeat_profile(clean):
+3158:def _ai_alignment_quality(aligned):
+3257:def _ai_align_repeat_chunks(clip, clean, td, active_start, active_end, max_words=8):
+3301:        quality=_ai_alignment_quality(aligned)
+3329:    quality=_ai_alignment_quality(results)
+3340:def _ai_repeat_profile(clean):
+3360:def _ai_alignment_quality(aligned):
+3459:def _ai_align_repeat_chunks(clip, clean, td, active_start, active_end, max_words=8):
+3503:        quality=_ai_alignment_quality(aligned)
+3531:    quality=_ai_alignment_quality(results)
+3542:        session(d.get('token'))
+3564:        profile=_ai_repeat_profile(clean)
+3584:            quality=_ai_alignment_quality(aligned)
+3590:                refined,refined_quality,extra_calls,chunks=_ai_align_repeat_chunks(
+3603:                strategy='repeat_chunks'
+3607:            if strategy=='repeat_chunks':
+3776:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+3813:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+3831:    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+=== EDITOR MARKERS ===
+2329:    S.doc.ai.block_alignments.push({engine:j.engine||"elevenlabs-forced-alignment",strategy:j.strategy||"full",quality:j.quality||null,repetition:j.repetition||null,calls:j.calls||1,chunks:j.chunks||1,at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});
+=== COMPILE ===
+PY_COMPILE_RC=0
