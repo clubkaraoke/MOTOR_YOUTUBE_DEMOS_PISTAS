@@ -44,6 +44,10 @@ jobs:
           sudo -u djgabo-cdg grep -n -B4 -A8 -E "position:[[:space:]]*sticky|sticky" "$F" | head -160 || true
           echo "=== PURPLE/BACKGROUND NEAR TOOLBAR ==="
           sudo -u djgabo-cdg grep -n -B4 -A8 -E "role|toolbar|roles|#5|#6|rgba\(" "$F" | head -240 || true
+          echo "=== PLAYHI CSS + JS ==="
+          sudo -u djgabo-cdg grep -n -B10 -A30 -E "playHi|classList.*playHi|currentTime|start_time|end_time" "$F" | head -520 || true
+          echo "=== RENDER FUNCTIONS ==="
+          sudo -u djgabo-cdg grep -n -B8 -A40 -E "function renderLyrics|function render.*lyrics|renderLyrics\(|update.*play|requestAnimationFrame|timeupdate" "$F" | head -520 || true
           echo "=== RECENT BACKUPS ==="
           sudo -u djgabo-cdg find /opt/djgabo-cdg-ia-test/editor_v1 -maxdepth 1 -type f -name 'index.html.bak*' -printf '%TY-%Tm-%Td %TH:%TM:%TS %f\n' | sort -r | head -20
           REMOTE
