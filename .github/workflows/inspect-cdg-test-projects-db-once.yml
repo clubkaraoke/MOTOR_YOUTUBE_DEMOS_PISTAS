@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           mkdir -p diagnostics
           scp -P "$OVH_PORT" deploy/inspect_cdg_test_projects.py "$OVH_USER@$OVH_HOST:/tmp/inspect_cdg_test_projects.py"
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "python3 /tmp/inspect_cdg_test_projects.py" > diagnostics/cdg-test-projects-db.txt
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo python3 /tmp/inspect_cdg_test_projects.py" > diagnostics/cdg-test-projects-db.txt
 
       - name: Commit report
         run: |
