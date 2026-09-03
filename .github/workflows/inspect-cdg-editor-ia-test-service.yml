@@ -28,6 +28,83 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519"
           ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
 
+      - name: Deploy seven IA improvements bundle
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_editor_ia_7_improvements.py
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_7_improvements.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_7_improvements.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "=== APPLY 7 IMPROVEMENTS ==="
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          sudo python3 /tmp/patch_cdg_editor_ia_7_improvements.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py /opt/djgabo-cdg-ia-test/renderer/normalize.py
+          sudo systemctl restart djgabo-cdg-ia-test
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/ia-health-7.json 2>/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8775/healthz >/dev/null
+          echo "TEST_PATCH=OK"
+
+          cd /opt/djgabo-cdg-ia-test
+          sudo -u djgabo-cdg env HOME=/var/lib/djgabo-cdg-ia-test DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache DJGABO_SKIP_PREV_MIGRATION=1 /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import json,time,requests
+          from pathlib import Path
+          import server
+          with server.db() as c:
+              r=c.execute("select * from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+              if not r: raise SystemExit('NO_IA_TEST_JOB')
+              row=dict(r)
+          jid=row['id']; jobdir=Path(server.JOBS)/jid
+          stamp=time.strftime('%Y%m%d-%H%M%S')
+          (jobdir/f'backup_pre_7_improvements_{stamp}.json').write_text(row.get('project_json') or '{}',encoding='utf-8')
+          (jobdir/f'backup_pre_7_improvements_{stamp}.txt').write_text(str(row.get('lyrics_corrected') or ''),encoding='utf-8')
+          voice=jobdir/row['voice_filename']
+          with voice.open('rb') as fh:
+              rr=requests.post('http://127.0.0.1:8097/api/elevenlabs/transcribe',files={'audio':(voice.name,fh,'audio/mpeg')},data={'lyrics':'','language_code':'spa'},timeout=(30,1200))
+          rr.raise_for_status(); payload=rr.json(); words=payload.get('words') or []
+          project=server._ai_project_from_words(row['artist'],row['title'],row['voice_filename'],row.get('duration') or 0,'',words,'scribe_only',jid=jid)
+          gaps=server._detect_untranscribed_voice(voice,words,row.get('duration') or 0)
+          project.setdefault('ai',{})['voice_gaps']=gaps
+          project['ai']['scribe_word_count']=len(words);project['ai']['coverage_check']='audio_energy_vs_scribe'
+          lyrics=server._project_lyrics(project)
+          total=sum(len(x.get('words',[])) for x in project.get('segments',[]))
+          timed=sum(1 for x in project.get('segments',[]) for w in x.get('words',[]) if w.get('start_time') is not None)
+          with server.db() as c:
+              c.execute("update jobs set project_json=?,lyrics_corrected=?,lyrics_moises=?,updated=? where id=?",(json.dumps(project,ensure_ascii=False),lyrics,lyrics,server.now(),jid))
+              server.log(c,jid,'SCRIBE V2 · RECONSTRUIR COMPLETO 7 MEJORAS','scribe_only')
+          (jobdir/'letra_moises.txt').write_text(lyrics,encoding='utf-8')
+          print('REBUILT_JOB='+jid);print('SCRIBE_WORDS='+str(len(words)));print('PROJECT_WORDS='+str(total));print('TIMED_WORDS='+str(timed));print('VOICE_GAPS='+str(len(gaps)))
+          for g in gaps: print('VOICE_GAP='+json.dumps(g,ensure_ascii=False))
+          assert len(words)==total==timed
+          PY
+
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import sys
+          sys.path.insert(0,'/opt/djgabo-cdg-ia-test/renderer')
+          import normalize as N
+          a=[[{'text':'a'}],[{'text':'b'}],[{'text':'c'}],[{'text':'d'}],[],[{'text':'e'}],[{'text':'f'}]]
+          out=N.center_stanza_pages(a,6)
+          pos=[i%6 for i,line in enumerate(out) if line and line[0]['text'] in ('e','f')]
+          print('CENTER_ROWS='+str(pos));assert pos==[2,3]
+          PY
+
+          curl -fsS http://127.0.0.1:8775/ >/tmp/panel7.html
+          curl -fsS 'http://127.0.0.1:8775/editor-v1?embed=1' >/tmp/editor7.html
+          grep -q 'iaProgressFill' /tmp/panel7.html
+          grep -q 'create-job/start' /tmp/panel7.html
+          grep -q 'aiQaBar' /tmp/editor7.html
+          grep -q 'VOZ SIN TEXTO' /tmp/editor7.html
+          echo "FRONTEND_7=OK"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+
       - name: Fix isolated env and Nginx route
         env:
           OVH_HOST: ${{ secrets.OVH_HOST }}
