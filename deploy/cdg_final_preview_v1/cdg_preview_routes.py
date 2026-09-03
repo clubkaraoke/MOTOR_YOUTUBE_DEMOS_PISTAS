@@ -78,7 +78,8 @@ def register_cdg_preview_routes(app, g):
 
     @app.get("/api/vendor/cdg-final-preview.js")
     def cdg_final_preview_asset():
-        _auth()
+        # Asset estatico: no contiene datos privados. Las rutas de medios si
+        # exigen el token de sesion del trabajo.
         return send_file(g["ROOT"] / "vendor" / "cdg-final-preview.js", mimetype="application/javascript", conditional=True)
 
     @app.get("/api/jobs/<jid>/preview/meta")
