@@ -1,9 +1,10 @@
-TIMESTAMP=2026-09-03T06:32:11+00:00
+TIMESTAMP=2026-09-03T06:32:52+00:00
 PROD_BEFORE=active
 TEST_BEFORE=active
 /tmp/patch_cdg_repeat_block_alignment.py:18: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
   stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+frontend_partial_apply=ALREADY_PATCHED
 PATCH_REPEAT_BLOCK_ALIGNMENT=OK
 /tmp/cleanup_cdg_repeat_block_alignment.py:10: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
   stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-MISSING_MARKER:strategy='repeat_chunks'
+EDITOR_MISSING:const repeatMsg=j.strategy==="repeat_chunks"
