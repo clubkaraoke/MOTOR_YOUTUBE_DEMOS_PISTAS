@@ -1,0 +1,791 @@
+TIMESTAMP=2026-09-03T07:54:54+00:00
+
+=== IA TEST SERVICE STATUS ===
+● djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST
+     Loaded: loaded (/etc/systemd/system/djgabo-cdg-ia-test.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-09-03 07:47:19 UTC; 7min ago
+   Main PID: 4153134 (gunicorn)
+      Tasks: 5 (limit: 13965)
+     Memory: 89.6M (peak: 317.9M)
+        CPU: 17.013s
+     CGroup: /system.slice/djgabo-cdg-ia-test.service
+             ├─4153134 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
+             └─4153138 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
+
+Sep 03 07:47:19 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+Sep 03 07:47:19 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Starting gunicorn 26.2.0
+Sep 03 07:47:19 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Listening at: http://127.0.0.1:8775 (4153134)
+Sep 03 07:47:19 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Using worker: gthread
+Sep 03 07:47:19 vps-3a3efbf9 gunicorn[4153138]: [2026-09-03 07:47:19 +0000] [4153138] [INFO] Booting worker with pid: 4153138
+Sep 03 07:47:19 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+
+=== IA TEST RESTARTS LAST 60M ===
+2026-09-03T07:02:43+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:02:43+00:00 vps-3a3efbf9 gunicorn[4117509]: [2026-09-03 07:02:43 +0000] [4117509] [INFO] Handling signal: term
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 gunicorn[4117509]: [2026-09-03 07:02:44 +0000] [4117509] [INFO] Shutting down: Master
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 gunicorn[4123973]: [2026-09-03 07:02:44 +0000] [4123973] [INFO] Listening at: http://127.0.0.1:8775 (4123973)
+2026-09-03T07:02:44+00:00 vps-3a3efbf9 gunicorn[4123982]: [2026-09-03 07:02:44 +0000] [4123982] [INFO] Booting worker with pid: 4123982
+2026-09-03T07:06:40+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:06:40+00:00 vps-3a3efbf9 gunicorn[4123973]: [2026-09-03 07:06:40 +0000] [4123973] [INFO] Handling signal: term
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 gunicorn[4123973]: [2026-09-03 07:06:41 +0000] [4123973] [INFO] Shutting down: Master
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 gunicorn[4126563]: [2026-09-03 07:06:41 +0000] [4126563] [INFO] Listening at: http://127.0.0.1:8775 (4126563)
+2026-09-03T07:06:41+00:00 vps-3a3efbf9 gunicorn[4126586]: [2026-09-03 07:06:41 +0000] [4126586] [INFO] Booting worker with pid: 4126586
+2026-09-03T07:13:35+00:00 vps-3a3efbf9 gunicorn[4126563]: [2026-09-03 07:13:35 +0000] [4126563] [INFO] Handling signal: term
+2026-09-03T07:13:35+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 gunicorn[4126563]: [2026-09-03 07:13:36 +0000] [4126563] [INFO] Shutting down: Master
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 gunicorn[4131172]: [2026-09-03 07:13:36 +0000] [4131172] [INFO] Listening at: http://127.0.0.1:8775 (4131172)
+2026-09-03T07:13:36+00:00 vps-3a3efbf9 gunicorn[4131178]: [2026-09-03 07:13:36 +0000] [4131178] [INFO] Booting worker with pid: 4131178
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 gunicorn[4131172]: [2026-09-03 07:13:51 +0000] [4131172] [INFO] Handling signal: term
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 gunicorn[4131172]: [2026-09-03 07:13:51 +0000] [4131172] [INFO] Shutting down: Master
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:51+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:13:52+00:00 vps-3a3efbf9 gunicorn[4131478]: [2026-09-03 07:13:52 +0000] [4131478] [INFO] Listening at: http://127.0.0.1:8775 (4131478)
+2026-09-03T07:13:52+00:00 vps-3a3efbf9 gunicorn[4131482]: [2026-09-03 07:13:52 +0000] [4131482] [INFO] Booting worker with pid: 4131482
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131478]: [2026-09-03 07:33:54 +0000] [4131478] [INFO] Handling signal: term
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131478]: [2026-09-03 07:33:54 +0000] [4131478] [INFO] Shutting down: Master
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:33:54 +0000] [4144327] [INFO] Listening at: http://127.0.0.1:8775 (4144327)
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144333]: [2026-09-03 07:33:54 +0000] [4144333] [INFO] Booting worker with pid: 4144333
+2026-09-03T07:42:21+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:42:21+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:42:21 +0000] [4144327] [INFO] Handling signal: term
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:42:43 +0000] [4144327] [INFO] Shutting down: Master
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:42:43 +0000] [4149957] [INFO] Listening at: http://127.0.0.1:8775 (4149957)
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149963]: [2026-09-03 07:42:43 +0000] [4149963] [INFO] Booting worker with pid: 4149963
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:47:18 +0000] [4149957] [INFO] Handling signal: term
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:47:19 +0000] [4149957] [INFO] Shutting down: Master
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Listening at: http://127.0.0.1:8775 (4153134)
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153138]: [2026-09-03 07:47:19 +0000] [4153138] [INFO] Booting worker with pid: 4153138
+
+=== PANEL SESSION ERROR STRING ===
+736-};
+737-const ESTADO_LABEL = {
+738-  [ESTADOS.PENDIENTE]:'Pendiente', [ESTADOS.CORRECCION]:'Corrigiendo', [ESTADOS.CORREGIDA]:'Corregida',
+739-  [ESTADOS.COPIADA]:'Copiada', [ESTADOS.TERMINADO]:'Terminado', [ESTADOS.ELIMINADO]:'Eliminado'
+740-};
+741-
+742-const NOMBRES_ROL = { ADMIN: 'Augusto', CORRECTORA: 'Valeria' };
+743-let ROL = 'CORRECTORA';
+744:let SESSION_TOKEN = localStorage.getItem('consola_session_token') || '';
+745-let CORRECTORA_PASSWORD_REQUIRED = false;
+746-let listaVisible = 60;
+747-let lockHeartbeat = null;
+748-let cambiosPendientesGlobal = false;
+749-let trabajosCache = [];
+750-let filtroActivo = 'TODOS';
+751-let busquedaActual = '';
+752-let seleccionados = new Set();
+--
+852-function abrirLoginCorrectora(){
+853-  if(!CORRECTORA_PASSWORD_REQUIRED)return iniciarSesionUI('CORRECTORA','');
+854-  document.getElementById('loginGate').classList.remove('hidden');document.getElementById('loginCorrectoraBox').classList.add('show');
+855-  setTimeout(()=>document.getElementById('loginCorrectoraPassword').focus(),50);
+856-}
+857-function iniciarSesionUI(rol,password){
+858-  const err=document.getElementById('loginError');err.textContent='';
+859-  llamar('iniciarSesionConsola',rol,password||'').then(function(s){
+860:    SESSION_TOKEN=s.token;ROL=s.rol;localStorage.setItem('consola_session_token',SESSION_TOKEN);document.getElementById('loginGate').classList.add('hidden');aplicarRol();mostrarVista('dashboard');
+861-  }).catch(function(e){err.textContent=(e&&e.message)||'No se pudo iniciar sesión.';});
+862-}
+863-document.getElementById('entrarCorrectora').onclick=abrirLoginCorrectora;
+864-document.getElementById('confirmarCorrectora').onclick=()=>iniciarSesionUI('CORRECTORA',document.getElementById('loginCorrectoraPassword').value);
+865-document.getElementById('loginCorrectoraPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('confirmarCorrectora').click();});
+866-document.getElementById('mostrarLoginAdmin').onclick=()=>document.getElementById('loginAdminBox').classList.toggle('show');
+867-document.getElementById('entrarAdmin').onclick=()=>iniciarSesionUI('ADMIN',document.getElementById('loginAdminPassword').value);
+868-document.getElementById('loginAdminPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('entrarAdmin').click();});
+869-document.querySelectorAll('.role-btn').forEach(function(b){b.addEventListener('click',function(){if(b.dataset.role==='ADMIN')abrirLoginAdmin();else abrirLoginCorrectora();});});
+870-function cerrarSesionUI(){
+871:  const viejo=SESSION_TOKEN;SESSION_TOKEN='';localStorage.removeItem('consola_session_token');llamar('cerrarSesionConsola',viejo).catch(()=>{});document.getElementById('loginGate').classList.remove('hidden');
+872-}
+873-document.getElementById('btnCerrarSesion').onclick=cerrarSesionUI;
+874-document.getElementById('btnCerrarSesionEditor').onclick=cerrarSesionUI;
+875-/* =========================================================
+876-   NAVEGACIÓN
+877-   ========================================================= */
+878-function mostrarVista(nombre){
+879-  if (nombre !== 'editor' && document.getElementById('view-editor').classList.contains('active')){
+--
+903-  else mostrarVista('lista');
+904-});
+905-
+906-/* =========================================================
+907-   DASHBOARD
+908-   ========================================================= */
+909-function cargarDashboard(){
+910-  document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'2-digit', month:'long' });
+911:  llamar('obtenerDashboard', SESSION_TOKEN).then(renderDashboard).catch(function(err){
+912-    document.getElementById('dashboardBody').innerHTML = '<div class="empty-state">No se pudo cargar el panel.</div>';
+913-    mostrarErrorAmigable(err);
+914-  });
+915-}
+916-
+917-function vu(pct, colorVar){
+918-  let html = '<div class="vu" style="--seg:var(--'+colorVar+')">';
+919-  for (let i=0;i<8;i++) html += '<i class="'+(i < Math.round(pct*8) ? 'on' : '')+'"></i>';
+--
+955-  { key:'CORRECCION', label:'En corrección', estado:ESTADOS.CORRECCION },
+956-  { key:'CORREGIDA', label:'Corregidas', estado:ESTADOS.CORREGIDA },
+957-  { key:'COPIADA', label:'Copiadas', copiada:true },
+958-  { key:'TERMINADO', label:'Terminadas', estado:ESTADOS.TERMINADO }
+959-];
+960-
+961-function cargarLista(){
+962-  seleccionados.clear(); listaVisible=60;
+963:  llamar('listarTrabajos', SESSION_TOKEN).then(function(data){
+964-    trabajosCache = data.filter(function(t){ return t.estado !== ESTADOS.ELIMINADO; });
+965-    renderFiltros();
+966-    renderLista();
+967-  }).catch(function(err){
+968-    document.getElementById('listaBody').innerHTML = '<div class="empty-state">No se pudo cargar la lista.</div>';
+969-    mostrarErrorAmigable(err);
+970-  });
+971-}
+--
+1032-  document.querySelectorAll('#listaBody tbody tr').forEach(function(row){ row.addEventListener('click', function(e){ if (e.target.closest('.sel-check,.actions-dot,.inst-upload-btn,.prod-box')) return; abrirEditor(row.dataset.id); }); });
+1033-  document.querySelectorAll('.mobile-cards .stat-card').forEach(function(card){ card.addEventListener('click', function(e){ if(e.target.closest('.inst-upload-btn,.prod-box'))return; abrirEditor(card.dataset.id); }); });
+1034-  document.querySelectorAll('.sel-check').forEach(function(chk){ chk.addEventListener('click', function(e){ e.stopPropagation(); if (chk.checked) seleccionados.add(chk.dataset.id); else seleccionados.delete(chk.dataset.id); renderBulkBar(); }); });
+1035-  document.querySelectorAll('.actions-dot').forEach(function(dot){ dot.addEventListener('click', function(e){ e.stopPropagation(); abrirMenuAcciones(dot.dataset.id, e); }); });
+1036-  document.querySelectorAll('.inst-upload-btn').forEach(function(b){ b.addEventListener('click',function(e){e.stopPropagation();elegirInstrumentalTrabajo(b.dataset.instId);}); });
+1037-  document.querySelectorAll('.drive-retry-btn').forEach(function(b){ b.addEventListener('click',async function(e){
+1038-    e.stopPropagation();b.disabled=true;b.textContent='Drive…';
+1039-    try{
+1040:      const r=await fetch('/cdg-editor-ia/api/jobs/'+encodeURIComponent(b.dataset.driveId)+'/drive/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN})});
+1041-      const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'No se pudo reintentar Drive.');
+1042-      toast('✓ Respaldo Drive verificado · voz '+d.voice+' · JSON '+d.timings);cargarLista();
+1043-    }catch(err){mostrarErrorAmigable(err);b.disabled=false;b.textContent='Reintentar Drive';}
+1044-  }); });
+1045-  document.querySelectorAll('.prod-box[data-drop-inst]').forEach(function(z){
+1046-    z.addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();z.classList.add('dragover');}); z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+1047-    z.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();z.classList.remove('dragover');const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)subirInstrumentalTrabajo(z.dataset.dropInst,f);});
+1048-  });
+--
+1053-  const existente = document.getElementById('bulkBar'); if (existente) existente.remove();
+1054-  if (!seleccionados.size || !esAdmin()) return;
+1055-  const bar = document.createElement('div'); bar.className = 'bulkbar'; bar.id = 'bulkBar';
+1056-  bar.innerHTML = '<span>'+seleccionados.size+' seleccionado(s)</span><div style="flex:1"></div><button class="btn" id="btnComprobarDropbox">↻ Comprobar Dropbox</button><button class="btn btn-primary" id="btnDestinoSel">📁 Asignar destino</button><button class="btn btn-danger" id="btnMoverSelPapelera">Mover a papelera</button>';
+1057-  document.body.appendChild(bar);
+1058-  document.getElementById('btnComprobarDropbox').onclick=comprobarDropboxSeleccionados;
+1059-  document.getElementById('btnDestinoSel').onclick=function(){DBX_PICK_MODE='bulk';abrirDropboxSelector();};
+1060-  document.getElementById('btnMoverSelPapelera').addEventListener('click', function(){
+1061:    confirmar('Mover a papelera', seleccionados.size+' trabajo(s) se moverán a la papelera junto a sus archivos.', function(){ llamar('moverTrabajosPapelera', Array.from(seleccionados), SESSION_TOKEN).then(function(){ toast('Trabajos movidos a la papelera.'); seleccionados.clear(); cargarLista(); }).catch(mostrarErrorAmigable); });
+1062-  });
+1063-}
+1064-
+1065-function pintarWavProgreso(id,pct,txt){
+1066-  const box=document.getElementById('wavprog-'+id); if(!box)return;
+1067-  box.style.display='inline-flex'; const fill=box.querySelector('.wav-progress-fill'), lab=box.querySelector('.wav-progress-txt');
+1068-  if(fill)fill.style.width=Math.max(0,Math.min(100,pct||0))+'%'; if(lab)lab.textContent=txt||((pct||0)+'%');
+1069-}
+--
+1073-    const xhr=new XMLHttpRequest(); xhr.open('POST',url,true);
+1074-    xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(e.loaded,e.total)};
+1075-    xhr.upload.onload=()=>onReceived&&onReceived();
+1076-    xhr.onload=()=>{let d={};try{d=JSON.parse(xhr.responseText||'{}')}catch(_){}; if(xhr.status>=200&&xhr.status<300&&d.ok!==false)resolve(d);else reject(new Error(d.error||('Error '+xhr.status)));};
+1077-    xhr.onerror=()=>reject(new Error('Se cortó la subida del WAV.')); xhr.send(fd);
+1078-  });
+1079-}
+1080-async function prepararWavDirecto(file,jobId,candidateIds){
+1081:  const r=await fetch('/cdg-editor-ia/api/instrumentals/prepare-direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,filename:file.name,size:file.size,job_id:jobId||'',candidate_ids:candidateIds||[]})});
+1082-  let d={};try{d=await r.json()}catch(_){};if(!r.ok||d.ok===false)throw new Error(d.error||('No se pudo preparar Dropbox · '+r.status));return d;
+1083-}
+1084-function xhrDropboxDirecto(url,file,onProgress,onReceived){
+1085-  return new Promise((resolve,reject)=>{
+1086-    const xhr=new XMLHttpRequest();xhr.open('POST',url,true);xhr.setRequestHeader('Content-Type','application/octet-stream');
+1087-    xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(e.loaded,e.total)};
+1088-    xhr.upload.onload=()=>onReceived&&onReceived();
+1089-    xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300)resolve();else reject(new Error('Dropbox rechazó el WAV · HTTP '+xhr.status));};
+1090-    xhr.onerror=()=>reject(new Error('Se cortó la subida directa a Dropbox. Puedes reintentarla sin duplicar el archivo.'));
+1091-    xhr.send(file);
+1092-  });
+1093-}
+1094-async function confirmarWavDirecto(jobId,file){
+1095:  const r=await fetch('/cdg-editor-ia/api/jobs/'+encodeURIComponent(jobId)+'/instrumental/direct-confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,filename:file.name,size:file.size})});
+1096-  let d={};try{d=await r.json()}catch(_){};if(!r.ok||d.ok===false)throw new Error(d.error||'Dropbox recibió el archivo, pero OVH todavía no pudo confirmarlo. Pulsa Comprobar Dropbox.');return d;
+1097-}
+1098-async function comprobarDropboxSeleccionados(){
+1099-  if(!seleccionados.size)return;
+1100-  const btn=document.getElementById('btnComprobarDropbox');if(btn){btn.disabled=true;btn.textContent='Comprobando…';}
+1101-  try{
+1102:    const r=await fetch('/cdg-editor-ia/api/jobs/reconcile-dropbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:SESSION_TOKEN,job_ids:Array.from(seleccionados)})});
+1103-    const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'No se pudo comprobar Dropbox.');
+1104-    const wav=(d.results||[]).filter(x=>x.wav).length,cdg=(d.results||[]).filter(x=>x.cdg).length;
+1105-    toast('Dropbox comprobado · WAV '+wav+' · CDG '+cdg);await cargarLista();
+1106-  }catch(e){toast(e.message||String(e),'error');}
+1107-  finally{if(btn){btn.disabled=false;btn.textContent='↻ Comprobar Dropbox';}}
+1108-}
+1109-async function subirInstrumentalTrabajo(idTrabajo,file){
+1110-  if(!esAdmin())return; if(!file||!/\.wav$/i.test(file.name))return toast('El instrumental debe ser WAV.','error');
+--
+1149-    { label:'Copiar letra', fn:function(){ copiarLetraDeTrabajo(idTrabajo); } },
+1150-    { label:'Descargar TXT', fn:function(){ descargarTxtDeTrabajo(idTrabajo); } }
+1151-  ];
+1152-  if (esAdmin()){
+1153-    items.push({ label:'Duplicar trabajo', fn:function(){ accionSimple('duplicarTrabajo', idTrabajo, 'Trabajo duplicado.'); } });
+1154-    items.push({ label:'—divider—' });
+1155-    items.push({ label:'Mover a papelera', danger:true, fn:function(){
+1156-      confirmar('Mover a papelera', 'Se moverán a la papelera el audio, la letra y sus backups.', function(){
+1157:        llamar('moverTrabajoPapelera', idTrabajo, SESSION_TOKEN).then(function(){ toast('Movido a papelera.'); cargarLista(); }).catch(mostrarErrorAmigable);
+1158-      });
+1159-    }});
+1160-  }
+1161-
+1162-  if (window.innerWidth <= 880){
+1163-    const sheet = document.getElementById('sheet');
+1164-    sheet.innerHTML = items.map(function(it, i){
+1165-      if (it.label === '—divider—') return '<hr>';
+--
+1191-}
+1192-document.getElementById('sheetOverlay').addEventListener('click', cerrarSheet);
+1193-function cerrarSheet(){
+1194-  document.getElementById('sheet').style.display = 'none';
+1195-  document.getElementById('sheetOverlay').classList.remove('open');
+1196-}
+1197-
+1198-function accionSimple(fn, idTrabajo, msgOk){
+1199:  llamar(fn, idTrabajo, SESSION_TOKEN).then(function(){ toast(msgOk); cargarLista(); }).catch(mostrarErrorAmigable);
+1200-}
+1201-
+1202-/**
+1203- * Convierte números escritos en dígitos a su forma hablada en español.
+1204- * Ej: "Armonia 10" -> "Armonia diez". Cubre 0-999999, suficiente para letras de canciones.
+1205- */
+1206-function numeroATextoEs(nStr){
+1207-  const n = parseInt(nStr, 10);
+--
+1275-    .replace(/ +\n/g, '\n')
+1276-    .replace(/\n{3,}/g, '\n\n')
+1277-    .split('\n').map(function(l){ return l.trim(); }).join('\n')
+1278-    .trim();
+1279-  return resultado;
+1280-}
+1281-
+1282-function copiarLetraDeTrabajo(idTrabajo){
+1283:  llamar('obtenerLetraTrabajo', idTrabajo, SESSION_TOKEN).then(function(t){
+1284-    const letra = limpiarLetra(t.letraCorregida || t.letraMoises);
+1285-    navigator.clipboard.writeText(letra).then(function(){
+1286-      toast('Letra copiada al portapapeles.');
+1287:      llamar('marcarLetraCopiada', idTrabajo, SESSION_TOKEN).then(function(){ cargarLista(); }).catch(function(){ /* no crítico */ });
+1288-    });
+1289-  }).catch(mostrarErrorAmigable);
+1290-}
+1291-
+1292-function descargarTxtDeTrabajo(idTrabajo){
+1293:  llamar('obtenerLetraTrabajo', idTrabajo, SESSION_TOKEN).then(function(t){
+1294-    const letra = t.letraCorregida || t.letraMoises;
+1295-    descargarBlobTxt(letra, idTrabajo+'.txt');
+1296-  }).catch(mostrarErrorAmigable);
+1297-}
+1298-
+1299-function descargarBlobTxt(texto, nombre){
+1300-  const blob = new Blob([texto], { type:'text/plain;charset=utf-8' });
+
+=== SERVER SESSION/AUTH CODE ===
+96-        print(f'[LOCAL 16.14 ONLINE CONTROLADO] Datos de LOCAL {source_version} migrados desde:',src_root)
+97-    except Exception as e:
+98-        print(f'[LOCAL 16.2 ONLINE] No se pudo migrar LOCAL {source_version} automáticamente:',e)
+99-
+<REDACTED>()
+101-app=Flask(__name__)
+102-if env_bool('DJGABO_TRUST_PROXY',IS_PRODUCTION):
+103-    # Debe usarse solamente detrás del Nginx incluido en deploy/.
+104-    app.wsgi_app=ProxyFix(app.wsgi_app,x_for=1,x_proto=1,x_host=1,x_port=1)
+105-app.config['MAX_CONTENT_LENGTH']=750*1024*1024  # WAVs grandes: subida multipart, sin Base64
+106-SESSIONS={}
+107-SESSION_ACTIVITY={}
+108:SESSION_TTL_SECONDS=max(900,int(os.getenv('DJGABO_SESSION_TTL_SECONDS') or (43200 if IS_PRODUCTION else 604800)))
+109-ADMIN_PASSWORD=str(os.getenv('DJGABO_ADMIN_PASSWORD') or ('' if IS_PRODUCTION else 'matata22'))
+110-CORRECTORA_PASSWORD=str(os.getenv('DJGABO_CORRECTORA_PASSWORD') or '')
+111-PORTAL_COOKIE_NAME='djgabo_portal_session_ia_test' if TEST_MODE else 'djgabo_portal_session'
+112-LOGIN_FAILURES={}
+113-LOGIN_RATE_WINDOW=15*60
+114-LOGIN_RATE_MAX=max(3,int(os.getenv('DJGABO_LOGIN_RATE_MAX') or 10))
+115-if IS_PRODUCTION and (len(ADMIN_PASSWORD)<16 or len(CORRECTORA_PASSWORD)<16 or ADMIN_PASSWORD==CORRECTORA_PASSWORD):
+116-    raise RuntimeError('Producción exige claves ADMIN/CORRECTORA distintas y de al menos 16 caracteres.')
+117-if IS_PRODUCTION and (not PUBLIC_BASE_URL.startswith('https://') or not DROPBOX_REDIRECT_URI.startswith('https://')):
+118-    raise RuntimeError('Producción exige DJGABO_PUBLIC_BASE_URL y DROPBOX_REDIRECT_URI con HTTPS.')
+119-EST_P='PENDIENTE DE CORRECCIÓN'; EST_C='EN CORRECCIÓN'; EST_OK='LETRA CORREGIDA'; EST_TERM='KARAOKE TERMINADO'; EST_DEL='ELIMINADO'
+120-
+121-# LOCAL 16.14: el navegador no recibe el MP3 completo antes de reproducirlo.
+122-# El backend recupera UNA sola vez el audio mediante la acción antigua `audio`
+123-# del puente ya publicado, lo comparte en memoria entre waveform y reproductor,
+124-# y sirve desde esa copia todos los HTTP Range que solicite el navegador.
+125-_DRIVE_AUDIO_META={}
+126-_DRIVE_CACHE_LOCK=threading.RLock()
+127-_DRIVE_AUDIO_MEMORY={}
+128-_DRIVE_AUDIO_LOADING=set()
+129-_DRIVE_AUDIO_ERRORS={}
+130-_DRIVE_AUDIO_MEMORY_COND=threading.Condition(threading.RLock())
+131:_DRIVE_TOKEN_CACHE={'token':'','expires':0.0}
+132-_DRIVE_TOKEN_LOCK=threading.RLock()
+133-_DRIVE_BACKUP_LOCK=threading.RLock()
+134-_DRIVE_TIMINGS_PENDING={}
+135-_DRIVE_TIMINGS_RUNNING=set()
+136-DRIVE_AUDIO_MEMORY_MAX=3
+137-DRIVE_AUDIO_YIELD_SIZE=256*1024
+138-VOICE_CACHE_MAX_BYTES=max(0,int(float(os.getenv('DJGABO_VOICE_CACHE_MAX_GB') or 8)*1024*1024*1024))
+139-VOICE_CACHE_METADATA_TTL=max(300,int(os.getenv('<REDACTED>') or 86400))
+140-
+141-_PEAKS_CACHE={}
+142-_PEAK_TASKS={}
+143-_PEAKS_LOCK=threading.RLock()
+--
+423-        },timeout=90)
+424-        with db() as c: c.execute("UPDATE jobs SET sheet_master_status='OK',sheet_master_error='' WHERE id=?",(str(jid),))
+425-        return result
+426-    except Exception as e:
+427-        with db() as c: c.execute("UPDATE jobs SET sheet_master_status='PENDIENTE',sheet_master_error=? WHERE id=?",(str(e)[:1000],str(jid)))
+428-        raise
+429-
+430-def drive_oauth_token(force=False):
+431-    """Token OAuth corto, entregado sólo al backend por el Apps Script privado."""
+432-    if not DRIVE_AUDIO_TOKEN_SECRET:
+433-        raise ValueError('Falta DJGABO_DRIVE_AUDIO_TOKEN_SECRET en el servidor.')
+434-    with _DRIVE_TOKEN_LOCK:
+435:        if not force and _DRIVE_TOKEN_CACHE['token'] and time.time()<_DRIVE_TOKEN_CACHE['expires']-90:
+436-            return _DRIVE_TOKEN_CACHE['token']
+437-        data=drive_bridge_call('audio_token',{'audioSecret':DRIVE_AUDIO_TOKEN_SECRET},timeout=45)
+438-        token=str(data.get('accessToken') or '').strip()
+439-        if not token: raise ValueError('Google Drive no entregó un token OAuth al backend.')
+440:        ttl=max(120,int(data.get('expiresInSec') or 1200))
+441:        _DRIVE_TOKEN_CACHE.update(token=token,expires=time.time()+ttl)
+442-        return token
+443-
+444-def _drive_api(method,url,force_token=False,**kwargs):
+445-    """Drive API con renovación única; nunca expone el token al navegador/log."""
+446-    headers=dict(kwargs.pop('headers',{}) or {})
+447-    headers['Authorization']='Bearer '+drive_oauth_token(force=force_token)
+448-    try: response=requests.request(method,url,headers=headers,timeout=kwargs.pop('timeout',120),**kwargs)
+449-    except requests.RequestException as e: raise ValueError('No se pudo conectar con Google Drive: '+str(e)) from e
+450-    if response.status_code==401 and not force_token:
+451-        return _drive_api(method,url,force_token=True,headers={k:v for k,v in headers.items() if k.lower()!='authorization'},**kwargs)
+452-    if response.status_code>=400:
+453-        raise ValueError('Google Drive HTTP '+str(response.status_code)+': '+(response.text or '')[:700])
+--
+945-def next_id(c):
+946-    r=c.execute("SELECT id FROM jobs ORDER BY id DESC LIMIT 1").fetchone()
+947-    n=max(HISTORICAL_ID_FLOOR+1, int(r['id'].split('-')[-1])+1 if r else HISTORICAL_ID_FLOOR+1)
+948-    return f'LET-{n:04d}'
+949-def log(c,jid,action,state=''):
+950-    c.execute('INSERT INTO logs(job_id,action,state,at) VALUES(?,?,?,?)',(jid,action,state,now()))
+<REDACTED>()
+952-seed_legacy_pending_jobs()
+953-
+954-def _client_ip():
+955-    return str(request.remote_addr or 'unknown')
+956-
+957:def _login_rate_check(ip):
+958-    cutoff=time.time()-LOGIN_RATE_WINDOW
+959-    attempts=[t for t in LOGIN_FAILURES.get(ip,[]) if t>=cutoff]
+960-    LOGIN_FAILURES[ip]=attempts
+961-    if len(attempts)>=LOGIN_RATE_MAX:
+962-        raise PermissionError('Demasiados intentos. Espera 15 minutos antes de volver a ingresar.')
+963-
+964:def _login_failed(ip):
+965-    LOGIN_FAILURES.setdefault(ip,[]).append(time.time())
+966-
+967:def session(token, role=None):
+968-    token=str(token or '')
+969-    r=SESSIONS.get(token)
+970-    last=float(SESSION_ACTIVITY.get(token) or 0)
+971:    if not r or not last or (time.time()-last)>SESSION_TTL_SECONDS:
+972-        SESSIONS.pop(token,None); SESSION_ACTIVITY.pop(token,None)
+973-        raise PermissionError('Sesión vencida. Vuelve a ingresar.')
+974-    if role and r!=role: raise PermissionError('Acceso no permitido.')
+975-    SESSION_ACTIVITY[token]=time.time()
+976-    return r
+977-
+978-def migrate_legacy_dropbox_cfg():
+979-    """Conserva autorización OAuth y carpeta actual al pasar de V10/V11 a V12."""
+980-    if DROPBOX_CFG.exists(): return
+981-    bases=[]
+982-    try: bases.extend([ROOT.parent,ROOT.parent.parent,Path.home()/'Downloads'])
+983-    except Exception: pass
+--
+1070-    if pr: h['Dropbox-API-Path-Root']=pr
+1071-    return h
+1072-
+1073-def _retry_sleep(attempt):
+1074-    # 1.25 s, 3 s. Tres intentos totales sin hacer esperar demasiado a Valeria.
+1075-    time.sleep((1.25,3.0)[min(attempt,1)])
+1076-
+1077-def dropbox_access_token(force=False):
+1078-    if TEST_MODE:
+1079-        raise ValueError('Dropbox desactivado en CDG Editor IA TEST.')
+1080-    cfg=load_dropbox_cfg()
+1081-    if not dropbox_connected(cfg): raise ValueError('Dropbox no está conectado. En ADMIN pulsa Configurar Dropbox.')
+1082:    if not force and cfg.get('access_token') and float(cfg.get('expires_at') or 0)>time.time()+60:
+1083-        return cfg['access_token']
+1084-    last=None
+1085-    for attempt in range(3):
+1086-        try:
+1087-            r=requests.post('https://api.dropboxapi.com/oauth2/token',
+1088-              data={'grant_type':'refresh_token','refresh_token':cfg['refresh_token']},
+1089-              auth=(cfg['app_key'],cfg['app_secret']),timeout=30)
+1090-            if r.ok:
+1091:                j=r.json(); cfg['access_token']=j['access_token']; cfg['expires_at']=time.time()+float(j.get('expires_in') or 14400)
+1092-                save_dropbox_cfg(cfg); return cfg['access_token']
+1093-            last=ValueError('Dropbox no pudo renovar la sesión: '+r.text[:500])
+1094-            if r.status_code not in (408,429,500,502,503,504): break
+1095-        except requests.RequestException as e:
+1096-            last=e
+1097-        if attempt<2: _retry_sleep(attempt)
+1098-    raise ValueError('Dropbox no pudo renovar la sesión tras 3 intentos: '+str(last))
+1099-
+1100-def dropbox_rpc(endpoint,payload=None,token=None,path_root=True,namespace_id=None):
+1101-    body=json.dumps(payload or {},ensure_ascii=False).encode('utf-8')
+1102-    last=None; forced=False
+1103-    for attempt in range(3):
+--
+1213-    result=dropbox_rpc('files/get_temporary_upload_link',payload,namespace_id=ns)
+1214-    link=str(result.get('link') or '').strip()
+1215-    if not link.startswith('https://content.dropboxapi.com/'):
+1216-        raise ValueError('Dropbox no devolvió un enlace temporal de subida válido.')
+1217-    return {
+1218-        'upload_url':link,
+1219-        'filename':filename,
+1220-        'folder_id':folder['id'],
+1221-        'folder_display':folder['path_display'],
+1222-        'folder_path_lower':folder['path_lower'],
+1223-        'namespace_id':ns,
+1224-        'remote_api_path':remote_api_path,
+1225:        'expires_in':payload['duration']
+1226-    }
+1227-
+1228-def dropbox_confirm_uploaded_file(folder_ref,filename,expected_size=0,expected_display_path=''):
+1229-    """Confirma por ID, tamaño y ruta visible un archivo subido directamente."""
+1230-    filename=Path(str(filename or '')).name
+1231-    folder=dropbox_folder_meta(folder_ref)
+1232-    if expected_display_path and _norm_dropbox_path(expected_display_path)!=_norm_dropbox_path(folder['path_display']):
+1233-        raise ValueError('El destino Dropbox cambió durante la subida; no se vinculó otra carpeta.')
+1234-    ns=folder.get('namespace_id') or dropbox_home_namespace_id()
+1235-    remote=dropbox_join(folder.get('api_path_lower') or folder['path_lower'],filename)
+1236-    meta=None
+1237-    for attempt in range(6):
+--
+1491-    response.headers.setdefault('X-Frame-Options','SAMEORIGIN')
+1492-    response.headers.setdefault('Referrer-Policy','same-origin')
+1493-    response.headers.setdefault('Permissions-Policy','camera=(), microphone=(), geolocation=()')
+1494-    # El WAV viaja directamente del navegador al enlace temporal y de ruta fija
+1495-    # que entrega Dropbox. Sin este host en connect-src, el navegador bloquea la
+1496-    # petición antes de que salga de la PC y XMLHttpRequest sólo informa un corte.
+1497-    response.headers.setdefault('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://content.dropboxapi.com https://uvronline.app https://*.uvronline.app; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'")
+1498-    if request.path.startswith('/api/') or request.path.startswith('/dropbox/'):
+1499-        response.headers.setdefault('Cache-Control','private, no-store')
+1500-    return response
+1501-
+1502-@app.errorhandler(PermissionError)
+1503:def expired_session_error(error):
+1504-    """Las rutas directas también deben responder 401, no registrar un 500."""
+1505-    message=str(error) or 'Sesión vencida. Vuelve a ingresar.'
+1506-    if request.path.startswith('/api/'):
+1507-        return jsonify(ok=False,error=message),401
+1508-    return '<h3>Sesión vencida</h3><p>Vuelve al panel e ingresa nuevamente.</p>',401
+1509-
+1510-@app.get('/healthz')
+1511-def healthz():
+1512-    checks={'database':False,'ffmpeg':bool(shutil.which('ffmpeg')),'data_writable':os.access(DATA,os.W_OK)}
+1513-    try:
+1514-        with db() as c: checks['database']=c.execute('SELECT 1').fetchone()[0]==1
+1515-    except Exception as e:
+--
+1528-
+1529-def _portal_auth(required_role=None):
+1530-    try:
+1531-        role=session(request.cookies.get(PORTAL_COOKIE_NAME,''),required_role)
+1532-        return jsonify(ok=True,rol=role),200
+1533-    except PermissionError:
+1534-        return jsonify(ok=False,error='Acceso no autorizado.'),401
+1535-
+1536-@app.get('/api/portal/session')
+1537-def portal_session_api():
+1538-    return _portal_auth()
+1539-
+1540:@app.get('/api/portal/auth/any')
+1541-def portal_auth_any_api():
+1542-    return _portal_auth()
+1543-
+1544:@app.get('/api/portal/auth/admin')
+1545-def portal_auth_admin_api():
+1546-    return _portal_auth('ADMIN')
+1547-
+1548-@app.get('/')
+1549-def panel(): return send_file(ROOT/'panel.html')
+1550-@app.get('/editor-v1')
+1551-def editor_v1(): return send_file(ROOT/'editor_v1'/'index.html')
+1552-@app.get('/api/style')
+1553-def style(): return jsonify(json.loads((ROOT/'renderer'/'style.json').read_text(encoding='utf-8')))
+1554-
+1555-@app.get('/api/drive/status')
+1556-def drive_status_api():
+--
+1595-        meta=dropbox_folder_meta(folder_id); cfg=load_dropbox_cfg()
+1596-        cfg['default_folder_id']=meta['id']; cfg['default_folder_display']=meta['path_display']; cfg['default_folder_path_lower']=meta['path_lower']; save_dropbox_cfg(cfg)
+1597-        return jsonify(ok=True,folder=meta)
+1598-    except ValueError as e: return jsonify(ok=False,error=str(e)),400
+1599-
+1600-@app.post('/api/dropbox/config')
+1601-def dropbox_config_api():
+1602-    d=request.get_json(silent=True) or {}; session(d.get('token'),'ADMIN')
+1603-    app_key=str(d.get('app_key') or '').strip() or DROPBOX_APP_KEY_DEFAULT
+1604-    app_secret=str(d.get('app_secret') or '').strip()
+1605-    if not app_key or not app_secret: return jsonify(ok=False,error='Falta App Key o App Secret.'),400
+1606-    cfg=load_dropbox_cfg(); cfg.update({'app_key':app_key,'app_secret':app_secret})
+1607:    for k in ('refresh_token','access_token','expires_at','account_name','account_email','account_id','root_namespace_id','home_namespace_id','home_path'): cfg.pop(k,None)
+1608-    save_dropbox_cfg(cfg)
+1609-    return jsonify(ok=True,app_key=app_key)
+1610-
+1611-@app.get('/dropbox/connect')
+1612-def dropbox_connect():
+1613-    token=request.args.get('token',''); session(token,'ADMIN')
+1614-    cfg=load_dropbox_cfg()
+1615-    if not cfg.get('app_key') or not cfg.get('app_secret'):
+1616-        return '<h3>Primero guarda App Key y App Secret desde el panel ADMIN.</h3>',400
+1617-    state=secrets.token_urlsafe(28); DROPBOX_OAUTH_STATES[state]={'token':token,'created':time.time()}
+1618-    from urllib.parse import urlencode
+1619-    q=urlencode({'client_id':cfg['app_key'],'response_type':'code','redirect_uri':DROPBOX_REDIRECT_URI,'token_access_type':'offline','state':state})
+--
+1622-@app.get('/dropbox/callback')
+1623-def dropbox_callback():
+1624-    code=request.args.get('code',''); state=request.args.get('state',''); err=request.args.get('error_description') or request.args.get('error')
+1625-    st=DROPBOX_OAUTH_STATES.pop(state,None)
+1626-    if err: return '<h3>Dropbox no autorizó la conexión.</h3><p>'+str(err)+'</p>',400
+1627-    if not code or not st or time.time()-st.get('created',0)>900:
+1628-        return '<h3>Autorización Dropbox vencida o inválida. Vuelve a pulsar Conectar Dropbox.</h3>',400
+1629-    cfg=load_dropbox_cfg()
+1630-    try:
+1631-        r=requests.post('https://api.dropboxapi.com/oauth2/token',data={'code':code,'grant_type':'authorization_code','redirect_uri':DROPBOX_REDIRECT_URI},auth=(cfg['app_key'],cfg['app_secret']),timeout=30)
+1632-        if not r.ok: raise ValueError(r.text[:800])
+1633-        j=r.json(); cfg['refresh_token']=j.get('refresh_token') or cfg.get('refresh_token')
+1634:        cfg['access_token']=j.get('access_token',''); cfg['expires_at']=time.time()+float(j.get('expires_in') or 14400)
+1635-        if not cfg.get('refresh_token'): raise ValueError('Dropbox no devolvió refresh_token. Revisa que la autorización use acceso offline.')
+1636-        acc=dropbox_rpc('users/get_current_account',{},token=cfg['access_token'],path_root=False)
+1637-        ri=acc.get('root_info') or {}
+1638-        cfg['account_name']=(acc.get('name') or {}).get('display_name',''); cfg['account_email']=acc.get('email',''); cfg['account_id']=acc.get('account_id','')
+1639-        cfg['root_namespace_id']=str(ri.get('root_namespace_id') or '')
+1640-        cfg['home_namespace_id']=str(ri.get('home_namespace_id') or ri.get('root_namespace_id') or '')
+1641-        cfg['home_path']=str(ri.get('home_path') or '')
+1642-        save_dropbox_cfg(cfg)
+1643-    except Exception as e:
+1644-        app.logger.exception('oauth dropbox'); return '<h3>No se pudo completar Dropbox.</h3><pre>'+str(e)+'</pre>',500
+1645-    html='<!doctype html><meta charset="utf-8"><title>Dropbox conectado</title><body style="font-family:Segoe UI;background:#12141A;color:#F1EFEA;padding:40px;text-align:center"><h2>Dropbox conectado</h2><p>Ya puedes volver al panel DJGABO.</p><script>try{window.opener&&window.opener.postMessage({type:"dropbox:connected"},"*");setTimeout(()=>window.close(),700)}catch(e){}</script></body>'
+1646-    return html
+--
+1667-            if not res.get('has_more'): break
+1668-            res=dropbox_rpc('files/list_folder/continue',{'cursor':res['cursor']},token=tok)
+1669-        out.sort(key=lambda x:x['name'].casefold())
+1670-        return jsonify(ok=True,current=current,folders=out)
+1671-    except ValueError as e: return jsonify(ok=False,error=str(e)),400
+1672-
+1673-@app.post('/api/call/<fn>')
+1674-def api_call(fn):
+1675-    args=(request.get_json(silent=True) or {}).get('args',[])
+1676-    try:
+1677-        result=dispatch(fn,args)
+1678-        response=jsonify(result)
+1679:        if fn=='iniciarSesionConsola' and result.get('token'):
+1680:            response.set_cookie(PORTAL_COOKIE_NAME,result['token'],max_age=SESSION_TTL_SECONDS,
+1681-              secure=IS_PRODUCTION,httponly=True,samesite='Lax',path='/')
+1682-        elif fn=='validarSesionConsola' and result.get('ok') and args:
+1683:            response.set_cookie(PORTAL_COOKIE_NAME,str(args[0]),max_age=SESSION_TTL_SECONDS,
+1684-              secure=IS_PRODUCTION,httponly=True,samesite='Lax',path='/')
+1685-        elif fn=='cerrarSesionConsola':
+1686-            response.delete_cookie(PORTAL_COOKIE_NAME,path='/',secure=IS_PRODUCTION,
+1687-              httponly=True,samesite='Lax')
+1688-        return response
+1689-    except PermissionError as e: return jsonify(error=str(e),ok=False),401
+1690-    except ValueError as e: return jsonify(error=str(e),ok=False),400
+1691-    except Exception as e:
+1692-        app.logger.exception('api %s',fn); return jsonify(error=str(e),ok=False),500
+1693-
+1694-def dispatch(fn,a):
+1695:    if fn=='iniciarSesionConsola':
+1696-        role=str(a[0] if a else '').upper(); pwd=str(a[1] if len(a)>1 else '')
+
+=== CREATE JOB ROUTE ===
+2720-            result={'idTrabajo':jid,'words':len(ai_words),'flagged':flagged,'voice_gaps':len(gaps),
+2721-                    'elapsed_s':round(time.monotonic()-started,3),'source_mode':'scribe_only'})
+2722-    except Exception as e:
+2723-        app.logger.exception('AI async create job')
+2724-        try: shutil.rmtree(tmp_folder,ignore_errors=True)
+2725-        except Exception: pass
+2726-        _ai_task_set(task_id,status='error',progress=100,stage='Error',error=str(e))
+2727-    finally:
+2728-        with _AI_TASK_LOCK: _AI_RESERVED_IDS.discard(str(jid))
+2729-
+2730:@app.post('/api/ai/create-job/start')
+2731-def ai_create_job_start():
+2732-    if not TEST_MODE: return jsonify(ok=False,error='Ruta sólo disponible en IA TEST.'),403
+2733-    token=request.form.get('session_token','')
+2734-    try:
+2735-        session(token,'ADMIN')
+2736-        voice=request.files.get('voice'); inst=request.files.get('instrumental')
+2737-        voice_bridge=str(request.form.get('voice_bridge_token') or '').strip()
+2738-        inst_bridge=str(request.form.get('instrumental_bridge_token') or '').strip()
+2739-        inst_bridge_name=safe_name(Path(str(request.form.get('instrumental_bridge_name') or '')).name) if request.form.get('instrumental_bridge_name') else ''
+2740-        artist=str(request.form.get('artist') or '').strip()
+2741-        title=str(request.form.get('title') or '').strip()
+2742-        duration=float(request.form.get('voice_duration') or 0)
+2743-
+2744-        voice_meta=None; inst_meta=None
+2745-        if voice_bridge: voice_meta,_,_=_uvr_bridge_meta(voice_bridge,'voice')
+2746-        if inst_bridge: inst_meta,_,_=_uvr_bridge_meta(inst_bridge,'instrumental')
+2747-        if duration<=0 and voice_meta:
+2748-            duration=float(voice_meta.get('duration') or 0)
+2749-        voice_original=(str(voice_meta.get('name') or '') if voice_meta else (voice.filename if voice else ''))
+2750-        inst_original=(inst_bridge_name if (inst_meta and inst_bridge_name) else (str(inst_meta.get('name') or '') if inst_meta else (inst.filename if inst else '')))
+2751-
+2752-        if not voice_original: raise ValueError('Selecciona la VOZ MP3.')
+2753-        if not inst_original: raise ValueError('Selecciona el INSTRUMENTAL WAV.')
+2754-        if Path(voice_original).suffix.lower()!='.mp3': raise ValueError('La VOZ debe ser MP3.')
+2755-        if Path(inst_original).suffix.lower()!='.wav': raise ValueError('El INSTRUMENTAL debe ser WAV.')
+2756-        if not artist or not title:
+2757-            try: artist,title=master_identity(inst_original)
+2758-            except Exception: raise ValueError('Completa artista y título.')
+2759-
+2760-        with _AI_TASK_LOCK:
+2761-            with db() as c: jid=next_id(c)
+2762-            while str(jid) in _AI_RESERVED_IDS:
+2763-                n=int(re.sub(r'\D','',jid) or 0)+1; jid=f'LET-{n:04d}'
+2764-            _AI_RESERVED_IDS.add(str(jid))
+2765-
+2766-        final_folder=JOBS/jid; tmp_folder=JOBS/f'.{jid}.ia-uploading'
+2767-        shutil.rmtree(tmp_folder,ignore_errors=True); tmp_folder.mkdir(parents=True,exist_ok=True)
+2768-        voice_name=safe_name(f'{artist} - {title} (Voz).mp3')
+2769-        inst_name=safe_name(Path(inst_original).name)
+2770-        voice_path=tmp_folder/voice_name; inst_path=tmp_folder/inst_name
+2771-        if voice_bridge: _uvr_bridge_consume(voice_bridge,'voice',voice_path)
+2772-        else: voice.save(voice_path)
+2773-        if inst_bridge: _uvr_bridge_consume(inst_bridge,'instrumental',inst_path)
+2774-        else: inst.save(inst_path)
+2775-        if voice_path.stat().st_size<=0 or inst_path.stat().st_size<=0:
+2776-            raise ValueError('Uno de los audios llegó vacío.')
+2777-
+2778-        task_id=secrets.token_urlsafe(12)
+2779-        _ai_task_set(task_id,status='running',progress=36,stage='Audio recibido · preparando Scribe v2…',
+2780-                     idTrabajo=jid)
+2781-        threading.Thread(
+2782-            target=_run_ai_create_task,
+2783-            args=(task_id,jid,artist,title,voice_name,voice_original,inst_name,duration,tmp_folder,final_folder),
+2784-            daemon=True
+2785-        ).start()
+2786-        return jsonify(ok=True,task_id=task_id,idTrabajo=jid),202
+2787-    except PermissionError as e: return jsonify(ok=False,error=str(e)),401
+2788-    except ValueError as e: return jsonify(ok=False,error=str(e)),400
+2789-    except Exception as e:
+2790-        app.logger.exception('AI start job')
+2791-        return jsonify(ok=False,error='No se pudo iniciar Scribe v2: '+str(e)),500
+2792-
+2793-@app.get('/api/ai/tasks/<task_id>')
+2794-def ai_task_status(task_id):
+2795-    if not TEST_MODE: return jsonify(ok=False,error='Ruta sólo disponible en IA TEST.'),403
+2796-    token=request.args.get('session_token','')
+2797-    try: session(token,'ADMIN')
+2798-    except PermissionError as e: return jsonify(ok=False,error=str(e)),401
+2799-    task=_ai_task_public(task_id)
+2800-    if not task: return jsonify(ok=False,error='Tarea IA no encontrada.'),404
+2801-    return jsonify(ok=True,task=task)
+2802-
+2803-def _ai_visual_units(text):
+2804-    """Aproxima el ancho visual de Impact sin depender de la UI."""
+2805-    total=0.0
+2806-    for ch in str(text or '').upper():
+2807-        if ch in 'MWÁÉÓÚQG': total+=1.20
+2808-        elif ch in 'IÍLJT1.,;:!¡?¿': total+=0.58
+2809-        elif ch==' ': total+=0.55
+2810-        else: total+=1.0
+2811-    return total
+2812-
+2813-def _ai_balance_phrase(tokens, max_units=29.0):
+2814-    toks=[dict(t) for t in tokens if str(t.get('text') or '').strip()]
+2815-    if not toks: return []
+2816-    widths=[_ai_visual_units(t.get('text')) for t in toks]
+2817-    spaces=.55
+2818-    total=sum(widths)+spaces*max(0,len(toks)-1)
+2819-    n_lines=max(1,int(math.ceil(total/max_units)))
+2820-    n_lines=min(n_lines,max(1,len(toks)))
+2821-    prefix=[0.0]
+2822-    for i,w in enumerate(widths):
+2823-        prefix.append(prefix[-1]+w+(spaces if i else 0.0))
+2824-    target=total/n_lines
+2825-    inf=10**18
+2826-    dp=[[inf]*(len(toks)+1) for _ in range(n_lines+1)]
+2827-    back=[[None]*(len(toks)+1) for _ in range(n_lines+1)]
+2828-    dp[0][0]=0.0
+2829-    def span(i,j):
+2830-        val=prefix[j]-prefix[i]
+2831-        if i>0: val-=spaces
+2832-        return val
+2833-    for ln in range(1,n_lines+1):
+2834-        for j in range(ln,len(toks)+1):
+2835-            for i in range(ln-1,j):
+2836-                w=span(i,j)
+2837-                if w>max_units*1.12: continue
+2838-                count=j-i
+2839-                penalty=(w-target)**2
+2840-                if count==1 and len(toks)>2: penalty+=28.0
+
+=== NGINX IA REQUESTS LAST 40M ===
+
+=== IA TEST JOURNAL LAST 40M ===
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131478]: [2026-09-03 07:33:54 +0000] [4131478] [INFO] Handling signal: term
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131482]: [2026-09-03 07:33:54 +0000] [4131482] [INFO] Worker exiting (pid: 4131482)
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131482]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4131478]: [2026-09-03 07:33:54 +0000] [4131478] [INFO] Shutting down: Master
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Deactivated successfully.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Consumed 9.186s CPU time.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:33:54 +0000] [4144327] [INFO] Starting gunicorn 26.2.0
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:33:54 +0000] [4144327] [INFO] Listening at: http://127.0.0.1:8775 (4144327)
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:33:54 +0000] [4144327] [INFO] Using worker: gthread
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144333]: [2026-09-03 07:33:54 +0000] [4144333] [INFO] Booting worker with pid: 4144333
+2026-09-03T07:33:54+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:33:54 +0000] [4144327] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+2026-09-03T07:42:21+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:42:21+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:42:21 +0000] [4144327] [INFO] Handling signal: term
+2026-09-03T07:42:42+00:00 vps-3a3efbf9 gunicorn[4144333]: [2026-09-03 07:42:42 +0000] [4144333] [INFO] Worker exiting (pid: 4144333)
+2026-09-03T07:42:42+00:00 vps-3a3efbf9 gunicorn[4144333]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4144327]: [2026-09-03 07:42:43 +0000] [4144327] [INFO] Shutting down: Master
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Deactivated successfully.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Consumed 4.268s CPU time.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:42:43 +0000] [4149957] [INFO] Starting gunicorn 26.2.0
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:42:43 +0000] [4149957] [INFO] Listening at: http://127.0.0.1:8775 (4149957)
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:42:43 +0000] [4149957] [INFO] Using worker: gthread
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149963]: [2026-09-03 07:42:43 +0000] [4149963] [INFO] Booting worker with pid: 4149963
+2026-09-03T07:42:43+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:42:43 +0000] [4149957] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST...
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:47:18 +0000] [4149957] [INFO] Handling signal: term
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 gunicorn[4149963]: [2026-09-03 07:47:18 +0000] [4149963] [INFO] Worker exiting (pid: 4149963)
+2026-09-03T07:47:18+00:00 vps-3a3efbf9 gunicorn[4149963]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4149957]: [2026-09-03 07:47:19 +0000] [4149957] [INFO] Shutting down: Master
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Deactivated successfully.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: djgabo-cdg-ia-test.service: Consumed 2.993s CPU time.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-ia-test.service - DJGABO CDG Editor IA TEST.
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Starting gunicorn 26.2.0
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Listening at: http://127.0.0.1:8775 (4153134)
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [INFO] Using worker: gthread
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153138]: [2026-09-03 07:47:19 +0000] [4153138] [INFO] Booting worker with pid: 4153138
+2026-09-03T07:47:19+00:00 vps-3a3efbf9 gunicorn[4153134]: [2026-09-03 07:47:19 +0000] [4153134] [ERROR] Control server error: [Errno 30] Read-only file system: '/var/lib/djgabo-cdg/.gunicorn/gunicorn.ctl'
+
+=== DB TABLES / SESSION COUNTS (NO TOKENS) ===
+TABLES=jobs,logs,sqlite_sequence
+
+=== PRODUCTION SAFETY ===
+PROD_STATUS=active
+PROD_HTTP=200
