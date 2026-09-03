@@ -1,0 +1,121 @@
+name: Deploy CDG spoken visible-gap fix once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-spoken-visible-gap-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_spoken_visible_gap.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Apply fix to TEST clone only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_spoken_visible_gap.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_spoken_visible_gap.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-spoken-visible-gap-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+          sudo python3 /tmp/patch_cdg_spoken_visible_gap.py
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/renderer/normalize.py"
+          grep -q 'const longSpoken=hasSpoken && gap>=' "$ROOT/editor_v1/index.html"
+          grep -q 'long_spoken = has_spoken and gap >= spoken_min' "$ROOT/renderer/normalize.py"
+
+          if command -v node >/dev/null 2>&1; then
+            sudo -u djgabo-cdg python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          Path('/tmp/cdg-spoken-fix.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+            node --check /tmp/cdg-spoken-fix.js
+            echo "EDITOR_JS_SYNTAX=OK"
+          fi
+
+          cd "$ROOT"
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" - <<'PY'
+          import sys
+          sys.path.insert(0,'/opt/djgabo-cdg-ia-test/renderer')
+          import normalize as N
+          # Synthetic case: sung -> spoken fragments with internal pauses -> next sung.
+          visual=[
+              [{'text':'QUIERO','start_time':390.0,'end_time':391.0}],
+              [{'text':'SIGUE','start_time':406.0,'end_time':406.8}],
+          ]
+          spoken=[(391.1,394.0),(395.0,399.0),(400.2,404.5)]
+          style={
+              'instrumental_label':'INSTRUMENTAL',
+              'instrumental_dots':4,
+              'instrumental_span_seconds':6.0,
+              'instrumental_lead_seconds':4.0,
+              'instrumental_min_gap':6.0,
+              'spoken_instrumental_min_seconds':6.0,
+              'spoken_instrumental_lead_seconds':4.0,
+              'spoken_block_join_seconds':0.75,
+              'lines_per_page':6,
+          }
+          out=N.build_instrumentals(visual,style,spoken)
+          labels=[w.get('text') for line in out for w in line if isinstance(w,dict)]
+          assert 'INSTRUMENTAL' in labels, labels
+          print('SYNTHETIC_SPOKEN_VISIBLE_GAP=PASS')
+          PY
+
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/test-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PROD_HTTP=$prod_http"
+          test "$prod_http" = "200"
+          echo "DEPLOY_SPOKEN_VISIBLE_GAP=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-spoken-visible-gap-deploy.txt
+          git commit -m "diag: deploy spoken visible-gap fix" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
