@@ -1,7 +1,7 @@
-TIMESTAMP=2026-09-02T20:40:09+00:00
+TIMESTAMP=2026-09-03T04:10:03+00:00
 === BEFORE ===
-name=cdg-ia-sync-test status=Up 3 minutes
-name=cdg-ai-sync-cpu status=Up 12 hours
+name=cdg-ia-sync-test status=Up 5 hours
+name=cdg-ai-sync-cpu status=Up 5 hours
 === STATIC CHECKS ===
 ELEVENLABS_KEY_INSTALLED=yes
 === BUILD WEB LAB ONLY ===
@@ -21,17 +21,17 @@ ELEVENLABS_KEY_INSTALLED=yes
 #4 DONE 0.0s
 
 #5 [internal] load build context
-#5 transferring context: 160.38kB done
+#5 transferring context: 171.08kB 0.0s done
 #5 DONE 0.0s
 
 #6 [1/6] FROM docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
 #6 resolve docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea 0.0s done
 #6 DONE 0.0s
 
-#7 [2/6] WORKDIR /app
+#7 [3/6] COPY requirements.txt .
 #7 CACHED
 
-#8 [3/6] COPY requirements.txt .
+#8 [2/6] WORKDIR /app
 #8 CACHED
 
 #9 [4/6] RUN pip install --no-cache-dir -r requirements.txt
@@ -45,26 +45,28 @@ ELEVENLABS_KEY_INSTALLED=yes
 
 #12 exporting to image
 #12 exporting layers 0.1s done
-#12 exporting manifest sha256:375f1c453a6b42663b6acfe442a7a5cd420deaa7d38d2a60859b9ffe67554ad3 done
-#12 exporting config sha256:b135def08901ae1da0fba0bb8a1d323ee0311cdf7da932cf5d598e6c2e8ef3db done
-#12 exporting attestation manifest sha256:d55bea26144dbf81891332a2ce1580a978087d137672e63c4bf87070bdcf9c79 done
-#12 exporting manifest list sha256:6cc17bd43ba14da126a3e116b762cc4665fb17c71fe50a39402a1cb656183c22 done
+#12 exporting manifest sha256:29c83a415c11e88df22e83de4d7e23d3bacc6736a1709b6f4df30909a2374310 done
+#12 exporting config sha256:1c55f8196f634fd1add461a35b898a3f1b444082a64e79d05f4698e8f80bd31b 0.1s done
+#12 exporting attestation manifest sha256:a413a4b65ef3eaf981cd38ca9ec39efe7c8af7033062ea80d83b8f119b7bd937 done
+#12 exporting manifest list sha256:08430963cbce0ca153f2dcfb6e63f09e137e290b9955b39a60cedf29bfa81492 done
 #12 naming to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest done
-#12 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest 0.0s done
-#12 DONE 0.2s
+#12 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest
+#12 unpacking to docker.io/library/cdg-ia-sync-test-cdg-ia-sync-test:latest 0.9s done
+#12 DONE 1.1s
 
 #13 resolving provenance for metadata file
 #13 DONE 0.0s
 === WAIT HEALTH ===
 {"ok":true,"version":"0.3.0","mvsep_configured":true,"mvsep_api_base":"https://mvsep.com/api","model":"Parakeet v3","sep_type":64,"add_opt1":0,"add_opt2":1,"qwen_configured":false,"qwen_endpoint":null,"elevenlabs_configured":true,"elevenlabs_model":"scribe_v2"}
 {"ok":true,"configured":true,"model":"scribe_v2","api_base":"https://api.elevenlabs.io"}
+FORCED_ALIGN_ROUTE=READY
 === MAPPER REGRESSION ===
 SCRIBE_MAPPER_TEST=PASS {'master_word_count': 9, 'scribe_word_count': 9, 'mapped_words': 9, 'exact_matches': 9, 'fuzzy_matches': 0, 'grouped_matches': 0, 'interpolated_words': 0, 'ignored_scribe_words': 0, 'coverage_ratio': 1.0}
 === AFTER ===
-name=cdg-ia-sync-test status=Up 2 seconds
-name=cdg-ai-sync-cpu status=Up 12 hours
-name=cdg-ia-sync-test mem=37.55MiB / 11.4GiB cpu=0.18%
-name=cdg-ai-sync-cpu mem=838.4MiB / 5GiB cpu=0.20%
+name=cdg-ia-sync-test status=Up 3 seconds
+name=cdg-ai-sync-cpu status=Up 5 hours
+name=cdg-ia-sync-test mem=37.68MiB / 11.4GiB cpu=0.20%
+name=cdg-ai-sync-cpu mem=170.8MiB / 5GiB cpu=0.23%
                total        used        free      shared  buff/cache   available
-Mem:            11Gi       3.7Gi       639Mi       2.8Mi       7.4Gi       7.7Gi
+Mem:            11Gi       3.2Gi       1.1Gi       2.8Mi       7.5Gi       8.2Gi
 Swap:             0B          0B          0B
