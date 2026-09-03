@@ -1,0 +1,118 @@
+name: Deploy CDG post export choice V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-post-export-choice-v1.yml"
+      - "deploy/cdg_post_export_choice_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_post_export_choice_v1/patch_production.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production editor and verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_post_export_choice_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_post_export_choice_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-post-export-choice-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/post_export_choice_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+
+          sudo mkdir -p "$BACKUP/editor_v1"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          echo "BACKUP=$BACKUP"
+
+          sudo rm -rf /tmp/djgabo-post-export-stage
+          sudo mkdir -p /tmp/djgabo-post-export-stage/editor_v1
+          sudo cp "$EDITOR" /tmp/djgabo-post-export-stage/editor_v1/index.html
+          sudo python3 /tmp/patch_cdg_post_export_choice_v1.py --root /tmp/djgabo-post-export-stage
+
+          STAGE=/tmp/djgabo-post-export-stage/editor_v1/index.html
+          sudo grep -Fq 'DJGABO_POST_EXPORT_CHOICE_V1' "$STAGE"
+          sudo grep -Fq 'Seguir flujo' "$STAGE"
+          sudo grep -Fq 'Quedarme en este trabajo' "$STAGE"
+          sudo grep -Fq 'showPostExportChoice(done)' "$STAGE"
+          if sudo grep -Fq 'CDG_EDITOR_IA_TEST_BADGE' "$STAGE"; then
+            echo "ERROR=badge IA TEST sigue presente en stage"
+            exit 1
+          fi
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_cdg_post_export_choice_v1.py --root "$ROOT"
+          sudo chown djgabo-cdg:djgabo-cdg "$EDITOR"
+
+          sudo grep -Fq 'DJGABO_POST_EXPORT_CHOICE_V1' "$EDITOR"
+          sudo grep -Fq 'Seguir flujo' "$EDITOR"
+          sudo grep -Fq 'Quedarme en este trabajo' "$EDITOR"
+          sudo grep -Fq 'showPostExportChoice(done)' "$EDITOR"
+          if sudo grep -Fq 'CDG_EDITOR_IA_TEST_BADGE' "$EDITOR"; then
+            echo "ERROR=badge IA TEST sigue presente en producción"
+            exit 1
+          fi
+
+          # Sólo frontend: no reiniciar servicio ni invalidar sesión.
+          code="$(curl -sS -o /tmp/editor-post-export.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$code"
+          test "$code" = 200
+          grep -Fq 'DJGABO_POST_EXPORT_CHOICE_V1' /tmp/editor-post-export.html
+          grep -Fq 'Quedarme en este trabajo' /tmp/editor-post-export.html
+          if grep -Fq 'CDG_EDITOR_IA_TEST_BADGE' /tmp/editor-post-export.html; then
+            echo "ERROR=badge IA TEST servido por HTTP"
+            exit 1
+          fi
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/editor_v1/index.html" diagnostics/cdg-prod-current-index.html
+
+      - name: Save deploy report and snapshot
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-post-export-choice-v1-deploy.txt diagnostics/cdg-prod-current-index.html 2>/dev/null || true
+          git commit -m "diag: record post export choice deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
