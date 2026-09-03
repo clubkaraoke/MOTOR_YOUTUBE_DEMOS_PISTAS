@@ -1,0 +1,98 @@
+name: Test CDG render lab smoke once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-cdg-render-lab-smoke-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Render smoke
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-render-lab-render-smoke.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PORT=8786
+          SESSION_JSON="$(curl -fsS -X POST http://127.0.0.1:$PORT/api/session/new)"
+          SID="$(python3 -c 'import json,sys;print(json.load(sys.stdin)["sid"])' <<<"$SESSION_JSON")"
+          python3 - <<'PY'
+          import wave,struct,math,json
+          p='/tmp/cdg-render-lab-render.wav';rate=8000;dur=14
+          with wave.open(p,'wb') as w:
+              w.setnchannels(1);w.setsampwidth(2);w.setframerate(rate)
+              frames=[]
+              for i in range(rate*dur):
+                  v=int(1200*math.sin(2*math.pi*220*i/rate))
+                  frames.append(struct.pack('<h',v))
+              w.writeframes(b''.join(frames))
+          project={
+            'version':1,
+            'lab_version':'CDG_RENDER_LAB_V1',
+            'song':{'artist':'LAB','title':'SMOKE','audio_file':'smoke.wav','duration':14.0},
+            'calibration_ms':0,
+            'segments':[
+              {'id':'s0000','kind':'lyric','text':'HOLA MUNDO','words':[
+                {'id':'w0000','text':'HOLA','start_time':2.0,'end_time':2.7,'spoken':False,'locked':False,'vocal_role':None},
+                {'id':'w0001','text':'MUNDO','start_time':2.8,'end_time':3.6,'spoken':False,'locked':False,'vocal_role':None}]},
+              {'id':'s0001','kind':'lyric','text':'ESTA ES','words':[
+                {'id':'w0002','text':'ESTA','start_time':4.2,'end_time':4.8,'spoken':False,'locked':False,'vocal_role':None},
+                {'id':'w0003','text':'ES','start_time':4.9,'end_time':5.2,'spoken':False,'locked':False,'vocal_role':None}]},
+              {'id':'s0002','kind':'lyric','text':'UNA PRUEBA','words':[
+                {'id':'w0004','text':'UNA','start_time':6.0,'end_time':6.4,'spoken':False,'locked':False,'vocal_role':None},
+                {'id':'w0005','text':'PRUEBA','start_time':6.5,'end_time':7.4,'spoken':False,'locked':False,'vocal_role':None}]}
+            ],
+            'ai':{'engine':'smoke'}
+          }
+          open('/tmp/cdg-render-lab-project.json','w').write(json.dumps(project))
+          PY
+          curl -fsS -F 'audio=@/tmp/cdg-render-lab-render.wav' "http://127.0.0.1:$PORT/api/upload/$SID" >/dev/null
+          curl -fsS -H 'Content-Type: application/json' --data-binary @/tmp/cdg-render-lab-project.json "http://127.0.0.1:$PORT/api/project/$SID" >/dev/null
+          curl -fsS -H 'Content-Type: application/json' -d '{"lines_per_screen":3,"mode":"page","read_ahead_seconds":2.5,"safe_clear_gap_seconds":4}' "http://127.0.0.1:$PORT/api/render/$SID" >/tmp/cdg-render-lab-render-result.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/cdg-render-lab-render-result.json'))
+          assert d.get('ok') is True,d
+          assert d.get('size',0)>1000,d
+          print('RENDER_SMOKE=PASS')
+          print('FILE='+str(d.get('file')))
+          print('SIZE='+str(d.get('size')))
+          print('MODE='+str((d.get('render_plan') or {}).get('mode')))
+          PY
+          echo "LAB_SERVICE=$(sudo systemctl is-active djgabo-cdg-render-lab)"
+          echo "PRODUCTION_SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+      - name: Save
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-render-lab-render-smoke.txt
+          git commit -m "diag: record render lab CDG smoke test" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
