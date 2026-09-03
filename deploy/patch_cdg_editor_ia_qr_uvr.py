@@ -225,7 +225,7 @@ if 'id="btnQrVoz"' not in panel:
 }
 async function qrImagenDesdeClipboard(){
   if(!navigator.clipboard||typeof navigator.clipboard.read!=='function'){
-    throw new Error('Este navegador no permite leer imágenes del portapapeles. Usa Chrome actualizado y abre el panel por HTTPS.');
+    throw new Error('Este navegador no permite leer imágenes del portapapeles. Abre el panel por HTTPS y habilita el permiso del portapapeles.');
   }
   const items=await navigator.clipboard.read();
   for(const item of items){
@@ -234,21 +234,60 @@ async function qrImagenDesdeClipboard(){
   }
   throw new Error('No encuentro una imagen en el portapapeles. En UVR usa “Enviar a otro dispositivo” y copia el QR.');
 }
-async function decodificarQrBlob(blob){
-  if(typeof BarcodeDetector==='undefined'){
-    throw new Error('El lector QR del navegador no está disponible en este equipo. Prueba con Chrome actualizado.');
-  }
-  let formatos=[];
-  try{formatos=await BarcodeDetector.getSupportedFormats();}catch(_){}
-  if(formatos.length&&!formatos.includes('qr_code'))throw new Error('Este navegador no admite QR en BarcodeDetector.');
-  const detector=new BarcodeDetector({formats:['qr_code']});
+let _jsQrCompatPromise=null;
+function cargarJsQrCompat(){
+  if(typeof window.jsQR==='function')return Promise.resolve(window.jsQR);
+  if(_jsQrCompatPromise)return _jsQrCompatPromise;
+  const fuentes=[
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+  ];
+  _jsQrCompatPromise=new Promise((resolve,reject)=>{
+    let i=0;
+    const intentar=()=>{
+      if(i>=fuentes.length)return reject(new Error('No pude cargar el lector QR compatible. Revisa la conexión a Internet y vuelve a intentar.'));
+      const s=document.createElement('script');
+      s.src=fuentes[i++];s.async=true;
+      s.onload=()=>typeof window.jsQR==='function'?resolve(window.jsQR):intentar();
+      s.onerror=()=>{try{s.remove();}catch(_){}intentar();};
+      document.head.appendChild(s);
+    };
+    intentar();
+  });
+  return _jsQrCompatPromise;
+}
+async function decodificarQrConJsQr(blob){
+  const jsQRfn=await cargarJsQrCompat();
   const bmp=await createImageBitmap(blob);
   try{
-    const codigos=await detector.detect(bmp);
-    const valor=codigos&&codigos[0]&&String(codigos[0].rawValue||'').trim();
-    if(!valor)throw new Error('No pude leer el QR de la imagen copiada.');
+    const canvas=document.createElement('canvas');
+    canvas.width=bmp.width;canvas.height=bmp.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(bmp,0,0);
+    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=jsQRfn(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+    const valor=code&&String(code.data||'').trim();
+    if(!valor)throw new Error('No pude leer el QR de la imagen copiada. Intenta copiar el QR nuevamente desde UVR.');
     return valor;
   }finally{try{bmp.close&&bmp.close();}catch(_){}}
+}
+async function decodificarQrBlob(blob){
+  if(typeof BarcodeDetector!=='undefined'){
+    try{
+      let formatos=[];
+      try{formatos=await BarcodeDetector.getSupportedFormats();}catch(_){}
+      if(!formatos.length||formatos.includes('qr_code')){
+        const detector=new BarcodeDetector({formats:['qr_code']});
+        const bmp=await createImageBitmap(blob);
+        try{
+          const codigos=await detector.detect(bmp);
+          const valor=codigos&&codigos[0]&&String(codigos[0].rawValue||'').trim();
+          if(valor)return valor;
+        }finally{try{bmp.close&&bmp.close();}catch(_){}}
+      }
+    }catch(_){}
+  }
+  return await decodificarQrConJsQr(blob);
 }
 function utf8DesdeBase64(b64){
   try{
