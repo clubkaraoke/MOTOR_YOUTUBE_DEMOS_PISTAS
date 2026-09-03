@@ -1,4 +1,4 @@
-BACKUP=/opt/djgabo-cdg/backups/cdg_final_preview_20260903-101400
+BACKUP=/opt/djgabo-cdg/backups/cdg_final_preview_20260903-102916
 PATCH=OK
 MARKER=PROD_FINAL_CDG_PREVIEW_V1
 curl: (7) Failed to connect to 127.0.0.1 port 8765 after 0 ms: Couldn't connect to server
