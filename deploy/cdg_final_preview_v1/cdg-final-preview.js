@@ -57,9 +57,9 @@
 
   const P={
     active:false, loadedJob:'', decoder:new CDGDecoder(), data:null, processed:0,
-    voice:new Audio(), inst:new Audio(), hasInst:false, raf:0, loading:false
+    voice:new Audio(), raf:0, loading:false
   };
-  P.voice.preload='metadata'; P.inst.preload='metadata';
+  P.voice.preload='metadata';
 
   function q(id){return document.getElementById(id);}
   function tokenUrl(path){
@@ -97,7 +97,6 @@
       .cdgfMixTitle{font:700 9px var(--mono,monospace);color:#8d99aa;letter-spacing:.08em;text-transform:uppercase}
       .cdgfRow{display:grid;grid-template-columns:88px 1fr 35px;gap:8px;align-items:center;color:#dfe4ed;font:11px var(--sans,Arial)}
       .cdgfRow input{width:100%;accent-color:#8b5cf6}
-      .cdgfRow.off{opacity:.42}
       #cdgFinalStatus{font:10px var(--mono,monospace);line-height:1.35;color:#9da9b8;border-top:1px solid #292f39;padding-top:8px}
       #cdgFinalStatus[data-kind="ok"]{color:#63d6a3}
       #cdgFinalStatus[data-kind="warn"]{color:#f2b705}
@@ -120,10 +119,9 @@
         <button class="cdgfBtn" id="cdgFinalFwd" type="button">+5 s</button>
       </div>
       <div class="cdgfMix">
-        <div class="cdgfMixTitle">Mezcla de audio sincronizada</div>
+        <div class="cdgfMixTitle">Audio de comprobación</div>
         <div class="cdgfRow"><span>🎙 Voz</span><input id="cdgVoiceVol" type="range" min="0" max="100" value="100"><span id="cdgVoicePct">100%</span></div>
-        <div class="cdgfRow" id="cdgInstRow"><span>♫ Instrumental</span><input id="cdgInstVol" type="range" min="0" max="100" value="100"><span id="cdgInstPct">100%</span></div>
-        <div class="cdgfNote">CDG + Voz + Instrumental usan el mismo reloj. Los dos volúmenes son independientes.</div>
+        <div class="cdgfNote">CDG final + Voz usan exactamente el mismo reloj. El volumen solo afecta la escucha, nunca el timing.</div>
         <div id="cdgFinalStatus">Buscando el último CDG renderizado…</div>
       </div>
       <button class="cdgfBtn" id="cdgFinalRender" type="button">↻ Crear / actualizar CDG final</button>
@@ -134,12 +132,14 @@
       try{ if(typeof PV!=='undefined')PV.mode='cdg'; }catch(_){}
       document.querySelectorAll('.pvTab').forEach(x=>x.classList.toggle('on',x===btn));
       document.querySelectorAll('.pvCtlGroup').forEach(g=>g.classList.remove('on'));
-      pvBox.hidden=true; q('pvInfo').hidden=true; q('pvDesigner').hidden=true; panel.hidden=false;
+      [pvBox,q('pvInfo'),q('pvDesigner')].forEach(el=>{if(el){el.hidden=true;el.style.setProperty('display','none','important');}});
+      panel.hidden=false;
       P.active=true; await loadFinal();
     });
 
     tabs.querySelectorAll('.pvTab:not(#pvTabCdg)').forEach(b=>b.addEventListener('click',()=>{
-      panel.hidden=true; pvBox.hidden=false; q('pvInfo').hidden=false; q('pvDesigner').hidden=false;
+      panel.hidden=true;
+      [pvBox,q('pvInfo'),q('pvDesigner')].forEach(el=>{if(el){el.hidden=false;el.style.removeProperty('display');}});
       P.active=false; pauseAll();
     }));
 
@@ -152,9 +152,6 @@
     };
     q('cdgVoiceVol').oninput=e=>{
       const v=Number(e.target.value);P.voice.volume=v/100;q('cdgVoicePct').textContent=Math.round(v)+'%';
-    };
-    q('cdgInstVol').oninput=e=>{
-      const v=Number(e.target.value);P.inst.volume=v/100;q('cdgInstPct').textContent=Math.round(v)+'%';
     };
     q('cdgFinalRender').onclick=async()=>{
       if(typeof crearCdg!=='function'){setStatus('No encuentro el renderer del editor.','bad');return;}
@@ -171,13 +168,9 @@
     P.voice.addEventListener('loadedmetadata',()=>{
       q('cdgFinalDur').textContent=fmt(P.voice.duration);
       q('cdgFinalSeek').disabled=false;
-      if(P.hasInst&&P.inst.readyState>=1)P.inst.currentTime=Math.min(P.voice.currentTime||0,P.inst.duration||Infinity);
     });
     P.voice.addEventListener('ended',pauseAll);
-    P.inst.addEventListener('loadedmetadata',()=>{
-      if(P.active)P.inst.currentTime=Math.min(P.voice.currentTime||0,P.inst.duration||Infinity);
-    });
-    setPct('cdgVoiceVol','cdgVoicePct',100);setPct('cdgInstVol','cdgInstPct',100);
+    setPct('cdgVoiceVol','cdgVoicePct',100);
     loop();
   }
 
@@ -203,13 +196,8 @@
       P.decoder.reset();P.processed=0;P.loadedJob=jid;
 
       P.voice.pause();P.voice.src=tokenUrl(meta.voice_url);P.voice.load();
-      P.hasInst=!!meta.has_instrumental;
-      const row=q('cdgInstRow');
-      row.classList.toggle('off',!P.hasInst);q('cdgInstVol').disabled=!P.hasInst;
-      if(P.hasInst){P.inst.pause();P.inst.src=tokenUrl(meta.instrumental_url);P.inst.load();}
-      else{P.inst.pause();P.inst.removeAttribute('src');P.inst.load();}
       renderAt(0);
-      setStatus('CDG final real cargado'+(P.hasInst?' · Voz + Instrumental listos para comparar.':' · Sin WAV instrumental vinculado.'),'ok');
+      setStatus('CDG final real cargado · Voz lista para comprobar sincronización.','ok');
     }catch(e){
       P.data=null;clearCanvas();setStatus((e&&e.message)||String(e),'bad');
     }finally{P.loading=false;}
@@ -242,26 +230,24 @@
   }
 
   function pauseAll(){
-    P.voice.pause();P.inst.pause();
+    P.voice.pause();
     const b=q('cdgFinalPlay');if(b)b.textContent='▶ Reproducir';
   }
   async function togglePlay(){
     if(!P.data){await loadFinal();if(!P.data)return;}
     if(!P.voice.paused){pauseAll();return;}
-    if(P.hasInst&&P.inst.readyState>=1){
-      try{P.inst.currentTime=Math.min(P.voice.currentTime||0,Math.max(0,(P.inst.duration||Infinity)-.02));}catch(_){}
+    try{
+      await P.voice.play();
+      q('cdgFinalPlay').textContent='❚❚ Pausar';
+    }catch(e){
+      setStatus('El navegador bloqueó el audio. Pulsa Reproducir otra vez.','warn');
     }
-    const jobs=[P.voice.play()];
-    if(P.hasInst)jobs.push(P.inst.play().catch(()=>{}));
-    await Promise.allSettled(jobs);
-    q('cdgFinalPlay').textContent='❚❚ Pausar';
   }
   function seekTo(t){
     const d=P.voice.duration;
     if(Number.isFinite(d)&&d>0)t=Math.max(0,Math.min(d,t));
     else t=Math.max(0,t);
     try{P.voice.currentTime=t;}catch(_){}
-    if(P.hasInst&&P.inst.readyState>=1)try{P.inst.currentTime=Math.min(t,Math.max(0,(P.inst.duration||t)-.02));}catch(_){}
     renderAt(t);paintTransport();
   }
   function paintTransport(){
@@ -272,11 +258,6 @@
   function loop(){
     if(P.active&&P.data){
       const t=P.voice.currentTime||0;
-      if(P.hasInst&&!P.voice.paused&&P.inst.readyState>=1){
-        const drift=(P.inst.currentTime||0)-t;
-        if(Math.abs(drift)>.075)try{P.inst.currentTime=t;}catch(_){}
-        if(P.inst.paused&&t<(P.inst.duration||Infinity)-.05)P.inst.play().catch(()=>{});
-      }
       renderAt(t);paintTransport();
       if(P.voice.paused&&q('cdgFinalPlay'))q('cdgFinalPlay').textContent='▶ Reproducir';
     }
