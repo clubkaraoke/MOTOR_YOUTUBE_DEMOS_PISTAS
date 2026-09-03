@@ -1,4 +1,4 @@
-name: Test CDG render lab smoke once
+name: Test CDG render lab smoke once # rerun font fix
 
 on:
   push:
