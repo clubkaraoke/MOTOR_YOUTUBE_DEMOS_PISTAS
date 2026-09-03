@@ -27,7 +27,7 @@ if "/api/ai/qr-import" not in server:
         'server imports'
     )
     anchor="@app.post('/api/instrumentals/auto-match')\ndef auto_match_instrumental_api():"
-    block=r"""
+    block=r'''
 def _uvr_qr_filename(response, source_url, target):
     """Obtiene un nombre útil sin confiar en rutas arbitrarias del QR."""
     cd=str(response.headers.get('Content-Disposition') or '')
