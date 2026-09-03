@@ -1677,10 +1677,15 @@ const cs = t => Math.round(t * 100);        // centésimas
 const f  = t => cs(t) * 3;                   // fotogramas CDG (300/s)
 
 /* --- 1. corte de línea, idéntico al del normalizador --- */
+/* DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2
+   Un INSTRUMENTAL largo también es un corte de página lógico.
+   Así ninguna página de letra puede contener texto de antes y después del
+   instrumental: el Preview y el CDG comparten exactamente el mismo bloque. */
 function pvWrap(){
   const lpp=PV.cfg.linesPerPage;
   const blocks=[];let block=[];
   const flushBlock=()=>{if(block.length){blocks.push(block);block=[];}};
+
   for(const seg of S.doc.segments){
     if(seg.kind==="break"){flushBlock();continue;}
     const renderWords=(seg.words||[]).filter(w=>!w.spoken);
@@ -1694,13 +1699,38 @@ function pvWrap(){
     if(cur.length)block.push(cur);
   }
   flushBlock();
-  const out=[];const padPage=()=>{while(out.length%lpp)out.push([]);};
+
+  const instStarts=new Set(
+    _diagInstrumentalDecisions()
+      .filter(x=>x.renderer_inserted&&x.next&&x.next.id)
+      .map(x=>x.next.id)
+  );
+  const splitBlocks=[];
   for(const b of blocks){
+    let bb=[];
+    for(const line of b){
+      let ll=[];
+      for(const w of line){
+        if(instStarts.has(w.id) && (ll.length||bb.length)){
+          if(ll.length){bb.push(ll);ll=[];}
+          if(bb.length){splitBlocks.push(bb);bb=[];}
+        }
+        ll.push(w);
+      }
+      if(ll.length)bb.push(ll);
+    }
+    if(bb.length)splitBlocks.push(bb);
+  }
+
+  const out=[];const padPage=()=>{while(out.length%lpp)out.push([]);};
+  for(const b of splitBlocks){
     if(out.length)padPage();
     for(let i=0;i<b.length;i+=lpp){
       if(i>0)padPage();
       const chunk=b.slice(i,i+lpp),top=Math.floor((lpp-chunk.length)/2),bottom=lpp-chunk.length-top;
-      for(let j=0;j<top;j++)out.push([]);out.push(...chunk);for(let j=0;j<bottom;j++)out.push([]);
+      for(let j=0;j<top;j++)out.push([]);
+      out.push(...chunk);
+      for(let j=0;j<bottom;j++)out.push([]);
     }
   }
   while(out.length&&!out[out.length-1].length)out.pop();
@@ -1782,10 +1812,11 @@ function buildRenderPagesDecision(){
     pages.push({page:pi+1,lines});
   }
   return {
-    version:"CDG_RENDER_PAGES_V1",
-    source:"KARAOKE_PREVIEW",
+    version:"CDG_RENDER_PAGES_V2",
+    source:"KARAOKE_PREVIEW_INSTRUMENTAL_BOUNDARIES",
     lines_per_page:lpp,
     clear_mode:"page",
+    instrumental_boundaries_locked:true,
     pages
   };
 }
@@ -1983,7 +2014,7 @@ function _diagInstrumentalDecisions(){
     const firstSynthetic=rendererWillInsert?spacerAt:null;
     out.push({
       prev:{line:_diagLineNoForWord(prev),text:prev?.text||null,start:prev?.start_time??null,end:prev?.end_time??null},
-      next:{line:_diagLineNoForWord(next),text:next?.text||null,start:next?.start_time??null,end:next?.end_time??null},
+      next:{id:next?.id||null,line:_diagLineNoForWord(next),text:next?.text||null,start:next?.start_time??null,end:next?.end_time??null},
       base_seconds:+Number(base).toFixed(3),
       gap_seconds:+gap.toFixed(3),
       has_spoken:hasSpoken,
@@ -2143,7 +2174,7 @@ function buildDiagnosticJsonPayload(){
     ai_end_extension_seconds:w.ai_end_extension_seconds??null
   }));
   return {
-    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V4",
+    diagnostic_version:"CDG_TOTAL_TIMELINE_DIAG_V5",
     generated_at:new Date().toISOString(),
     job_id:(typeof PANEL_JOB_ID!=="undefined"?PANEL_JOB_ID:""),
     song:S.doc?.song||null,
@@ -4864,5 +4895,6 @@ resize(); loop();
 <!-- DJGABO_POST_EXPORT_CHOICE_V1 -->
 <!-- DJGABO_RENDER_TIMELINE_V1 -->
 <!-- DJGABO_AUTHORITATIVE_PAGES_V1 -->
+<!-- DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2 -->
 </body>
 </html>

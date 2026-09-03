@@ -256,6 +256,11 @@ def resolve_render_pages(doc: dict, style: dict, font: ImageFont.FreeTypeFont, u
     }
 
     if isinstance(raw,dict) and isinstance(raw.get("pages"),list):
+        if str(raw.get("version") or "") != "CDG_RENDER_PAGES_V2":
+            raise NormalizeError(
+                "Este proyecto conserva paginado V1. Recarga el editor (Ctrl+F5) "
+                "y vuelve a Crear CDG para regenerar las páginas V2."
+            )
         declared=int(raw.get("lines_per_page") or lpp)
         if declared!=lpp:
             raise NormalizeError(
@@ -299,6 +304,7 @@ def resolve_render_pages(doc: dict, style: dict, font: ImageFont.FreeTypeFont, u
         meta=dict(raw)
         meta["source"]="KARAOKE_PREVIEW"
         meta["clear_mode"]="page"
+        meta["instrumental_boundaries_locked"]=True
         meta["authoritative"]=True
         return visual,meta
 
@@ -319,10 +325,11 @@ def resolve_render_pages(doc: dict, style: dict, font: ImageFont.FreeTypeFont, u
             ],
         })
     return visual,{
-        "version":"CDG_RENDER_PAGES_V1",
+        "version":"CDG_RENDER_PAGES_V2",
         "source":"NORMALIZER_FALLBACK_PREVIEW_COMPAT",
         "lines_per_page":lpp,
         "clear_mode":"page",
+        "instrumental_boundaries_locked":False,
         "authoritative":False,
         "pages":pages,
     }
@@ -356,17 +363,18 @@ def wipe_spans(visual: list[list[dict]], tail: float = 0.45) -> None:
         w["_wipe"] = max(0.01, end - w["start_time"])
 
 
-def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals: list[tuple[float, float]] | None = None, voice_gaps: list[tuple[float, float]] | None = None) -> list[list[dict]]:
-    """Inserta INSTRUMENTAL como una PÁGINA visual propia y centrada.
+# DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_NORMALIZER_V2
+def build_instrumentals(visual: list[list[dict]], style: dict,
+                        spoken_intervals: list[tuple[float, float]] | None = None,
+                        voice_gaps: list[tuple[float, float]] | None = None) -> list[list[dict]]:
+    """Inserta cada INSTRUMENTAL como página completa SIN tocar slots de letra.
 
-    El bloque siempre ocupa una página completa: se rellena con líneas vacías
-    arriba/abajo para que `INSTRUMENTAL` y los cuatro círculos queden en el
-    centro independientemente de cuántas líneas por pantalla haya elegido la
-    operadora. El rótulo usa cantante 2 (sin sweep); los círculos conservan la
-    cuenta temporal.
+    V1 recorría línea por línea. Si una página cantada empezaba con un slot
+    vacío por centrado, copiaba ese vacío y recién después insertaba la página
+    instrumental. Eso corría las líneas y mezclaba dos páginas.
     """
     label = style.get("instrumental_label", "INSTRUMENTAL")
-    dot = "§"  # glifo especial: el renderer lo dibuja como círculo real
+    dot = "§"
     n_dots = int(style.get("instrumental_dots", 4))
     span = float(style.get("instrumental_span_seconds", 6.0))
     lead = float(style.get("instrumental_lead_seconds", 4.0))
@@ -378,9 +386,6 @@ def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals:
     spoken_intervals = spoken_intervals or []
     voice_gaps = voice_gaps or []
 
-    # Un bloque HABLADO puede estar compuesto por muchas palabras cortas.
-    # Se unen intervalos contiguos para medir la duración REAL del bloque, no
-    # la duración individual de cada palabra.
     merged_spoken: list[list[float]] = []
     for sa, sb in sorted(spoken_intervals):
         if not merged_spoken or sa - merged_spoken[-1][1] > spoken_join:
@@ -388,105 +393,112 @@ def build_instrumentals(visual: list[list[dict]], style: dict, spoken_intervals:
         else:
             merged_spoken[-1][1] = max(merged_spoken[-1][1], sb)
 
-    out: list[list[dict]] = []
-    prev_end: float | None = None
-    n = 0
+    def decision(base: float, start: float):
+        gap=start-base
+        overlaps=[
+            (max(sa,base),min(sb,start))
+            for sa,sb in merged_spoken
+            if sa<start and sb>base
+        ]
+        overlaps=[(a,b) for a,b in overlaps if b>a]
+        voice_overlaps=[
+            (max(va,base),min(vb,start))
+            for va,vb in voice_gaps
+            if va<start and vb>base
+        ]
+        voice_overlaps=[(a,b) for a,b in voice_overlaps if b>a]
+        has_spoken=bool(overlaps)
+        has_untranscribed_voice=bool(voice_overlaps)
+        long_spoken=has_spoken and gap>=spoken_min
+        regular_gap=gap>=min_gap and not has_spoken and not has_untranscribed_voice
+        return long_spoken,regular_gap,gap
 
-    def pad_to_page() -> None:
-        while len(out) % lpp:
-            out.append([])
+    def make_instrumental(base: float, start: float, n: int):
+        long_spoken,regular_gap,_=decision(base,start)
+        if not (label and n_dots>0 and (long_spoken or regular_gap)):
+            return None
+        use_lead=spoken_lead if long_spoken else lead
+        label_slot=.55
+        avail=(start-use_lead)-(base+.4)
+        use_label=avail>=1.0+label_slot
+        use_span=min(span,avail-(label_slot if use_label else 0.0))
+        min_span=.6 if long_spoken else 1.0
+        if use_span<min_span:
+            return None
 
-    for line in visual:
-        if not line:
-            out.append([])
-            continue
-        start = line[0]["start_time"]
-        # PROD_FINAL_CDG_PREVIEW_V1
-        # El primer bloque INSTRUMENTAL comparte la MISMA timeline absoluta
-        # que el opening. Nunca puede empezar en t=0 y quedar en cola detras
-        # del opening: eso obliga a cdgmaker a "ponerse al dia" despues de
-        # los 6 s y desplaza visualmente los circulos/letras en el CDG final.
-        # Esta base coincide exactamente con pvInstrumentalState() del editor.
-        if prev_end is None:
-            base = max(0.0, float(style.get("intro_duration_seconds", 0.0) or 0.0) + 0.25)
-            gap = start - base
+        dots_end=start-use_lead
+        step=use_span/n_dots
+        dots_start=dots_end-use_span
+        spacer_at=base+.3
+        label_at=dots_start-label_slot
+
+        page=[]
+        dot_row=lpp//2
+        top=max(0,dot_row-1)
+        bottom=max(0,lpp-2-top)
+        page.extend([[] for _ in range(top)])
+        if use_label and label_at>spacer_at+.15:
+            page.append([
+                {"id":f"in{n}s","text":"_","_inst":True,"_silent":True,
+                 "_label":True,"start_time":spacer_at,"end_time":label_at},
+                {"id":f"in{n}","text":label,"_inst":True,"_label":True,
+                 "start_time":label_at,"end_time":dots_start-.05},
+            ])
         else:
-            base = prev_end
-            gap = start - prev_end
+            page.append([{
+                "id":f"in{n}","text":label,"_inst":True,"_label":True,
+                "start_time":spacer_at,
+                "end_time":max(spacer_at+.4,dots_start-.05),
+            }])
+        page.append([
+            {"id":f"dot{n}_{i}","text":dot,"_inst":True,"_dotline":True,
+             "start_time":dots_start+i*step,
+             "end_time":dots_start+(i+1)*step}
+            for i in range(n_dots)
+        ])
+        page.extend([[] for _ in range(bottom)])
+        if len(page)!=lpp:
+            raise NormalizeError(f"Página instrumental inválida: {len(page)} slots, esperaba {lpp}.")
+        return page
 
-        # R11: si HABLADO crea un hueco visual >= spoken_min, no exportamos
-        # ese texto y mostramos INSTRUMENTAL. La próxima página cantada queda
-        # libre spoken_lead segundos antes.
-        overlaps = [
-            (max(sa, base), min(sb, start))
-            for sa, sb in merged_spoken
-            if sa < start and sb > base
-        ]
-        overlaps = [(sa, sb) for sa, sb in overlaps if sb > sa]
-        has_spoken = bool(overlaps)
-        voice_overlaps = [
-            (max(va, base), min(vb, start))
-            for va, vb in voice_gaps
-            if va < start and vb > base
-        ]
-        voice_overlaps = [(va, vb) for va, vb in voice_overlaps if vb > va]
-        has_untranscribed_voice = bool(voice_overlaps)
-        # R11/R13:
-        # HABLADO explícito manda. Pero un hueco normal NO es instrumental si
-        # el detector QA encontró voz sin texto dentro de ese mismo hueco.
-        long_spoken = has_spoken and gap >= spoken_min
-        regular_gap = gap >= min_gap and not has_spoken and not has_untranscribed_voice
+    out:list[list[dict]]=[]
+    prev_end:float|None=None
+    inst_n=0
 
-        if label and n_dots > 0 and (long_spoken or regular_gap):
-            use_lead = spoken_lead if long_spoken else lead
-            LABEL_SLOT = 0.55
-            avail = (start - use_lead) - (base + 0.4)
-            use_label = avail >= 1.0 + LABEL_SLOT
-            use_span = min(span, avail - (LABEL_SLOT if use_label else 0.0))
-            # Con HABLADO de apenas >4 s quedan ~1 s antes de liberar la próxima
-            # letra. Permitimos un contador compacto sin exigir los 6 s completos.
-            min_span = 0.6 if long_spoken else 1.0
-            if use_span >= min_span:
-                dots_end = start - use_lead
-                step = use_span / n_dots
-                dots_start = dots_end - use_span
-                spacer_at = base + 0.3
-                label_at = dots_start - LABEL_SLOT
+    for pos in range(0,len(visual),lpp):
+        page=list(visual[pos:pos+lpp])
+        if len(page)<lpp:
+            page += [[] for _ in range(lpp-len(page))]
+        content=[line for line in page if line]
+        if not content:
+            out.extend(page)
+            continue
 
-                # Fuerza página independiente para que nunca quede arriba/abajo.
-                # El rótulo puede ir algo por encima, pero la fila de círculos
-                # debe quedar en el centro visual real.
-                pad_to_page()
-                dot_row = lpp // 2
-                top = max(0, dot_row - 1)
-                bottom = max(0, lpp - 2 - top)
-                out.extend([[] for _ in range(top)])
+        first=content[0]
+        first_start=float(first[0]["start_time"])
+        base=(max(0.0,float(style.get("intro_duration_seconds",0.0) or 0.0)+.25)
+              if prev_end is None else prev_end)
 
-                if use_label and label_at > spacer_at + 0.15:
-                    out.append([
-                        {"id": f"in{n}s", "text": "_", "_inst": True, "_silent": True,
-                         "_label": True, "start_time": spacer_at, "end_time": label_at},
-                        {"id": f"in{n}", "text": label, "_inst": True, "_label": True,
-                         "start_time": label_at, "end_time": dots_start - 0.05},
-                    ])
-                else:
-                    out.append([{
-                        "id": f"in{n}", "text": label, "_inst": True, "_label": True,
-                        "start_time": spacer_at,
-                        "end_time": max(spacer_at + 0.4, dots_start - 0.05),
-                    }])
+        inst_page=make_instrumental(base,first_start,inst_n)
+        if inst_page is not None:
+            out.extend(inst_page)
+            inst_n+=1
 
-                out.append([
-                    {"id": f"dot{n}_{i}", "text": dot, "_inst": True, "_dotline": True,
-                     "start_time": dots_start + i * step,
-                     "end_time": dots_start + (i + 1) * step}
-                    for i in range(n_dots)
-                ])
-                out.extend([[] for _ in range(bottom)])
-                n += 1
+        scan_end=max(w["end_time"] for w in first)
+        for line in content[1:]:
+            st=float(line[0]["start_time"])
+            long_spoken,regular_gap,_=decision(scan_end,st)
+            if long_spoken or regular_gap:
+                raise NormalizeError(
+                    "Paginado V1 detectado: hay un INSTRUMENTAL dentro de una "
+                    "página de letra. Recarga el editor (Ctrl+F5) para generar "
+                    "CDG_RENDER_PAGES_V2 antes de renderizar."
+                )
+            scan_end=max(w["end_time"] for w in line)
 
-        out.append(line)
-        prev_end = max(w["end_time"] for w in line)
+        out.extend(page)
+        prev_end=max(w["end_time"] for w in content[-1])
+
     return out
 
 
