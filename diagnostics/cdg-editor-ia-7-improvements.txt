@@ -1,0 +1,26 @@
+TIMESTAMP=2026-09-03T02:55:04+00:00
+PRODUCTION_BEFORE=active
+TEST_BEFORE=active
+PATCH_7_IMPROVEMENTS=OK
+TEST_HEALTH=OK
+=== REBUILD CURRENT IA TEST FROM FULL SCRIBE ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+JOB=LET-0078
+SCRIBE_WORDS=577
+PROJECT_WORDS=577
+TIMED_WORDS=577
+VOICE_GAPS=3
+VOICE_GAP={"start": 155.6, "end": 173.4, "duration": 17.8, "kind": "untranscribed_voice", "score": 1.0, "peak_db": -10.4, "threshold_db": -40.6}
+VOICE_GAP={"start": 270.8, "end": 289.8, "duration": 19.0, "kind": "untranscribed_voice", "score": 1.0, "peak_db": -10.8, "threshold_db": -40.6}
+VOICE_GAP={"start": 486.8, "end": 488.2, "duration": 1.4, "kind": "untranscribed_voice", "score": 0.79, "peak_db": -28.6, "threshold_db": -40.6}
+ELAPSED=12.896
+=== CENTERING TEST ===
+SECOND_STANZA_ROWS=[2, 3]
+=== FRONTEND MARKERS ===
+FRONTEND_7=OK
+ASYNC_START_ROUTE=405
+ASYNC_STATUS_ROUTE=401
+TEST_AFTER=active
+PRODUCTION_AFTER=active
+PRODUCTION_HTTP=200
+PUBLIC_HTTP=302
