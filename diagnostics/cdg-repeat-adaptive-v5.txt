@@ -1,0 +1,14 @@
+TIMESTAMP=2026-09-03T06:46:01+00:00
+PROD_BEFORE=active
+TEST_BEFORE=active
+/tmp/patch_cdg_repeat_adaptive_v5.py:17: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+PATCH_REPEAT_ADAPTIVE_8_4_2_V5=OK
+STATIC_MARKERS=PASS
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+ADAPTIVE_8_4_2_QUALITY=PASS
+STRICT_REPEAT_SHORT=PASS {'ok': False, 'reasons': ['repeat_short_word'], 'tiny': 0, 'repeat_short': 1, 'huge': 0, 'collapsed': 1, 'median_duration': 0.18, 'huge_limit': 2.0}
+TEST_AFTER=active
+PROD_AFTER=active
+PROD_HTTP=200
+DEPLOY_REPEAT_ADAPTIVE_V5=OK
