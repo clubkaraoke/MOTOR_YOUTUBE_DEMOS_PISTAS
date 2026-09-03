@@ -1,0 +1,52 @@
+name: Inspect CDG voicegap instrumental fix once
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-voicegap-instrumental-fix-once.yml"
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect live code
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-voicegap-instrumental-fix-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "=== NORMALIZE CALL SITE ==="
+          sudo -u djgabo-cdg sed -n '420,480p' "$ROOT/renderer/normalize.py"
+          echo "=== BUILD INSTRUMENTALS ==="
+          sudo -u djgabo-cdg sed -n '267,382p' "$ROOT/renderer/normalize.py"
+          echo "=== PREVIEW STATE ==="
+          sudo -u djgabo-cdg sed -n '1810,1860p' "$ROOT/editor_v1/index.html"
+          REMOTE
+      - name: Save
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-voicegap-instrumental-fix-live.txt
+          git commit -m "diag: inspect voicegap instrumental fix" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
