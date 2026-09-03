@@ -1,0 +1,881 @@
+=== VOICE GAP / QA ===
+704-}
+705-.waveNavHandle.top{top:-7px}
+706-.waveNavHandle.bottom{bottom:-7px}
+707-.waveNavHandle:hover{background:#d0d5dc}
+708-.waveNavHandle:active{background:#fff}
+709-.waveZoomPresets{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+710-@media(max-width:420px){
+711-  #waveNavigator{flex-basis:32px}
+712-  #waveNavTrack{left:6px;right:6px}
+713-}
+714-
+715-
+716:.aiQaBar{margin:6px 0 7px;padding:7px 8px;border:1px solid rgba(242,169,0,.45);background:rgba(242,169,0,.08);border-radius:7px;font:10px/1.35 var(--mono);color:#f6cf73}
+717-.aiQaTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;font-weight:700}
+718-.aiQaList{display:flex;gap:5px;overflow-x:auto;padding-bottom:2px}.aiQaGap{flex:0 0 auto;border:1px solid rgba(242,169,0,.35);background:rgba(0,0,0,.18);color:#f4d17d;border-radius:5px;padding:4px 6px;font:9.5px var(--mono);cursor:pointer}
+719-.aiQaGap:hover{border-color:#f2a900;color:#fff}
+720-
+721-#btnAiBlock{border-color:rgba(139,92,246,.55);color:#c7b5ff;background:rgba(139,92,246,.08)}
+722-#btnAiBlock:hover{border-color:#9f7aea;color:#fff;background:rgba(139,92,246,.16)}
+723-#btnAiBlock.busy{opacity:.65;pointer-events:none}
+724-</style>
+725-</head>
+726-<body>
+727-<div id="CDG_EDITOR_IA_TEST_BADGE" style="position:fixed;top:8px;right:10px;z-index:99999;background:#7c3aed;color:white;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 10px;font:700 11px/1.1 Arial,sans-serif;letter-spacing:.08em;box-shadow:0 4px 18px rgba(0,0,0,.3)">IA TEST · NO PRODUCCIÓN</div>
+728-
+729-<header>
+730-  <div id="songName"><span class="art">—</span></div>
+731-  <div class="spacer"></div>
+732-  <div id="counter">0/0 · 0%</div>
+733-  <span id="status"></span>
+734-  <button class="hbtn" id="btnPreview">Pantalla</button>
+735-  <button class="hbtn" id="btnLyrics">Letra</button>
+736-  <button class="hbtn" id="btnSettings">Ajustes</button>
+737-  <button class="hbtn" id="btnSave">Guardar proyecto</button>
+738-  <button class="hbtn go" id="btnCdg">Crear CDG</button>
+739-</header>
+740-
+741-<div id="workspace">
+742-  <div id="leftPane">
+743-    <div id="waveNavStage">
+744-      <div id="waveWrap">
+745-      <canvas id="wave"></canvas>
+746-      <div id="onlineLoadOverlay" class="onlineLoadOverlay" hidden>
+747-        <div class="onlineLoadCard">
+748-          <div class="onlineLoadHead"><div id="onlineLoadTitle" class="onlineLoadTitle">Preparando audio online…</div><div id="onlineLoadPct" class="onlineLoadPct">0%</div></div>
+749-          <div class="onlineLoadTrack"><div id="onlineLoadFill" class="onlineLoadFill"></div></div>
+750-          <div id="onlineLoadDetail" class="onlineLoadDetail">Conectando con el servidor…</div>
+751-          <div id="onlineLoadWarning" class="onlineLoadWarning">No actualices ni cierres esta página. La primera carga puede tardar; las siguientes serán rápidas.</div>
+--
+803-      <div id="reticle"></div>
+804-      <div id="slots">
+805-        <span class="slot prev"></span>
+806-        <span class="slot cur">—</span>
+807-        <span class="slot next"></span>
+808-      </div>
+809-      <div id="lineEcho"></div>
+810-      <div id="hint">Espacio = siguiente palabra&nbsp;&nbsp;·&nbsp;&nbsp;P = pantalla</div>
+811-    </div>
+812-    <div id="lyricsDrawer">
+813-      <div id="editHint"><span>Clic = seleccionar · doble clic = editar/agregar texto (doble clic de nuevo en el texto = guardar y volver, Esc = cancelar) · Enter = nueva línea · Shift+clic = seleccionar estrofa · Supr/Backspace = borrar</span><div style="display:flex;gap:6px;align-items:center"><button id="btnResync" type="button">↻ RESINCRONIZAR SELECCIÓN</button></div></div>
+814-      <div id="vocalRoles" style="display:flex;gap:6px;align-items:center;padding:5px 0 7px;border-bottom:1px solid var(--line)"><button class="hbtn roleNone" id="btnRoleNone">SIN ROL <span class="roleKey">0</span></button><button class="hbtn roleMale" id="btnMale">HOMBRE <span class="roleKey">1</span></button><button class="hbtn roleFemale" id="btnFemale">MUJER <span class="roleKey">2</span></button><button class="hbtn roleDuet" id="btnDuet">DUO <span class="roleKey">3</span></button><button class="hbtn spoken" id="btnSpoken2">HABLADO <span class="roleKey">4</span></button><button class="hbtn" id="btnAiBlock" title="Alinear sólo la selección con ElevenLabs Forced Alignment">✨ IA BLOQUE</button><span style="font-size:10px;color:var(--dimmer);margin-left:6px">Manual = SPACE · IA BLOQUE = sólo la selección</span></div>
+815:      <div id="aiQaBar" class="aiQaBar" hidden></div>
+816-      <div id="lyricsInner"></div>
+817-    </div>
+818-  </div>
+819-  <div class="split" id="splitRight"></div>
+820-  <aside id="preview">
+821-    <div class="pvHead">Vista de pantalla · editor visual</div>
+822-    <div class="pvTabs"><button class="pvTab on" data-pvmode="lyrics">Karaoke</button><button class="pvTab" data-pvmode="intro">Opening</button><button class="pvTab" data-pvmode="outro">Ending</button></div>
+823-    <div id="pvBox"><canvas id="pv"></canvas></div>
+824-    <div id="pvInfo">—</div>
+825-    <div id="pvDesigner">
+826-      <div class="pvCtlGroup on" data-group="lyrics">
+827-        <div class="pvCtlTitle">Diseño de letra CDG</div>
+828-        <div class="pvCtl"><label>Líneas / pantalla</label><select id="pvLines"><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select></div>
+829-        <div class="pvCtl"><label>Fuente</label><select id="pvFont"><option value="impact">Impact</option><option value="arialbd">Arial Bold</option><option value="arial">Arial</option></select></div>
+830-        <div class="pvCtl"><label>Tamaño</label><input id="pvFontSize" type="number" min="12" max="24" value="18"></div>
+831-        <div class="pvCtl"><label>Grosor borde</label><input id="pvStroke" type="number" min="0" max="3" value="1"></div>
+832-        <div class="pvCtl"><label>Posición vertical</label><input id="pvLyricY" type="number" min="-5" max="5" value="0"></div>
+833-        <div class="pvMini">Preview HD nítido · texto blanco · barrido por rol · borde negro. El CD+G final conserva su geometría real 300×216.</div>
+834-      </div>
+835-      <div class="pvCtlGroup" data-group="intro">
+836-        <div class="pvCtlTitle">Opening beta · automático</div>
+837-        <div class="pvMini" style="line-height:1.45">
+838-          Fondo negro sólido. El sistema genera automáticamente:<br>
+839-          <b style="color:var(--text)">TÍTULO DE LA CANCIÓN</b><br>
+840-          <span>Al estilo de:</span><br>
+841-          <b style="color:var(--text)">NOMBRE DEL CANTANTE</b><br><br>
+842-          Sin plantilla, sin logo y sin ajustes manuales de posición o tamaño.
+843-        </div>
+844-      </div>
+845-      <div class="pvCtlGroup" data-group="outro">
+846-        <div class="pvCtlTitle">Ending / cierre</div>
+847-        <div class="pvCtl"><label>Línea 1</label><input id="pvOutro1" type="text" value="Ediciones Personalizadas."></div>
+848-        <div class="pvCtl"><label>Línea 2</label><input id="pvOutro2" type="text" value="Whatsapp +51921675846"></div>
+849-        <div class="pvCtl"><label>Tamaño</label><input id="pvOutroSize" type="number" min="12" max="28" value="18"></div>
+850-        <div class="pvCtl"><label>Efecto</label><select id="pvOutroTransition"><option value="centertexttoplogobottomtext">Clásico</option><option value="fizzle">Fizzle</option><option value="wipeout">Wipe</option><option value="circleout">Círculo</option><option value="spiral">Espiral</option></select></div>
+--
+1443-    const a = Math.floor((S.view.t0 + py/CH*S.view.dur) * rate);
+1444-    const b = Math.max(a+1, Math.floor(a + perPx));
+1445-    if(b <= 0 || a >= min.length) continue;
+1446-    let lo=0, hi=0;
+1447-    for(let i=Math.max(0,a); i<Math.min(min.length,b); i++){
+1448-      if(min[i]<lo) lo=min[i]; if(max[i]>hi) hi=max[i];
+1449-    }
+1450-    const xa = mid + lo*amp, xb = mid + hi*amp;
+1451-    cx.fillRect(xa, py, Math.max(1, xb-xa), 1);
+1452-  }
+1453-
+1454-  /* QA IA: posible voz no transcrita */
+1455:  const qaGaps=(S.doc?.ai?.voice_gaps||[]);
+1456-  for(const g of qaGaps){
+1457-    const a=Number(g.start),b=Number(g.end);
+1458-    if(!Number.isFinite(a)||!Number.isFinite(b)||b<S.view.t0||a>S.view.t0+S.view.dur)continue;
+1459-    const y1=Math.max(0,t2y(a)),y2=Math.min(CH,t2y(b));if(y2<=y1)continue;
+1460-    cx.fillStyle="rgba(242,169,0,.10)";cx.fillRect(x0,y1,wavW,Math.max(2,y2-y1));
+1461-    cx.strokeStyle="rgba(242,169,0,.75)";cx.lineWidth=1;cx.setLineDash([5,4]);
+1462-    cx.strokeRect(x0+.5,y1+.5,wavW-1,Math.max(2,y2-y1)-1);cx.setLineDash([]);
+1463-    if(S.view.dur<120){cx.font="700 9px "+mono;cx.fillStyle="#F2A900";cx.textAlign="right";cx.fillText("⚠ VOZ SIN TEXTO",CW-6,Math.max(10,y1+9));}
+1464-  }
+1465-
+1466-  /* marcas */
+1467-  const showLabels = S.view.dur < 90;
+1468-  cx.textAlign = "left";
+1469-  for(let i=0;i<S.words.length;i++){
+1470-    const w = S.words[i];
+1471-    if(w.start_time === null) continue;
+1472-    const y1 = t2y(w.start_time);
+1473-    if(y1 > CH + 300) break;
+1474-    const y2 = t2y(effectiveTimingEnd(i) ?? (w.start_time + .2));
+1475-    if(y2 < -300) continue;
+1476-    const sel = S.selStart>=0 ? (i>=Math.min(S.selStart,S.selEnd) && i<=Math.max(S.selStart,S.selEnd)) : i === S.sel;
+1477-
+1478-    const roleColor = w.vocal_role==="female"?"#FF4FA3":w.vocal_role==="male"?"#32B7FF":w.vocal_role==="duet"?"#7ED957":"#F2A900";
+1479-    cx.fillStyle = w.spoken ? (sel ? "rgba(224,86,62,.30)" : "rgba(224,86,62,.16)") : (sel ? roleColor+"47" : roleColor+"1C");
+1480-    cx.fillRect(x0, y1, wavW, Math.max(1, y2-y1));
+1481-
+1482-    cx.strokeStyle = w.spoken ? "#E0563E" : (sel ? roleColor : roleColor+"99");
+1483-    cx.lineWidth = sel ? 2 : 1;
+1484-    cx.beginPath(); cx.moveTo(x0, y1+.5); cx.lineTo(CW, y1+.5); cx.stroke();
+1485-    { cx.strokeStyle=w.spoken?"#E0563E":(sel?"#86E0BE":(w.end_time===null?"rgba(98,199,160,.42)":"rgba(98,199,160,.85)")); cx.lineWidth=sel?2:1; cx.beginPath(); cx.moveTo(x0,y2+.5); cx.lineTo(CW,y2+.5); cx.stroke(); }
+1486-
+1487-    if(w.locked){
+1488-      cx.fillStyle = "#F2B705"; cx.fillRect(x0, y1, 3, Math.max(2, y2-y1));
+1489-    }
+1490-    if(sel){
+--
+1971-      sp.textContent = w.text;
+1972-      if(w === cur) sp.className = "on";
+1973-      echo.appendChild(sp);
+1974-      if(k < seg.words.length-1) echo.appendChild(document.createTextNode(" "));
+1975-    });
+1976-  }
+1977-}
+1978-function fmtQaTime(t){
+1979-  t=Math.max(0,Number(t)||0);const m=Math.floor(t/60),sec=t-m*60;
+1980-  return m+":"+(sec<10?"0":"")+sec.toFixed(1);
+1981-}
+1982-function paintAiQa(){
+1983:  const bar=$("#aiQaBar");if(!bar)return;const gaps=S.doc?.ai?.voice_gaps||[];
+1984-  if(!gaps.length){bar.hidden=true;bar.innerHTML="";return;}
+1985-  bar.hidden=false;
+1986:  bar.innerHTML='<div class="aiQaTitle"><span>⚠ '+gaps.length+' posible'+(gaps.length===1?'':'s')+' vocalización'+(gaps.length===1?'':'es')+' omitida'+(gaps.length===1?'':'s')+' por Scribe</span><span>clic = escuchar</span></div>'
+1987-    +'<div class="aiQaList">'+gaps.map((g,i)=>'<button class="aiQaGap" data-gap="'+i+'">'+fmtQaTime(g.start)+'–'+fmtQaTime(g.end)+' · '+Number(g.duration||0).toFixed(1)+' s</button>').join('')+'</div>';
+1988-  bar.querySelectorAll(".aiQaGap").forEach(btn=>btn.onclick=()=>{
+1989-    const g=gaps[+btn.dataset.gap];if(!g)return;
+1990-    const a=Math.max(0,Number(g.start)||0),b=Math.max(a+.5,Number(g.end)||a+4);
+1991-    S.audio.currentTime=Math.max(0,a-.5);const dur=Math.max(8,Math.min(30,(b-a)+4));
+1992-    S.view={t0:Math.max(0,a-2),dur:Math.min(dur,Math.max(8,S.duration-Math.max(0,a-2)))};
+1993-    draw();pvDraw();paintClock();toast("Revisando posible voz no transcrita.");
+1994-  });
+1995-}
+1996-function paintCounter(){
+1997:  const n = timedCount(), tot = S.words.length, gaps=S.doc?.ai?.voice_gaps||[];
+1998-  $("#counter").innerHTML = "<b>"+n+"</b>/"+tot+" · "+(tot?Math.round(n/tot*100):0)+"%"+(gaps.length?' · <span style="color:#F2A900">⚠ '+gaps.length+'</span>':'');
+1999-  paintAiQa();
+2000-}
+2001-function refreshSelectionVisual(){
+2002-  const box=$("#lyricsInner"); if(!box) return;
+2003-  const a=S.selStart>=0?Math.min(S.selStart,S.selEnd):-1, b=S.selStart>=0?Math.max(S.selStart,S.selEnd):-1;
+2004-  box.querySelectorAll(".chip[data-gi]").forEach(c=>{
+2005-    const i=+c.dataset.gi;
+2006-    c.classList.toggle("sel", (a>=0 && i>=a && i<=b) || i===S.sel);
+2007-    c.classList.toggle("cursor", i===S.cursor);
+2008-  });
+2009-  const rb=$("#btnResync");
+2010-  if(rb){ const n=S.selStart>=0 ? Math.abs(S.selEnd-S.selStart)+1 : 0; rb.classList.toggle("show", n>1); rb.textContent=n>1 ? `↻ RESINCRONIZAR ${n} PALABRAS` : "↻ RESINCRONIZAR SELECCIÓN"; }
+2011-}
+2012-function ensureWordVisible(i){
+2013-  const drawer=$("#lyricsDrawer"), el=$("#lyricsInner")?.querySelector(`.chip[data-gi="${i}"]`);
+2014-  if(!drawer||!el) return;
+2015-  const dr=drawer.getBoundingClientRect(), er=el.getBoundingClientRect();
+2016-  if(er.top < dr.top+28 || er.bottom > dr.bottom-12) el.scrollIntoView({block:"nearest"});
+2017-}
+2018-function paintLyrics(){
+2019-  if($("#lyricsDrawer").classList.contains("hidden")) return;
+2020-  const drawer=$("#lyricsDrawer"), oldScroll=drawer.scrollTop;
+2021-  const box = $("#lyricsInner"); box.innerHTML = "";
+2022-  let gi = 0, lyricLineNo=0;
+2023-  for(const seg of S.doc.segments){
+2024-    const row = document.createElement("div");
+2025-    row.className = "lrow" + (seg.kind === "break" ? " brk" : "");
+2026-    const lineStart=gi;
+2027-    if(seg.kind!=="break"){
+2028-      lyricLineNo++;
+2029-      const lb=document.createElement("button");
+2030-      lb.type="button"; lb.className="roleLineBtn"; lb.textContent="L"+lyricLineNo;
+2031-      lb.dataset.roleLine="1"; lb.dataset.start=lineStart;
+2032-      row.appendChild(lb);
+--
+2325-      const u=byId.get(w.id);
+2326-      if(u){
+2327-        w.start_time=Number(u.start);w.end_time=Number(u.end);w.locked=false;w.provisional=false;
+2328-        w.ai_status="green";w.ai_match_type="forced_alignment_block";w.ai_loss=u.loss;
+2329-      }else if(reviewIds.has(w.id)){
+2330-        // Conserva el timing anterior y marca sólo este pedazo para revisión.
+2331-        w.ai_status="amber";w.ai_match_type="repeat_review";w.provisional=true;
+2332-      }
+2333-    }
+2334-    S.doc.ai=S.doc.ai||{};S.doc.ai.block_alignments=S.doc.ai.block_alignments||[];
+2335-    S.doc.ai.block_alignments.push({engine:j.engine||"elevenlabs-forced-alignment",strategy:j.strategy||"full",quality:j.quality||null,repetition:j.repetition||null,calls:j.calls||1,chunks:j.chunks||1,review_chunks:j.review_chunks||[],applied_words:j.applied_words??(j.updates||[]).length,requested_words:j.requested_words??selected.length,at:new Date().toISOString(),words:selected.length,clip_start:j.clip_start,clip_end:j.clip_end,loss:j.loss});
+2336-    const a=Number(j.clip_start),b=Number(j.clip_end);
+2337:    S.doc.ai.voice_gaps=(S.doc.ai.voice_gaps||[]).filter(g=>{
+2338-      const ov=Math.max(0,Math.min(b,Number(g.end))-Math.max(a,Number(g.start))),gd=Math.max(.01,Number(g.end)-Number(g.start));
+2339-      return ov/gd<0.45;
+2340-    });
+2341-    reindex();S.dirty=true;pvInvalidate();paintNow();paintLyrics();paintCounter();draw();scheduleSave();
+2342-    const ft=selected[0]?.start_time;if(ft!==null&&ft!==undefined){centerOn(ft);S.audio.currentTime=Math.max(0,ft-.5);}
+2343-    setStatus("Bloque sincronizado con ElevenLabs","good");
+2344-    const applied=Number(j.applied_words??(j.updates||[]).length), reviewCount=(j.review_word_ids||[]).length;
+2345-    if(reviewCount){
+2346-      const firstReview=selected.find(w=>reviewIds.has(w.id));
+2347-      if(firstReview&&firstReview.start_time!=null){centerOn(firstReview.start_time);S.audio.currentTime=Math.max(0,firstReview.start_time-.5);}
+2348-      toast("✓ "+applied+" sincronizadas · "+reviewCount+" marcadas para revisión · no se descartó el bloque",5200);
+2349-    }else{
+2350-      const repeatMsg=(j.strategy||"").startsWith("repeat_chunks")?" · repetición recalculada por subbloques de audio":"";
+2351-      toast("✓ "+applied+" palabras sincronizadas con IA"+repeatMsg+" · el resto no se tocó",4200);
+2352-    }
+2353-  }catch(err){
+2354-    setStatus("No se pudo sincronizar el bloque","bad");toast((err.message||String(err)).slice(0,420),5000);
+2355-  }finally{
+2356-    btn.classList.remove("busy");btn.textContent=old;setTimeout(()=>setStatus(""),2600);
+2357-  }
+2358-}
+2359-
+2360-function applyRoleToIndices(indices, role, quiet=false){
+2361-  const ids=[...new Set(indices)].filter(i=>i>=0&&i<S.words.length).sort((a,b)=>a-b);
+2362-  if(!ids.length) return false;
+2363-  const allTarget=ids.every(i=>wordRole(S.words[i])===role);
+2364-  push(docSnapshot());
+2365-  ids.forEach(i=>applyWordRole(S.words[i], allTarget?"none":role));
+2366-  S.dirty=true; pvInvalidate(); paintNow(); paintLyrics(); draw(); scheduleSave();
+2367-  if(!quiet) toast(`${ids.length} palabra${ids.length===1?"":"s"} · ${allTarget?"SIN ROL":roleLabel(role)}`,1100);
+2368-  return true;
+2369-}
+2370-// Aplica el rol ARMADO a lo que esté seleccionado AHORA MISMO. Se llama tras
+2371-// cualquier gesto de selección (clic, Shift+clic, Ctrl+arrastrar, L# línea).
+2372-function applyArmedRoleToCurrentSelection(){
+=== END / REFRESH ===
+1224-function buildDoc(artist, title, text){
+1225-  const segments = [];
+1226-  text = normalizeLyricsForCdg(text);
+1227-  const rawLines = text.replace(/\r/g,"").split("\n");
+1228-  let si = 0, wi = 0;
+1229-  for(const raw of rawLines){
+1230-    const line = raw.trim();
+1231-    if(!line){
+1232-      segments.push({id:uid("s",si++), kind:"break", text:"", words:[]});
+1233-      continue;
+1234-    }
+1235-    const words = line.split(/\s+/).map(w => ({
+1236:      id: uid("w", wi++), text: w, start_time: null, end_time: null, locked: false, spoken:false, vocal_role:null
+1237-    }));
+1238-    segments.push({id:uid("s",si++), kind:"lyric", text:line, words});
+1239-  }
+1240-  while(segments.length && segments[segments.length-1].kind==="break") segments.pop();
+1241-  S.doc = {
+1242-    version: 1,
+1243-    song: {artist, title, audio_file: S.audioName, audio_sha1: S.sha1, duration: S.duration},
+1244-    calibration_ms: S.cfg.cal,
+1245-    segments
+1246-  };
+1247-  reindex();
+1248-}
+1249-function reindex(){
+1250-  S.words = [];
+1251-  for(const seg of S.doc.segments) for(const w of seg.words){ w._seg = seg; S.words.push(w); }
+1252-  // Una edición estructural puede mover índices: nunca conservar una selección de roles obsoleta.
+1253-  if(S.rolePick) S.rolePick.clear();
+1254-  S.cursor = S.words.findIndex(w => w.start_time === null);
+1255-  if(S.cursor < 0) S.cursor = S.words.length;
+1256-  // lastMarkT pertenece a la captura actual, NO a todos los timings existentes.
+1257-  // Esto permite agregar una frase pendiente en cualquier punto de una canción ya terminada.
+1258-  S.lastMarkT = -1;
+1259-  S.capturePrevIndex = null;
+1260-}
+1261-function nextPendingIndex(from=0){
+1262-  for(let i=Math.max(0,from|0);i<S.words.length;i++) if(S.words[i].start_time===null) return i;
+1263-  return S.words.length;
+1264-}
+1265-function timedCount(){ return S.words.reduce((n,w)=>n+(w.start_time!==null?1:0),0); }
+1266-
+1267-/* START y END son independientes. */
+1268:function refreshEnds(from){ const a=Math.max(0,(from|0)-1); for(let i=a;i<S.words.length;i++){ const w=S.words[i]; if(w.start_time===null) continue; if(w.end_time!==null && w.end_time<=w.start_time) w.end_time=w.start_time+.05; } }
+1269-
+1270-/* ---------------- undo ---------------- */
+1271-function push(entry){ S.undo.push(entry); if(S.undo.length>4000) S.undo.shift(); S.redo.length=0; S.dirty=true; }
+1272-function applyInverse(e){
+1273-  if(e.doc !== undefined) return restoreDoc(e);
+1274-  const w = S.words[e.i];
+1275:  const cur = {i:e.i, start:w.start_time, end:w.end_time, locked:w.locked, cursor:S.cursor};
+1276:  w.start_time = e.start; w.end_time = e.end; w.locked = e.locked; S.cursor = e.cursor;
+1277:  refreshEnds(e.i);
+1278-  return cur;
+1279-}
+1280-function undo(){
+1281-  if(!S.undo.length) return false;
+1282-  S.redo.push(applyInverse(S.undo.pop()));
+1283-  return true;
+1284-}
+1285-function redo(){
+1286-  if(!S.redo.length) return false;
+1287-  S.undo.push(applyInverse(S.redo.pop()));
+1288-  return true;
+1289-}
+1290-function snapshot(i){
+1291-  const w = S.words[i];
+1292:  return {i, start:w.start_time, end:w.end_time, locked:w.locked, cursor:S.cursor};
+1293-}
+1294-
+1295-/* ---------------- sincronización ---------------- */
+1296-function mark(){
+1297-  if(!S.playing) { flashHint("Pulsa Enter para reproducir"); return; }
+1298-  let targetIndex=S.cursor;
+1299-  if(S.resyncSession){
+1300-    if(S.resyncSession.pos>=S.resyncSession.ids.length){ S.resyncSession=null; flashHint("Resincronización terminada"); return; }
+1301-    targetIndex=S.resyncSession.ids[S.resyncSession.pos];
+1302-  }else if(S.clickResync){
+1303-    // Clic normal: SPACE remarca EXACTAMENTE desde esa palabra, aunque ya tenga timing.
+1304-    targetIndex=S.cursor;
+1305-  }else{
+1306-    // Sincronización normal: sólo palabras todavía pendientes.
+1307-    if(targetIndex>=S.words.length || S.words[targetIndex]?.start_time!==null) targetIndex=nextPendingIndex(targetIndex);
+1308-  }
+1309-  if(targetIndex >= S.words.length){ flashHint("Canción completa"); return; }
+1310-  const t = S.audio.currentTime;
+1311-  if(S.lastMarkT >= 0 && t >= S.lastMarkT && (t - S.lastMarkT) * 1000 < S.cfg.minGap) return;
+1312-
+1313-  push(snapshot(targetIndex));
+1314-  const w=S.words[targetIndex];
+1315-  const session=S.resyncSession;
+1316-  const prevIndex=session ? (session.pos>0 ? session.ids[session.pos-1] : -1) : (S.capturePrevIndex ?? -1);
+1317-  const prev=prevIndex>=0 ? S.words[prevIndex] : null;
+1318:  if(prev && prev.start_time!==null && !prev.locked) prev.end_time=Math.max(prev.start_time+.05,t-.08);
+1319:  w.start_time=t; w.end_time=null; w.locked=false; w.provisional=false;
+1320-  S.lastMarkT=t;
+1321-
+1322-  if(session){
+1323-    session.pos++;
+1324-    if(session.pos>=session.ids.length){
+1325:      w.end_time=Math.min(S.duration,t+S.cfg.maxWord);
+1326-      S.cursor=nextPendingIndex(targetIndex+1);
+1327-      S.resyncSession=null;
+1328-      S.capturePrevIndex=null;
+1329-      S.range=null; S.rangeSource=null; S.loopingRange=false;
+1330-      toast("Resincronización de la selección completada · el resto de la canción no fue tocado",3000);
+1331-    }else{
+1332-      S.cursor=session.ids[session.pos];
+1333-    }
+1334-  }else if(S.clickResync){
+1335-    // Resincronización por clic: 1 por 1, sin saltar a pendientes ni a otra zona.
+1336-    const next=targetIndex+1;
+1337-    S.cursor=next;
+1338-    if(next<S.words.length){
+1339-      S.capturePrevIndex=targetIndex;
+1340-    }else{
+1341:      w.end_time=Math.min(S.duration,t+S.cfg.maxWord);
+1342-      S.capturePrevIndex=null;
+1343-      S.clickResync=false;
+1344-    }
+1345-  }else{
+1346-    const next=nextPendingIndex(targetIndex+1);
+1347-    S.cursor=next;
+1348-    if(next < S.words.length && next===targetIndex+1){
+1349-      S.capturePrevIndex=targetIndex;
+1350-    }else{
+1351-      const following=S.words[targetIndex+1];
+1352-      const cap=(following && following.start_time!==null && following.start_time>t)
+1353-        ? Math.max(t+.05, Math.min(t+S.cfg.maxWord, following.start_time-.08))
+1354-        : Math.min(S.duration,t+S.cfg.maxWord);
+1355:      w.end_time=cap;
+1356-      S.capturePrevIndex=null;
+1357-    }
+1358-  }
+1359:  refreshEnds(Math.max(0,targetIndex-1));
+1360-  S.dirty = true; pvInvalidate(); bumpSlots(); paintNow(); paintLyrics(); paintCounter(); scheduleSave();
+1361-  if(S.cursor<S.words.length) requestAnimationFrame(()=>ensureWordVisible(S.cursor));
+1362-}
+1363-
+1364-function undoMark(){
+1365-  if(!S.undo.length) return;
+1366-  const structural = S.undo[S.undo.length-1].doc !== undefined;
+1367-  if(!undo()) return;
+1368-  pvInvalidate();
+1369-  S.lastMarkT = S.lastMarkTOf() ?? -1;
+1370-  if(!structural){
+1371-    const back = Math.max(0, (S.lastMarkTOf() ?? S.audio.currentTime) - 1.5);
+1372-    S.audio.currentTime = back;
+1373-  }
+1374-  paintNow(); paintLyrics(); paintCounter(); draw(); scheduleSave();
+1375-  if(structural) toast("Cambio recuperado.");
+1376-}
+1377-S.lastMarkTOf = function(){
+1378-  for(let i=S.cursor-1;i>=0;i--) if(S.words[i].start_time!==null) return S.words[i].start_time;
+1379-  return null;
+1380-};
+1381-
+1382-/* ---------------- canvas ---------------- */
+1383-/* ---------------- onda vertical ----------------
+1384-   El tiempo corre de arriba abajo. La amplitud se abre a los lados desde el
+1385-   centro. Cada marca es una línea horizontal con su palabra al lado, y la
+1386-   cabeza de reproducción es otra línea horizontal.                        */
+1387-const cv = $("#wave"), cx = cv.getContext("2d");
+1388-let CW=0, CH=0, DPR=1;
+1389-const RULER_W = 46;              // franja de tiempos, a la izquierda
+1390-function resize(){
+1391-  DPR = window.devicePixelRatio || 1;
+1392-  const r = cv.getBoundingClientRect();
+1393-  CW = Math.max(1, Math.floor(r.width)); CH = Math.max(1, Math.floor(r.height));
+1394-  cv.width = CW*DPR; cv.height = CH*DPR;
+1395-  cx.setTransform(DPR,0,0,DPR,0,0);
+1396-}
+1397-new ResizeObserver(()=>{ resize(); draw(); }).observe($("#waveWrap"));
+1398-
+1399-const t2y = t => (t - S.view.t0) / S.view.dur * CH;
+1400-const y2t = y => S.view.t0 + y / CH * S.view.dur;
+1401-
+1402-function tickStep(){
+1403-  const target = S.view.dur / (CH/56);
+1404-  const steps = [.05,.1,.25,.5,1,2,5,10,15,30,60,120,300];
+--
+1473-    if(y1 > CH + 300) break;
+1474-    const y2 = t2y(effectiveTimingEnd(i) ?? (w.start_time + .2));
+1475-    if(y2 < -300) continue;
+1476-    const sel = S.selStart>=0 ? (i>=Math.min(S.selStart,S.selEnd) && i<=Math.max(S.selStart,S.selEnd)) : i === S.sel;
+1477-
+1478-    const roleColor = w.vocal_role==="female"?"#FF4FA3":w.vocal_role==="male"?"#32B7FF":w.vocal_role==="duet"?"#7ED957":"#F2A900";
+1479-    cx.fillStyle = w.spoken ? (sel ? "rgba(224,86,62,.30)" : "rgba(224,86,62,.16)") : (sel ? roleColor+"47" : roleColor+"1C");
+1480-    cx.fillRect(x0, y1, wavW, Math.max(1, y2-y1));
+1481-
+1482-    cx.strokeStyle = w.spoken ? "#E0563E" : (sel ? roleColor : roleColor+"99");
+1483-    cx.lineWidth = sel ? 2 : 1;
+1484-    cx.beginPath(); cx.moveTo(x0, y1+.5); cx.lineTo(CW, y1+.5); cx.stroke();
+1485:    { cx.strokeStyle=w.spoken?"#E0563E":(sel?"#86E0BE":(w.end_time===null?"rgba(98,199,160,.42)":"rgba(98,199,160,.85)")); cx.lineWidth=sel?2:1; cx.beginPath(); cx.moveTo(x0,y2+.5); cx.lineTo(CW,y2+.5); cx.stroke(); }
+1486-
+1487-    if(w.locked){
+1488-      cx.fillStyle = "#F2B705"; cx.fillRect(x0, y1, 3, Math.max(2, y2-y1));
+1489-    }
+1490-    if(sel){
+1491-      cx.fillStyle = "#F2B705";
+1492-      cx.fillRect(mid-11, y1-2, 22, 4);
+1493-      cx.fillRect(mid-11, y2-2, 22, 4);
+1494-    }
+1495-    if(showLabels && (y2 - y1) >= 11){
+1496-      cx.font = (sel ? "700 " : "") + "11px " + sans;
+1497-      cx.fillStyle = w.spoken ? "#ff7777" : (sel ? roleColor : "#93A099");
+1498-      cx.fillText(w.text, x0 + 6, (y1 + y2)/2);
+1499-    }
+1500-  }
+1501-
+1502-  // Botón LOOP del rango seleccionado. Se dibuja una sola vez y ya no depende
+1503-  // de que una palabra individual mida 32 px de alto.
+1504-  const lpr=rangePlayRect();
+1505-  if(lpr){
+1506-    const {bx,by,bw,bh}=lpr;
+1507-    cx.fillStyle="rgba(11,13,12,.94)"; cx.fillRect(bx,by,bw,bh);
+1508-    cx.strokeStyle="#F2B705"; cx.lineWidth=1; cx.strokeRect(bx+.5,by+.5,bw-1,bh-1);
+1509-    cx.font="700 10px "+mono; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillStyle="#D6DED8";
+1510-    cx.fillText(S.loopingRange?"■ STOP":"▶ LOOP",bx+bw/2,by+bh/2);
+1511-    cx.textAlign="left";
+1512-  }
+1513-
+1514-  /* cabeza de reproducción */
+1515-  const py = t2y(S.audio.currentTime);
+1516-  if(py >= -1 && py <= CH+1){
+1517-    cx.strokeStyle = "#FFFFFF"; cx.lineWidth = 1;
+1518-    cx.beginPath(); cx.moveTo(0, py+.5); cx.lineTo(CW, py+.5); cx.stroke();
+1519-    cx.fillStyle = "#FFFFFF";
+1520-    cx.beginPath(); cx.moveTo(CW,py-4); cx.lineTo(CW,py+4); cx.lineTo(CW-6,py); cx.closePath(); cx.fill();
+1521-  }
+1522-
+1523-  $("#zoomHud").textContent = S.view.dur.toFixed(1) + " s";
+1524-}
+1525-
+1526-/* ==========================================================================
+1527-   VISTA DE PANTALLA
+1528-   Reproduce lo que hará el CD+G, con las mismas reglas que el renderer:
+1529-     · misma fuente y mismas anchuras (tabla de avances extraída del TTF)
+1530-     · mismo corte de línea
+1531-     · mismo planificador de dibujado y borrado, portado de cdgmaker
+1532-   Si esto miente, no sirve de nada. Cualquier cambio en style.json debe
+1533-   reflejarse también en PV.cfg.
+1534-   ========================================================================== */
+1535-const PV_FONT = "Impact";
+1536-let pvMeasureCanvas=document.createElement("canvas"), pvMeasureCtx=pvMeasureCanvas.getContext("2d");
+1537-function pvFontCss(size=S.cfg.fontSize){ const fam=S.cfg.fontFamily==="arial"?"Arial":S.cfg.fontFamily==="arialbd"?"Arial Black":"Impact"; return `${size}px ${fam}, Arial, sans-serif`; }
+1538-function advWidth(s){ pvMeasureCtx.font=pvFontCss(); let w=0; for(const c of s) w+=pvMeasureCtx.measureText(c).width; return w; }
+1539-
+1540-const PV = {
+1541-  cfg: {
+1542-    linesPerPage: 6, lineTileHeight: 2, row: 3,   // = style.json
+1543:    uppercase: true, tailSeconds: 0.45, smartPageGap:2.0,
+1544-    instrumental: {label:"INSTRUMENTAL", dot:"\u25CF", dots:4,
+1545-                   span:6.0, lead:4.0, minGap:6.0,
+1546-                   spokenMin:6.0, spokenLead:4.0, spokenJoin:0.75},
+1547-  },
+1548-  W: 300, H: 216, VW: 288, VH: 192, TILE: 12,
+1549-  WRAP: 280,          // límite real de cdgmaker; el lienzo mide 288
+1550-  GAP: 50,            // LINE_DRAW_ERASE_GAP = 300/6 frames
+1551-  on: true,
+1552-  mode: "lyrics",
+1553-  plan: null,
+1554-  ready: false,
+1555-};
+1556-
+1557-/* Impact se toma de Windows. */
+1558-(async()=>{ try{ await document.fonts.load("18px Impact"); PV.ready=true; }catch(e){PV.ready=false;} })();
+1559-
+1560-const pvText = s => (s === "_" ? " " : (PV.cfg.uppercase ? s.toUpperCase() : s));
+1561-const cs = t => Math.round(t * 100);        // centésimas
+1562-const f  = t => cs(t) * 3;                   // fotogramas CDG (300/s)
+1563-
+1564-/* --- 1. corte de línea, idéntico al del normalizador --- */
+1565-function pvWrap(){
+1566-  const lpp=PV.cfg.linesPerPage;
+1567-  const blocks=[];let block=[];
+1568-  const flushBlock=()=>{if(block.length){blocks.push(block);block=[];}};
+1569-  for(const seg of S.doc.segments){
+1570-    if(seg.kind==="break"){flushBlock();continue;}
+1571-    const renderWords=(seg.words||[]).filter(w=>!w.spoken);
+1572-    if(!renderWords.length)continue;
+1573-    if(renderWords.some(w=>w.start_time===null)){flushBlock();break;}
+1574-    let cur=[];
+1575-    for(const w of renderWords){
+1576-      const probe=cur.concat([w]),txt=probe.map(x=>pvText(x.text)).join(" ");
+1577-      if(cur.length&&advWidth(txt)>PV.WRAP){block.push(cur);cur=[w];}else cur=probe;
+1578-    }
+1579-    if(cur.length)block.push(cur);
+1580-  }
+1581-  flushBlock();
+1582-  const out=[];const padPage=()=>{while(out.length%lpp)out.push([]);};
+1583-  for(const b of blocks){
+1584-    if(out.length)padPage();
+1585-    for(let i=0;i<b.length;i+=lpp){
+1586-      if(i>0)padPage();
+1587-      const chunk=b.slice(i,i+lpp),top=Math.floor((lpp-chunk.length)/2),bottom=lpp-chunk.length-top;
+1588-      for(let j=0;j<top;j++)out.push([]);out.push(...chunk);for(let j=0;j<bottom;j++)out.push([]);
+--
+1613-      const avail = (start - c.lead) - (base + 0.4);
+1614-      const useLabel = avail >= 1.0 + SLOT;
+1615-      const span = Math.min(c.span, avail - (useLabel ? SLOT : 0));
+1616-      if(span >= 1.0){
+1617-        const end = start - c.lead, step = span / c.dots, from = end - span;
+1618-        const spacerAt = base + 0.3, labelAt = from - SLOT;
+1619-        padToPage();
+1620-        const top = Math.max(0, Math.floor((lpp - 2) / 2));
+1621-        const bottom = Math.max(0, lpp - 2 - top);
+1622-        for(let j=0;j<top;j++) out.push([]);
+1623-        if(useLabel && labelAt > spacerAt + 0.15){
+1624-          out.push([
+1625:            {text:"_", _inst:true, _silent:true, _label:true, start_time: spacerAt, end_time: labelAt},
+1626:            {text:c.label, _inst:true, _label:true, start_time: labelAt, end_time: from - 0.05},
+1627-          ]);
+1628-        }else if(useLabel){
+1629:          out.push([{text:c.label, _inst:true, _label:true, start_time: spacerAt, end_time: from - 0.05}]);
+1630-        }else{
+1631:          out.push([{text:c.label, _inst:true, _label:true, start_time: spacerAt, end_time: Math.max(spacerAt+.4, from-.05)}]);
+1632-        }
+1633-        const dots = [];
+1634-        for(let i=0;i<c.dots;i++){
+1635-          dots.push({text:c.dot, _inst:true,
+1636:                     start_time: from + i*step, end_time: from + (i+1)*step});
+1637-        }
+1638-        out.push(dots);
+1639-        for(let j=0;j<bottom;j++) out.push([]);
+1640-        n++;
+1641-      }
+1642-    }
+1643-    out.push(line);
+1644:    prevEnd = Math.max(...line.map(w => w.end_time ?? w.start_time));
+1645-  }
+1646-  return out;
+1647-}
+1648-
+1649-/* --- 2. plan de dibujado, portado de KaraokeComposer._set_draw_times --- */
+1650-function pvPlan(){
+1651-  const lpp = PV.cfg.linesPerPage, lth = PV.cfg.lineTileHeight;
+1652-  PV.cfg.row = Math.max(1, Math.floor((18 - lpp*lth)/2));
+1653-  const lines = pvWrap();
+1654-  if(!lines.length) return null;
+1655-
+1656-  const syl = [], geom = [];
+1657-  const flatWords=lines.flat().filter(Boolean);
+1658:  const fallbackEnd=(w)=>{
+1659:    if(w.end_time!==null && w.end_time!==undefined && w.end_time>w.start_time) return w.end_time;
+1660-    const idx=flatWords.indexOf(w), nxt=idx>=0?flatWords[idx+1]:null;
+1661-    if(nxt && nxt.start_time>w.start_time) return Math.min(nxt.start_time,w.start_time+0.45);
+1662-    return w.start_time+0.45;
+1663-  };
+1664-  for(let li=0; li<lines.length; li++){
+1665-    const line = lines[li];
+1666-    const txt = line.map(w => pvText(w.text)).join(" ");
+1667-    const lw = advWidth(txt);
+1668-    const x0 = Math.floor((PV.W - lw) / 2);
+1669-    const y  = PV.cfg.row * PV.TILE + (li % lpp) * lth * PV.TILE;
+1670-    const boxes = [];
+1671-    let cx0 = x0;
+1672-    for(const w of line){
+1673-      const t = pvText(w.text), ww = advWidth(t);
+=== LINE/SEGMENT HELPERS ===
+1036-const $ = s => document.querySelector(s);
+1037-const clamp = (v,a,b) => v<a?a:v>b?b:v;
+1038-
+1039-/* ---------------- estado ---------------- */
+1040-const S = {
+1041-  audio: new Audio(),
+1042-  audioName: "", sha1: "",
+1043-  duration: 0,
+1044:  peaks: null,          // {min:Float32Array, max:Float32Array, rate:buckets/seg}
+1045:  doc: null,            // {song, segments[]}
+1046-  words: [],            // lista plana, referencias a los objetos de doc
+1047-  cursor: 0,            // índice de la siguiente palabra a marcar
+1048-  sel: -1,              // palabra principal seleccionada
+1049-  selStart: -1,         // selección múltiple inclusiva
+1050-  selEnd: -1,
+1051-  view: {t0:0, dur:30},
+1052-  playing: false,
+1053-  lastMarkT: -1,
+1054-  capturePrevIndex: null, // palabra anterior marcada en la captura ACTUAL; nunca toca timings viejos al insertar letra
+1055-  undo: [], redo: [],
+1056-  cfg: {cal:0, minGap:60, maxWord:2.5, stall:4, introMode:"auto", introDuration:6, introShort:3, linesPerPage:6,
+1057-        fontFamily:"impact", fontSize:18, strokeWidth:1, lyricYOffset:0,
+1058-        introTitleSize:28, introArtistSize:20, introTitleX:0, introTitleY:0, introArtistX:0, introArtistY:0,
+1059-        introTransition:"centertexttoplogobottomtext", outroLine1:"Ediciones Personalizadas.", outroLine2:"Whatsapp +51921675846",
+1060-        outroSize:18, outroX:0, outroY:0, outroTransition:"centertexttoplogobottomtext"},
+1061-  drag: null,
+1062-  range: null,          // rango derivado únicamente de la selección sincronizada
+1063-  rangeSource: null,    // sólo "word"
+1064-  loopingRange: false,
+1065-  dirty: false,
+1066-  editing: true,
+1067-  resyncSession: null,  // {ids,pos}: SPACE queda limitado a esta selección
+1068-  clickResync: false,   // clic normal = punto exacto de resincronización secuencial
+1069-  armedRole: null,       // null | none | hombre | mujer | duo | hablado — rol ARMADO (botón iluminado)
+1070-  playHiIndex: -1,       // índice de la palabra que brilla ahora mismo siguiendo el audio
+--
+1102-}
+1103-function setRenderBusy(msg){
+1104-  $("#renderBusyMsg").textContent = msg || "Procesando…";
+1105-}
+1106-function setRenderProgress(pct,msg,stage){
+1107-  const p=Math.max(0,Math.min(100,Math.round(Number(pct)||0)));
+1108-  const f=$("#renderProgFill"),t=$("#renderProgPct"),st=$("#renderProgStage"); if(f)f.style.width=p+"%";if(t)t.textContent=p+"%";if(st)st.textContent=stage||"Backend online";if(msg)setRenderBusy(msg);
+1109-}
+1110:function hideRenderBusy(){ $("#renderBusy").hidden = true; setRenderProgress(0,"Preparando proyecto…","Backend online"); }
+1111-function uid(p,i){ return p + String(i).padStart(4,"0"); }
+1112-
+1113-/* Almacenamiento opcional. En claude.ai existe window.storage; en local no
+1114-   existe y el autoguardado simplemente no ocurre (ver README para activarlo). */
+1115-const Store = (() => {
+1116-  // IndexedDB sólo cuando el editor lo sirve el servidor local. Abierto como
+1117-  // file:// no hay origen persistente y no se activa: en ese caso queda el
+1118-  // aviso al cerrar y Ctrl+S.
+1119-  const usable = location.protocol === "http:" || location.protocol === "https:";
+1120-  let dbp = null;
+1121-  function db(){
+1122-    if(dbp) return dbp;
+1123-    dbp = new Promise((res, rej) => {
+1124-      const r = indexedDB.open("karaoke-cdg", 1);
+1125-      r.onupgradeneeded = () => r.result.createObjectStore("proyectos");
+1126-      r.onsuccess = () => res(r.result);
+1127-      r.onerror = () => rej(r.error);
+1128-    });
+1129-    return dbp;
+1130-  }
+1131-  return {
+1132-    async set(k, v){
+1133-      if(!usable) return;
+1134-      try{
+1135-        const d = await db();
+--
+1217-    }
+1218-    mn[i]=lo; mx[i]=hi;
+1219-  }
+1220-  S.peaks = {min:mn, max:mx, rate};
+1221-}
+1222-
+1223-/* ---------------- documento ---------------- */
+1224-function buildDoc(artist, title, text){
+1225:  const segments = [];
+1226-  text = normalizeLyricsForCdg(text);
+1227-  const rawLines = text.replace(/\r/g,"").split("\n");
+1228-  let si = 0, wi = 0;
+1229-  for(const raw of rawLines){
+1230-    const line = raw.trim();
+1231-    if(!line){
+1232:      segments.push({id:uid("s",si++), kind:"break", text:"", words:[]});
+1233-      continue;
+1234-    }
+1235-    const words = line.split(/\s+/).map(w => ({
+1236-      id: uid("w", wi++), text: w, start_time: null, end_time: null, locked: false, spoken:false, vocal_role:null
+1237-    }));
+1238:    segments.push({id:uid("s",si++), kind:"lyric", text:line, words});
+1239-  }
+1240:  while(segments.length && segments[segments.length-1].kind==="break") segments.pop();
+1241-  S.doc = {
+1242-    version: 1,
+1243-    song: {artist, title, audio_file: S.audioName, audio_sha1: S.sha1, duration: S.duration},
+1244-    calibration_ms: S.cfg.cal,
+1245:    segments
+1246-  };
+1247-  reindex();
+1248-}
+1249-function reindex(){
+1250-  S.words = [];
+1251:  for(const seg of S.doc.segments) for(const w of seg.words){ w._seg = seg; S.words.push(w); }
+1252-  // Una edición estructural puede mover índices: nunca conservar una selección de roles obsoleta.
+1253-  if(S.rolePick) S.rolePick.clear();
+1254-  S.cursor = S.words.findIndex(w => w.start_time === null);
+1255-  if(S.cursor < 0) S.cursor = S.words.length;
+1256-  // lastMarkT pertenece a la captura actual, NO a todos los timings existentes.
+1257-  // Esto permite agregar una frase pendiente en cualquier punto de una canción ya terminada.
+1258-  S.lastMarkT = -1;
+1259-  S.capturePrevIndex = null;
+1260-}
+1261-function nextPendingIndex(from=0){
+1262-  for(let i=Math.max(0,from|0);i<S.words.length;i++) if(S.words[i].start_time===null) return i;
+1263-  return S.words.length;
+1264-}
+1265-function timedCount(){ return S.words.reduce((n,w)=>n+(w.start_time!==null?1:0),0); }
+1266-
+1267-/* START y END son independientes. */
+1268-function refreshEnds(from){ const a=Math.max(0,(from|0)-1); for(let i=a;i<S.words.length;i++){ const w=S.words[i]; if(w.start_time===null) continue; if(w.end_time!==null && w.end_time<=w.start_time) w.end_time=w.start_time+.05; } }
+1269-
+1270-/* ---------------- undo ---------------- */
+1271-function push(entry){ S.undo.push(entry); if(S.undo.length>4000) S.undo.shift(); S.redo.length=0; S.dirty=true; }
+1272-function applyInverse(e){
+1273-  if(e.doc !== undefined) return restoreDoc(e);
+1274-  const w = S.words[e.i];
+1275-  const cur = {i:e.i, start:w.start_time, end:w.end_time, locked:w.locked, cursor:S.cursor};
+1276-  w.start_time = e.start; w.end_time = e.end; w.locked = e.locked; S.cursor = e.cursor;
+--
+1561-const cs = t => Math.round(t * 100);        // centésimas
+1562-const f  = t => cs(t) * 3;                   // fotogramas CDG (300/s)
+1563-
+1564-/* --- 1. corte de línea, idéntico al del normalizador --- */
+1565-function pvWrap(){
+1566-  const lpp=PV.cfg.linesPerPage;
+1567-  const blocks=[];let block=[];
+1568-  const flushBlock=()=>{if(block.length){blocks.push(block);block=[];}};
+1569:  for(const seg of S.doc.segments){
+1570:    if(seg.kind==="break"){flushBlock();continue;}
+1571:    const renderWords=(seg.words||[]).filter(w=>!w.spoken);
+1572-    if(!renderWords.length)continue;
+1573-    if(renderWords.some(w=>w.start_time===null)){flushBlock();break;}
+1574-    let cur=[];
+1575-    for(const w of renderWords){
+1576-      const probe=cur.concat([w]),txt=probe.map(x=>pvText(x.text)).join(" ");
+1577-      if(cur.length&&advWidth(txt)>PV.WRAP){block.push(cur);cur=[w];}else cur=probe;
+1578-    }
+1579-    if(cur.length)block.push(cur);
+1580-  }
+1581-  flushBlock();
+1582-  const out=[];const padPage=()=>{while(out.length%lpp)out.push([]);};
+1583-  for(const b of blocks){
+1584-    if(out.length)padPage();
+1585-    for(let i=0;i<b.length;i+=lpp){
+1586-      if(i>0)padPage();
+1587-      const chunk=b.slice(i,i+lpp),top=Math.floor((lpp-chunk.length)/2),bottom=lpp-chunk.length-top;
+1588-      for(let j=0;j<top;j++)out.push([]);out.push(...chunk);for(let j=0;j<bottom;j++)out.push([]);
+1589-    }
+1590-  }
+1591-  while(out.length&&!out[out.length-1].length)out.pop();
+1592-  return out;
+1593-}
+1594-
+1595-/* El bloque de instrumental son LÍNEAS DE LETRA, no pantallas de cdgmaker:
+1596-   así se dibujan una vez y los puntos los consume el mismo barrido que las
+--
+1781-    // R11: HABLADO oculta texto. Si el HUECO VISUAL entre canto y canto
+1782-    // dura >= spokenMin, mostramos INSTRUMENTAL aunque el hablado tenga
+1783-    // pausas internas o Scribe lo haya dividido en varios intervalos.
+1784-    const longSpoken=hasSpoken && gap>=(c.spokenMin??6);
+1785-    const regularGap=gap>=c.minGap && !hasSpoken;
+1786-    if(!longSpoken && !regularGap) continue;
+1787-
+1788-    // R11: un hueco visual creado por HABLADO se trata como pausa de canto.
+1789:    // La próxima letra se libera spokenLead segundos antes del siguiente START cantado.
+1790-    const lead=longSpoken?(c.spokenLead??3):c.lead;
+1791-    const hideAt=next.start_time-lead;
+1792-    if(t<base+.2 || t>=hideAt) continue;
+1793-
+1794-    const remain=next.start_time-t;
+1795-    const countdownRemain=hideAt-t;
+1796-    const halfStep=c.span/Math.max(1,c.dots*2);
+1797-    const phase=countdownRemain>=c.span?0:Math.min(c.dots*2,Math.max(0,Math.floor((c.span-countdownRemain)/halfStep+.0001)));
+1798-    return {remain,phase,spoken:longSpoken};
+1799-  }
+1800-  return null;
+1801-}
+1802-function pvDrawInstrumental(state){
+1803-  pvx.fillStyle="#000"; pvx.fillRect(0,0,PV.VW,PV.VH);
+1804-  pvx.textAlign="center"; pvx.textBaseline="middle";
+1805-  pvx.font="28px Impact, Arial Narrow, Arial, sans-serif";
+1806-  pvx.lineWidth=3; pvx.strokeStyle="#111"; pvx.strokeText("INSTRUMENTAL", PV.VW/2, 58);
+1807-  pvx.fillStyle="#fff"; pvx.fillText("INSTRUMENTAL", PV.VW/2, 58);
+1808-
+1809-  const cy = 100, r = 13, gap = 42, sx = PV.VW/2 - gap*1.5;
+1810-  const total = 4;
+1811-  for(let j=0;j<total;j++){
+1812-    const x = sx + j*gap;
+1813-    const order = total - 1 - j;
+1814-    const stage = state.phase - order*2;
+--
+1823-    pvx.restore();
+1824-    pvx.strokeStyle = "#111111";
+1825-    pvx.lineWidth = 2.5;
+1826-    pvx.beginPath(); pvx.arc(x, cy, r, 0, Math.PI*2); pvx.stroke();
+1827-  }
+1828-  pvx.textAlign="left"; pvx.textBaseline="top";
+1829-}
+1830-
+1831:function pvDrawOutlinedText(text,x,y,size,fill="#fff",align="center"){
+1832-  pvx.save(); pvx.font=pvFontCss(size); pvx.textAlign=align; pvx.textBaseline="middle";
+1833-  pvx.lineJoin="round"; pvx.lineWidth=Math.max(2,S.cfg.strokeWidth*2); pvx.strokeStyle="#000"; pvx.fillStyle=fill;
+1834-  pvx.strokeText(text,x,y); pvx.fillText(text,x,y); pvx.restore();
+1835-}
+1836-function pvWrapText(text,size,maxWidth,maxLines=2){
+1837-  const words=(text||"").trim().split(/\s+/).filter(Boolean); if(!words.length) return [""];
+1838-  pvMeasureCtx.font=pvFontCss(size);
+1839-  let lines=[], line="";
+1840-  for(const word of words){
+1841-    const test=line?line+" "+word:word;
+1842-    if(line && pvMeasureCtx.measureText(test).width>maxWidth){ lines.push(line); line=word; }
+1843-    else line=test;
+1844-  }
+1845-  if(line) lines.push(line);
+1846-  if(lines.length>maxLines) return null;
+1847-  return lines;
+1848-}
+1849-function pvDrawFitBlock(text,box,maxSize,minSize,maxLines,fill){
+1850-  const [x1,y1,x2,y2]=box, bw=x2-x1, bh=y2-y1;
+1851-  let chosen=null;
+1852-  for(let size=maxSize;size>=minSize;size--){
+1853-    const lines=pvWrapText(text,size,bw,maxLines); if(!lines) continue;
+1854-    pvMeasureCtx.font=pvFontCss(size);
+1855-    const lineH=Math.ceil(size*1.02), total=lines.length*lineH+(lines.length-1)*2;
+1856-    if(total<=bh && lines.every(line=>pvMeasureCtx.measureText(line).width<=bw)){ chosen={size,lines,lineH,total}; break; }
+--
+1957-}
+1958-function paintNow(){
+1959-  const prev = S.words[S.cursor-1], cur = S.words[S.cursor], next = S.words[S.cursor+1];
+1960-  $(".slot.prev").textContent = prev ? prev.text : "";
+1961-  $(".slot.cur").textContent  = cur ? cur.text : "✓ completa";
+1962-  $(".slot.next").textContent = next ? next.text : "";
+1963-  $("#now").classList.toggle("done", !cur);
+1964-
+1965:  const seg = cur ? cur._seg : (prev ? prev._seg : null);
+1966-  const echo = $("#lineEcho");
+1967-  echo.innerHTML = "";
+1968:  if(seg){
+1969:    seg.words.forEach((w,k)=>{
+1970-      const sp = document.createElement("span");
+1971-      sp.textContent = w.text;
+1972-      if(w === cur) sp.className = "on";
+1973-      echo.appendChild(sp);
+1974:      if(k < seg.words.length-1) echo.appendChild(document.createTextNode(" "));
+1975-    });
+1976-  }
+1977-}
