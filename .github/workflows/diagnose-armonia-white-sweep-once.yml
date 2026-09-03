@@ -1,0 +1,112 @@
+name: Diagnose Armonia white sweep once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-armonia-white-sweep-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture project comparison
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/armonia-white-sweep-current.txt <<'REMOTE'
+          set +e
+          echo "TIMESTAMP=$(date -Is)"
+          echo "=== SERVICE ==="
+          sudo systemctl is-active djgabo-cdg-ia-test
+          echo
+          echo "=== PROJECT COMPARISON ==="
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python - <<'PY'
+          import sqlite3, json, re, math
+          db='/var/lib/djgabo-cdg-ia-test/local.db'
+          c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+          rows=c.execute("""
+            select id,artist,title,status,updated,project_json,lyrics_corrected,voice_filename,instrumental_filename
+            from jobs
+            where lower(artist) like '%armoni%' or lower(title) like '%mujeres enga%'
+            order by updated desc
+            limit 12
+          """).fetchall()
+          def summarize(r):
+              print('\nJOB',r['id'],repr(r['artist']),repr(r['title']),'STATUS',r['status'],'UPDATED',r['updated'])
+              p={}
+              try: p=json.loads(r['project_json'] or '{}')
+              except Exception as e: print('PROJECT_JSON_ERROR',e); return
+              segs=p.get('segments') or []
+              words=[w for s in segs for w in (s.get('words') or [])]
+              def num(v):
+                  return isinstance(v,(int,float)) and math.isfinite(float(v))
+              timed_start=sum(1 for w in words if num(w.get('start_time')))
+              timed_end=sum(1 for w in words if num(w.get('end_time')))
+              timed_both=sum(1 for w in words if num(w.get('start_time')) and num(w.get('end_time')))
+              print('SEGMENTS',len(segs),'WORDS',len(words),'START_TIMED',timed_start,'END_TIMED',timed_end,'BOTH_TIMED',timed_both)
+              print('PROJECT_KEYS',sorted(p.keys()))
+              print('AI',json.dumps(p.get('ai') or {},ensure_ascii=False)[:3000])
+              print('FIRST_12_WORDS')
+              for w in words[:12]:
+                  print(json.dumps({k:w.get(k) for k in ('text','start_time','end_time','start','end','activated','active','state','status') if k in w},ensure_ascii=False))
+              print('MID_6_WORDS')
+              mid=max(0,len(words)//2-3)
+              for w in words[mid:mid+6]:
+                  print(json.dumps({k:w.get(k) for k in ('text','start_time','end_time','start','end','activated','active','state','status') if k in w},ensure_ascii=False))
+              print('LAST_6_WORDS')
+              for w in words[-6:]:
+                  print(json.dumps({k:w.get(k) for k in ('text','start_time','end_time','start','end','activated','active','state','status') if k in w},ensure_ascii=False))
+              bad=[w for w in words if not (num(w.get('start_time')) and num(w.get('end_time')))]
+              print('UNTIMED_SAMPLE',json.dumps(bad[:8],ensure_ascii=False)[:3000])
+          for r in rows: summarize(r)
+          PY
+          echo
+          echo "=== EDITOR SWEEP / HIGHLIGHT LOGIC ==="
+          sudo grep -n -E -i 'sweep|shine|highlight|progress|word.*active|active.*word|start_time|end_time|karaoke|clip-path|linear-gradient|white|#fff|rgba\(255' /opt/djgabo-cdg-ia-test/editor_v1.html 2>/dev/null | head -320
+          echo
+          echo "=== PANEL/EDITOR FILES ==="
+          sudo ls -lh /opt/djgabo-cdg-ia-test | grep -E 'editor|panel'
+          echo
+          echo "=== EDITOR HTML LIVE EXCERPTS AROUND CURRENT TIME LOGIC ==="
+          sudo grep -n -C 6 -E 'currentTime|start_time|end_time' /opt/djgabo-cdg-ia-test/editor_v1.html 2>/dev/null | head -360
+          echo
+          echo "=== RECENT DEPLOYS / RESTARTS ==="
+          sudo journalctl -u djgabo-cdg-ia-test --since "90 min ago" --no-pager -o short-iso | grep -E 'Started|Stopping|Stopped' | tail -120
+          echo
+          echo "=== PROD SAFETY ==="
+          echo "PROD_STATUS=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PROD_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
+
+      - name: Commit diagnostic
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/armonia-white-sweep-current.txt
+          git commit -m "diag: compare Armonia and Mujeres sweep data" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
