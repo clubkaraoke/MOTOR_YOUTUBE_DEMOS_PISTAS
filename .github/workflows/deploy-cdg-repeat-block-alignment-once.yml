@@ -55,12 +55,12 @@ jobs:
           sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/server.py"
 
           echo "=== STATIC CHECKS ==="
-          grep -q "_ai_repeat_profile" "$ROOT/server.py"
-          grep -q "_ai_alignment_quality" "$ROOT/server.py"
-          grep -q "_ai_align_repeat_chunks" "$ROOT/server.py"
-          grep -q "repeat_chunks" "$ROOT/server.py"
-          grep -q 'session(d.get('''token'''))' "$ROOT/server.py"
-          grep -q 'repetition recalculada por subbloques de audio' "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -q "_ai_repeat_profile" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q "_ai_alignment_quality" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q "_ai_align_repeat_chunks" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q "repeat_chunks" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q "session(d.get('token'))" "$ROOT/server.py"
+          sudo -u djgabo-cdg grep -q 'repetition recalculada por subbloques de audio' "$ROOT/editor_v1/index.html"
 
           if command -v node >/dev/null 2>&1; then
             sudo -u djgabo-cdg python3 - <<'PY'
