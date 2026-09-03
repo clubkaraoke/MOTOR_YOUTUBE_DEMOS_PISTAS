@@ -1,0 +1,6 @@
+DIR=/var/lib/djgabo-cdg-ia-test/pending/cdg
+2026-09-03 07:10:27.1815953250 | 119 | /var/lib/djgabo-cdg-ia-test/pending/cdg/LET-0078.json
+2026-09-03 07:10:27.1765953080 | 3644136 | /var/lib/djgabo-cdg-ia-test/pending/cdg/LET-0078.bin
+=== LET0078 CONTENT ===
+/var/lib/djgabo-cdg-ia-test/pending/cdg/LET-0078.bin
+/var/lib/djgabo-cdg-ia-test/pending/cdg/LET-0078.json
