@@ -42,9 +42,10 @@ jobs:
           if [ -z "$voice" ]; then
             voice="$(sudo find /var/lib/djgabo-cdg-ia-test/jobs -type f -iname '*.mp3' -print -quit)"
           fi
-          test -f "$voice"
+          sudo test -f "$voice"
           rm -f /tmp/forced-align-mio.wav /tmp/forced-align-result.json
-          ffmpeg -hide_banner -loglevel error -ss 34.70 -t 4.20 -i "$voice" -ac 1 -ar 44100 -c:a pcm_s16le /tmp/forced-align-mio.wav
+          sudo ffmpeg -hide_banner -loglevel error -y -ss 34.70 -t 4.20 -i "$voice" -ac 1 -ar 44100 -c:a pcm_s16le /tmp/forced-align-mio.wav
+          sudo chmod 644 /tmp/forced-align-mio.wav
           curl -fsS -X POST http://127.0.0.1:8097/api/elevenlabs/forced-align \
             -F 'audio=@/tmp/forced-align-mio.wav;type=audio/wav' \
             -F 'text=mío.' > /tmp/forced-align-result.json
