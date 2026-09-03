@@ -1,35 +1,12 @@
-set -euo pipefail
-echo "TIMESTAMP=$(date -Is)"
-echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
-echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
-curl -fsS http://127.0.0.1:8097/api/health > /tmp/ia-lab-health.json
-python3 - <<'PY'
-import json
-d=json.load(open('/tmp/ia-lab-health.json'))
-assert d.get('ok') is True, d
-assert d.get('elevenlabs_configured') is True, d
-print('SCRIBE_LAB=READY',d.get('elevenlabs_model'))
-PY
-sudo python3 /tmp/patch_cdg_editor_ia_new_scribe_flow.py
-sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
-sudo systemctl restart djgabo-cdg-ia-test
-for i in $(seq 1 40); do
-  if curl -fsS http://127.0.0.1:8775/healthz >/tmp/health.json; then break; fi
-  sleep 2
-done
-python3 - <<'PY'
-import json
-d=json.load(open('/tmp/health.json'))
-assert d.get('ok') is True, d
-print('TEST_HEALTH=OK')
-PY
-curl -fsS http://127.0.0.1:8775/ > /tmp/panel.html
-grep -q 'Crear y sincronizar con IA' /tmp/panel.html
-grep -q 'Letra maestra · OPCIONAL' /tmp/panel.html
-code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/api/ai/create-job)
-test "$code" = "405"
-echo "AI_ROUTE=READY"
-echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
-echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
-echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+TIMESTAMP=2026-09-03T00:29:45+00:00
+PRODUCTION_BEFORE=active
+TEST_BEFORE=active
+SCRIBE_LAB=READY scribe_v2
+PATCH_NEW_SCRIBE_FLOW=OK
+curl: (7) Failed to connect to 127.0.0.1 port 8775 after 0 ms: Couldn't connect to server
+TEST_HEALTH=OK
+AI_ROUTE=READY
+TEST_AFTER=active
+PRODUCTION_AFTER=active
+PRODUCTION_HTTP=200
 PUBLIC_HTTP=302
