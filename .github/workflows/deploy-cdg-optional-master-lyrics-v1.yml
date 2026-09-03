@@ -69,11 +69,17 @@ jobs:
           sudo grep -Fq "reserve_lyrics=str(lyrics or '').strip() or '[PENDIENTE IA]'" /tmp/djgabo-optional-master-stage/server.py
           echo "STAGE=PASS"
 
+          NEED_RESTART=1
+          if sudo grep -Fq 'DJGABO_OPTIONAL_MASTER_LYRICS_V1' "$SERVER"; then NEED_RESTART=0; fi
           sudo python3 /tmp/patch_optional_master_lyrics_v1.py --root "$ROOT"
           sudo python3 -m py_compile "$SERVER"
           sudo grep -Fq 'DJGABO_OPTIONAL_MASTER_LYRICS_V1' "$SERVER"
 
-          sudo systemctl restart djgabo-cdg
+          if [ "$NEED_RESTART" = 1 ]; then
+            sudo systemctl restart djgabo-cdg
+          else
+            echo "RESTART=SKIPPED_ALREADY_LIVE"
+          fi
           ok=0
           for i in $(seq 1 40); do
             code="$(curl -sS -o /tmp/root-optional-master.html -w '%{http_code}' http://127.0.0.1:8765/ || true)"
@@ -86,7 +92,7 @@ jobs:
           echo "DEPLOY=OK"
           REMOTE
 
-          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/opt/djgabo-cdg/server.py" diagnostics/cdg-prod-current-server.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/server.py' > diagnostics/cdg-prod-current-server.py
 
       - name: Save deploy report
         if: always()
