@@ -1,0 +1,75 @@
+name: Verify ElevenLabs forced alignment on IA audio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-elevenlabs-forced-alignment-ia.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Verify with 4-second non-mutating clip
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          voice="$(sudo -u djgabo-cdg python3 - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db=sqlite3.connect('/var/lib/djgabo-cdg-ia-test/local.db');db.row_factory=sqlite3.Row
+          r=db.execute("select id,voice_filename from jobs where origin='IA_TEST' and id='LET-0078' limit 1").fetchone()
+          if not r: r=db.execute("select id,voice_filename from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          if not r: raise SystemExit(2)
+          print(str(Path('/var/lib/djgabo-cdg-ia-test/jobs')/r['id']/r['voice_filename']))
+          PY
+          )"
+          test -f "$voice"
+          rm -f /tmp/forced-align-mio.wav /tmp/forced-align-result.json
+          ffmpeg -hide_banner -loglevel error -ss 34.70 -t 4.20 -i "$voice" -ac 1 -ar 44100 -c:a pcm_s16le /tmp/forced-align-mio.wav
+          curl -fsS -X POST http://127.0.0.1:8097/api/elevenlabs/forced-align \
+            -F 'audio=@/tmp/forced-align-mio.wav;type=audio/wav' \
+            -F 'text=mío.' > /tmp/forced-align-result.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/forced-align-result.json'))
+          assert d.get('ok') is True,d
+          ws=d.get('words') or []
+          assert len(ws)==1,d
+          w=ws[0]
+          assert float(w['end'])>float(w['start']),w
+          print('FORCED_ALIGNMENT_E2E=PASS')
+          print('WORD='+str(w.get('text')))
+          print('START='+str(w.get('start')))
+          print('END='+str(w.get('end')))
+          print('ELAPSED='+str(d.get('elapsed_s')))
+          PY
+          rm -f /tmp/forced-align-mio.wav /tmp/forced-align-result.json
+          echo "TEST=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
