@@ -1,0 +1,108 @@
+name: Inspect CDG repeated block audio once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-repeated-block-audio-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect repeated blocks and voice energy
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-repeated-block-audio.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          cd "$ROOT"
+          sudo -u djgabo-cdg env             DJGABO_ENV=test DJGABO_TEST_MODE=1 DJGABO_URL_PREFIX=/cdg-editor-ia             DJGABO_DATA_DIR=/var/lib/djgabo-cdg-ia-test             DJGABO_CONFIG_DIR=/var/lib/djgabo-cdg-ia-test/config             DJGABO_DB_PATH=/var/lib/djgabo-cdg-ia-test/local.db             DJGABO_JOBS_DIR=/var/lib/djgabo-cdg-ia-test/jobs             DJGABO_OUTPUT_DIR=/var/lib/djgabo-cdg-ia-test/output             DJGABO_VOICE_CACHE_DIR=/var/lib/djgabo-cdg-ia-test/voice_cache             "$ROOT/.venv/bin/python" - <<'PY'
+          import json, math, subprocess, tempfile, wave
+          from array import array
+          from pathlib import Path
+          import server
+
+          with server.db() as c:
+              r=c.execute("select id,artist,title,project_json,voice_filename,updated from jobs where origin='IA_TEST' order by updated desc limit 1").fetchone()
+          row=dict(r); doc=json.loads(row.get('project_json') or '{}')
+          source=server.JOBS/row['id']/row['voice_filename']
+          print('JOB',row['id'],row['artist'],'-',row['title'],'updated',row['updated'])
+          print('VOICE',source,source.exists(),source.stat().st_size if source.exists() else 0)
+          windows=[(155.410,183.330),(270.209,297.980)]
+          words=[w for s in doc.get('segments') or [] for w in s.get('words') or [] if w.get('start_time') is not None]
+          for wi,(a,b) in enumerate(windows,1):
+              print('\n=== WINDOW',wi,a,b,'dur',round(b-a,3),'===')
+              ww=[w for w in words if float(w.get('start_time'))>=a-.2 and float(w.get('start_time'))<=b+.2]
+              for i,w in enumerate(ww,1):
+                  print(i,repr(w.get('text')),'start',w.get('start_time'),'end',w.get('end_time'))
+              toks=[str(w.get('text') or '').strip().lower() for w in ww]
+              print('TOKENS',len(toks),'UNIQUE',sorted(set(toks))[:20])
+
+              with tempfile.TemporaryDirectory() as td0:
+                  wav=Path(td0)/'clip.wav'
+                  subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-ss',str(a),'-to',str(b),'-i',str(source),'-ac','1','-ar','16000','-c:a','pcm_s16le',str(wav)],check=True)
+                  with wave.open(str(wav),'rb') as wf:
+                      sr=wf.getframerate(); raw=wf.readframes(wf.getnframes())
+                  pcm=array('h'); pcm.frombytes(raw)
+                  frame_ms=20; n=max(1,int(sr*frame_ms/1000))
+                  db=[]
+                  for x in range(0,len(pcm)-n+1,n):
+                      fr=pcm[x:x+n]
+                      rms=math.sqrt(sum(float(v)*float(v) for v in fr)/len(fr))/32768.0
+                      db.append(20*math.log10(max(rms,1e-7)))
+                  sdb=sorted(db)
+                  p20=sdb[int(.20*(len(sdb)-1))]; p35=sdb[int(.35*(len(sdb)-1))]; p50=sdb[int(.50*(len(sdb)-1))]
+                  print('DB p20/p35/p50/max',round(p20,1),round(p35,1),round(p50,1),round(max(db),1))
+                  for add in (7,9,11,13):
+                      thr=max(-50,min(-24,p20+add))
+                      for join_ms in (80,120,180,240):
+                          active=[]
+                          for idx,dv in enumerate(db):
+                              if dv>=thr:
+                                  active.append([idx*frame_ms/1000,(idx+1)*frame_ms/1000])
+                          merged=[]
+                          for x,y in active:
+                              if not merged or x-merged[-1][1]>(join_ms/1000):
+                                  merged.append([x,y])
+                              else:
+                                  merged[-1][1]=y
+                          seg=[z for z in merged if z[1]-z[0]>=.08]
+                          if len(seg) in range(30,51):
+                              print('CAND add',add,'join',join_ms,'thr',round(thr,1),'count',len(seg),'first',[(round(x,2),round(y,2)) for x,y in seg[:5]],'last',[(round(x,2),round(y,2)) for x,y in seg[-5:]])
+          PY
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-repeated-block-audio.txt
+          git commit -m "diag: inspect repeated block audio" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
