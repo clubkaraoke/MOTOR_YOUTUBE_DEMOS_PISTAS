@@ -1,0 +1,75 @@
+name: Deploy CDG IA UVR Brave Bridge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/patch_cdg_editor_ia_uvr_bridge.py"
+      - "deploy/trigger-cdg-editor-ia-uvr-bridge.txt"
+      - ".github/workflows/deploy-cdg-editor-ia-uvr-bridge.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_editor_ia_uvr_bridge.py
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Upload patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" deploy/patch_cdg_editor_ia_uvr_bridge.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_ia_uvr_bridge.py"
+
+      - name: Apply and verify IA TEST
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "PRODUCTION_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          sudo python3 /tmp/patch_cdg_editor_ia_uvr_bridge.py
+          sudo -u djgabo-cdg /opt/djgabo-cdg-ia-test/.venv/bin/python -m py_compile /opt/djgabo-cdg-ia-test/server.py
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+
+          sudo grep -q "@app.post('/api/ai/bridge-stage')" /opt/djgabo-cdg-ia-test/server.py
+          sudo grep -q "voice_bridge_token" /opt/djgabo-cdg-ia-test/server.py
+          sudo grep -q "function esperarPuenteUvr" /opt/djgabo-cdg-ia-test/panel.html
+          sudo grep -q "instrumental_bridge_token" /opt/djgabo-cdg-ia-test/panel.html
+          test -d /var/lib/djgabo-cdg-ia-test/uvr_bridge
+
+          echo "IA_TEST_HEALTH=OK"
+          echo "UVR_BRIDGE_CODE=OK"
+          echo "PRODUCTION_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "PRODUCTION_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          REMOTE
