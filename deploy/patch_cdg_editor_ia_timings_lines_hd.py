@@ -120,9 +120,16 @@ new="""        seed_lyrics=lyrics if source_mode=='compare_master' else ''
         final_lyrics=lyrics if source_mode=='compare_master' else _project_lyrics(project)
         if not final_lyrics:
             final_lyrics=str((payload.get('scribe') or {}).get('text') or '').strip()"""
-if old not in s:
-    raise SystemExit('No encontré bloque final_lyrics actual')
-s=s.replace(old,new)
+if old in s:
+    s=s.replace(old,new)
+else:
+    old2="""        final_lyrics=lyrics or str((payload.get('scribe') or {}).get('text') or '').strip()
+        if not final_lyrics: final_lyrics=' '.join(str(w.get('text') or '').strip() for w in ai_words).strip()
+
+        project=_ai_project_from_words(artist,title,voice_name,duration,final_lyrics,ai_words,source_mode)"""
+    if old2 not in s:
+        raise SystemExit('No encontré bloque final_lyrics actual')
+    s=s.replace(old2,new)
 SERVER.write_text(s,encoding='utf-8')
 
 h=EDITOR.read_text(encoding='utf-8')
