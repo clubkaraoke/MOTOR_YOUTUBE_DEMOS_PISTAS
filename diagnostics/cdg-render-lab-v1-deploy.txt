@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-03T19:30:40+00:00
+TIMESTAMP=2026-09-03T19:33:43+00:00
 PROD_SERVICE_BEFORE=active
 PROD_HTTP_BEFORE=200
 PROD_CODE_HASH_BEFORE=9e7c557d8037e5bcf910f66b14639fb851091b2286c1a6bbbe8f104c4be7a880
@@ -14,7 +14,7 @@ UPLOAD_SMOKE=PASS
 LAB_SMOKE=PASS
 === NGINX ROUTE ===
 NGINX_ROUTE=ALREADY_PRESENT /etc/nginx/sites-available/panel.kitkaraoke.com
-NGINX_ROUTE=INSTALLED /etc/nginx/sites-available/djgabo-cdg
+NGINX_ROUTE=ALREADY_PRESENT /etc/nginx/sites-available/djgabo-cdg
 nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
 nginx: configuration file /etc/nginx/nginx.conf test is successful
 === FINAL SAFETY ===
