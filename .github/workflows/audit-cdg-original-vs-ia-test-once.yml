@@ -1,0 +1,137 @@
+name: Audit CDG original vs IA test once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/audit-cdg-original-vs-ia-test-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Audit live original and IA test
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-original-vs-ia-test-audit.txt <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          TEST=/opt/djgabo-cdg-ia-test
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "MODE=READ_ONLY_AUDIT"
+          echo
+
+          echo "=== HEALTH / SAFETY ==="
+          echo "PROD_SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_SERVICE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "TEST_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/healthz)"
+          echo
+
+          echo "=== CORE FILE HASHES ==="
+          for rel in server.py panel.html editor_v1/index.html; do
+            echo "--- $rel ---"
+            for root in "$PROD" "$TEST"; do
+              tag=PROD; [ "$root" = "$TEST" ] && tag=TEST
+              if [ -f "$root/$rel" ]; then
+                printf '%s ' "$tag"
+                sudo stat -c 'size=%s mtime=%y' "$root/$rel"
+                printf '%s sha256=' "$tag"
+                sudo sha256sum "$root/$rel" | awk '{print $1}'
+              else
+                echo "$tag MISSING"
+              fi
+            done
+          done
+          echo
+
+          echo "=== DIRECTORY SNAPSHOT (TOP LEVEL) ==="
+          echo "--- PROD ---"
+          sudo find "$PROD" -maxdepth 2 -type f -printf '%P|%s|%TY-%Tm-%Td %TH:%TM:%TS\n' | sort | head -220
+          echo "--- TEST ---"
+          sudo find "$TEST" -maxdepth 2 -type f -printf '%P|%s|%TY-%Tm-%Td %TH:%TM:%TS\n' | sort | head -260
+          echo
+
+          echo "=== ROUTES: PROD ==="
+          sudo grep -nE "^@app\.(get|post|put|delete)|add_url_rule" "$PROD/server.py" | sed -E 's/[A-Za-z0-9_-]{40,}/<REDACTED>/g' | head -260 || true
+          echo "=== ROUTES: TEST ==="
+          sudo grep -nE "^@app\.(get|post|put|delete)|add_url_rule" "$TEST/server.py" | sed -E 's/[A-Za-z0-9_-]{40,}/<REDACTED>/g' | head -320 || true
+          echo
+
+          echo "=== ORIGINAL FLOWS: PRESERVE CHECK ==="
+          for key in "dropbox" "drive" "export" "cdg" "render" "create-job" "instrumental" "voice" "guardar" "subir"; do
+            echo "--- KEY=$key PROD ---"
+            sudo grep -niE "$key" "$PROD/server.py" "$PROD/panel.html" 2>/dev/null | head -30 || true
+            echo "--- KEY=$key TEST ---"
+            sudo grep -niE "$key" "$TEST/server.py" "$TEST/panel.html" 2>/dev/null | head -36 || true
+          done
+          echo
+
+          echo "=== TEST IMPROVEMENT MARKERS ==="
+          sudo grep -RniE "QR_BLOB|QR_UPSCALE|UVR|Pegar QR|playHi|Brillo en vivo|voice_gaps|IA BLOQUE|diagnostic|Diagnóstico|Scribe|elevenlabs|sustained|repeat|provisional|roleFemale|roleMale|roleDuet|Sincroniz|progress|progreso"             "$TEST/panel.html" "$TEST/server.py" "$TEST/editor_v1/index.html" 2>/dev/null | head -900 || true
+          echo
+
+          echo "=== SAME MARKERS IN PROD ==="
+          sudo grep -RniE "QR_BLOB|QR_UPSCALE|UVR|Pegar QR|playHi|Brillo en vivo|voice_gaps|IA BLOQUE|diagnostic|Diagnóstico|Scribe|elevenlabs|sustained|repeat|provisional|roleFemale|roleMale|roleDuet|Sincroniz|progress|progreso"             "$PROD/panel.html" "$PROD/server.py" "$PROD/editor_v1/index.html" 2>/dev/null | head -700 || true
+          echo
+
+          echo "=== FILE DIFF STATS ==="
+          for rel in server.py panel.html editor_v1/index.html; do
+            echo "--- $rel ---"
+            sudo diff -u "$PROD/$rel" "$TEST/$rel" 2>/dev/null | diffstat 2>/dev/null || true
+            sudo diff -u "$PROD/$rel" "$TEST/$rel" 2>/dev/null | grep -E '^@@|^[+-](function |async function |def |@app|[.#][A-Za-z0-9_-]+|.*QR|.*UVR|.*Scribe|.*Eleven|.*playHi|.*voice_gap|.*export|.*Dropbox|.*Drive|.*instrumental|.*progress|.*progreso)' | head -700 || true
+          done
+          echo
+
+          echo "=== SYSTEMD EXECSTART ONLY ==="
+          echo "--- PROD ---"
+          sudo systemctl show djgabo-cdg -p ExecStart -p WorkingDirectory -p User --no-pager
+          echo "--- TEST ---"
+          sudo systemctl show djgabo-cdg-ia-test -p ExecStart -p WorkingDirectory -p User --no-pager
+          echo
+
+          echo "=== NGINX ROUTING FOR BOTH ==="
+          sudo nginx -T 2>/dev/null | grep -n -A18 -B2 -E "location = /cdg-editor-ia|location /cdg-editor-ia/|location = /cdg |location /cdg/" | head -180 || true
+          echo
+
+          echo "=== FINAL HEALTH RECHECK ==="
+          echo "PROD_SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "TEST_HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/healthz)"
+          REMOTE
+
+      - name: Commit audit report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-original-vs-ia-test-audit.txt
+          git commit -m "audit: compare original CDG panel vs IA test" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
