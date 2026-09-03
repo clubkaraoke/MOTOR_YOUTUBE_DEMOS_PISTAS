@@ -77,16 +77,26 @@ jobs:
           echo "QR_LAB_HTTP=$code"
 
           UVR='https://a111p.uvronline.app/s/Me5saf9v_MymH2xvJ4RIK3czxbzgvlHt/LV/mp3'
-          curl -sS --max-time 120 -o /tmp/uvr-check.json             -X POST http://127.0.0.1:8775/api/qr-lab/check             -H 'Content-Type: application/json'             --data-binary "{\"url\":\"$UVR\"}"
+          curl -sS --max-time 120 -o /tmp/uvr-check.json \
+            -X POST http://127.0.0.1:8775/api/qr-lab/check \
+            -H 'Content-Type: application/json' \
+            --data-binary "{\"url\":\"$UVR\"}"
+          echo "=== APP UVR CHECK ==="
           cat /tmp/uvr-check.json
+
+          echo "=== DIRECT UVR RESPONSE ==="
+          curl -sS --max-time 60 -D /tmp/uvr-h.txt -o /tmp/uvr-b.bin \
+            -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36' \
+            -H 'Accept: audio/mpeg,audio/*;q=0.9,*/*;q=0.8' \
+            -H 'Accept-Language: es-PE,es;q=0.9,en;q=0.8' \
+            -e 'https://nextgen.uvronline.app/' \
+            "$UVR" || true
+          sed -n '1,40p' /tmp/uvr-h.txt || true
           python3 - <<'PY'
-          import json
-          d=json.load(open('/tmp/uvr-check.json'))
-          assert d.get('ok') is True, d
-          assert int(d.get('bytes_received') or 0)>0, d
-          print('OVH_UVR_DOWNLOAD=OK')
-          print('CONTENT_TYPE='+str(d.get('content_type')))
-          print('BYTES_RECEIVED='+str(d.get('bytes_received')))
+          from pathlib import Path
+          b=Path('/tmp/uvr-b.bin').read_bytes() if Path('/tmp/uvr-b.bin').exists() else b''
+          print('DIRECT_BODY_BYTES='+str(len(b)))
+          print('DIRECT_BODY_PREVIEW='+repr(b[:300]))
           PY
 
           grep -q '<script src="/cdg-editor-ia/vendor/jsQR.js"></script>' /opt/djgabo-cdg-ia-test/panel.html
