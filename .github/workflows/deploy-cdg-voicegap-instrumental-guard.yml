@@ -1,0 +1,127 @@
+name: Deploy CDG voicegap instrumental guard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-voicegap-instrumental-guard.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate patch
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/patch_cdg_voicegap_instrumental_guard.py
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Deploy IA TEST only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/patch_cdg_voicegap_instrumental_guard.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_voicegap_instrumental_guard.py"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-voicegap-instrumental-guard-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg-ia-test
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PROD_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "TEST_BEFORE=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          curl -fsS http://127.0.0.1:8765/ >/dev/null
+
+          sudo python3 /tmp/patch_cdg_voicegap_instrumental_guard.py
+          sudo -u djgabo-cdg "$ROOT/.venv/bin/python" -m py_compile "$ROOT/renderer/normalize.py"
+
+          sudo -u djgabo-cdg grep -Fq "hasUntranscribedVoice" "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq "VOZ_SIN_TEXTO_SUPRIME_INSTRUMENTAL" "$ROOT/editor_v1/index.html"
+          sudo -u djgabo-cdg grep -Fq "has_untranscribed_voice" "$ROOT/renderer/normalize.py"
+          echo "STATIC_MARKERS=PASS"
+
+          if command -v node >/dev/null 2>&1; then
+            sudo -u djgabo-cdg python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/opt/djgabo-cdg-ia-test/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          Path('/tmp/cdg-voicegap-inst.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+            node --check /tmp/cdg-voicegap-inst.js
+            echo "EDITOR_JS_SYNTAX=PASS"
+          fi
+
+          echo "=== SYNTHETIC RENDERER CHECK ==="
+          sudo -u djgabo-cdg env PYTHONPATH="$ROOT/renderer" "$ROOT/.venv/bin/python" - <<'PY'
+          import normalize
+          style={
+            'instrumental_label':'INSTRUMENTAL',
+            'instrumental_dots':4,
+            'instrumental_span_seconds':6.0,
+            'instrumental_lead_seconds':4.0,
+            'instrumental_min_gap':6.0,
+            'spoken_instrumental_min_seconds':6.0,
+            'spoken_instrumental_lead_seconds':4.0,
+            'spoken_block_join_seconds':0.75,
+            'lines_per_page':6,
+          }
+          visual=[
+            [{'id':'a','text':'NO.','start_time':98.62,'end_time':99.24}],
+            [{'id':'b','text':'TU','start_time':105.26,'end_time':105.44}],
+          ]
+          out1=normalize.build_instrumentals([list(map(dict,x)) for x in visual],style,[],[])
+          assert any(w.get('_inst') for line in out1 for w in line), 'expected normal 6s gap to create instrumental'
+          out2=normalize.build_instrumentals([list(map(dict,x)) for x in visual],style,[],[(101.0,104.4)])
+          assert not any(w.get('_inst') for line in out2 for w in line), 'voice gap must suppress false instrumental'
+          out3=normalize.build_instrumentals([list(map(dict,x)) for x in visual],style,[(101.0,104.4)],[(101.0,104.4)])
+          assert any(w.get('_inst') for line in out3 for w in line), 'explicit HABLADO must still allow instrumental'
+          print('NORMAL_6S_GAP=PASS')
+          print('VOICE_GAP_SUPPRESS=PASS')
+          print('EXPLICIT_SPOKEN_PRIORITY=PASS')
+          PY
+
+          sudo systemctl restart djgabo-cdg-ia-test
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8775/healthz >/tmp/voicegap-inst-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+
+          echo "TEST_AFTER=$(sudo systemctl is-active djgabo-cdg-ia-test)"
+          echo "PROD_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          prod_http="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "PROD_HTTP=$prod_http"
+          test "$prod_http" = 200
+          echo "DEPLOY_VOICE_GAP_INSTRUMENTAL_GUARD=OK"
+          REMOTE
+
+      - name: Save report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-voicegap-instrumental-guard-deploy.txt ]; then
+            git add diagnostics/cdg-voicegap-instrumental-guard-deploy.txt
+            git commit -m "diag: verify voicegap instrumental guard" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
