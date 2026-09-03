@@ -1,0 +1,63 @@
+name: Test UVR via curl_cffi
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/trigger-uvr-cffi-test.txt"
+      - ".github/workflows/test-uvr-cffi.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Test curl_cffi on OVH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          rm -rf /tmp/uvr-cffi-lib
+          mkdir -p /tmp/uvr-cffi-lib
+          python3 -m pip install --quiet --target /tmp/uvr-cffi-lib curl_cffi
+          PYTHONPATH=/tmp/uvr-cffi-lib python3 - <<'PY'
+          from curl_cffi import requests
+          url='https://a111p.uvronline.app/s/Me5saf9v_MymH2xvJ4RIK3czxbzgvlHt/LV/mp3'
+          for imp in ('chrome','chrome124','chrome131'):
+              try:
+                  r=requests.get(url,impersonate=imp,timeout=60,allow_redirects=True)
+                  print('IMP='+imp)
+                  print('STATUS='+str(r.status_code))
+                  print('CTYPE='+str(r.headers.get('content-type')))
+                  print('CLEN='+str(r.headers.get('content-length')))
+                  print('BYTES='+str(len(r.content)))
+                  print('HEAD='+repr(r.content[:24]))
+                  if r.status_code==200 and len(r.content)>1024 and 'text/html' not in str(r.headers.get('content-type','')).lower():
+                      print('UVR_CFFI_OK=1')
+                      raise SystemExit(0)
+              except SystemExit:
+                  raise
+              except Exception as e:
+                  print('ERR='+repr(e))
+          raise SystemExit('UVR_CFFI_OK=0')
+          PY
+          REMOTE
