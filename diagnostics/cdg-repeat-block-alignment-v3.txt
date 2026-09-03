@@ -1,16 +1,6 @@
-TIMESTAMP=2026-09-03T06:21:47+00:00
+TIMESTAMP=2026-09-03T06:31:10+00:00
 PROD_BEFORE=active
 TEST_BEFORE=active
-/tmp/cleanup_cdg_repeat_block_alignment.py:10: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+/tmp/patch_cdg_repeat_block_alignment.py:18: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
   stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-REPEAT_HELPER_SETS=1
-CLEANUP_REPEAT_ALIGNMENT=OK
-=== MARKERS ===
-STATIC_MARKERS=PASS
-[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
-REPEAT_DETECTION=PASS
-COLLAPSE_GUARD=PASS {'ok': False, 'reasons': ['tiny_cluster', 'same_timestamp_cluster'], 'tiny': 12, 'huge': 1, 'collapsed': 13, 'median_duration': 0.001, 'huge_limit': 2.0}
-TEST_AFTER=active
-PROD_AFTER=active
-PROD_HTTP=200
-DEPLOY_REPEAT_BLOCK_ALIGNMENT_V3=OK
+PATCH_FAIL:frontend_alignment_history
