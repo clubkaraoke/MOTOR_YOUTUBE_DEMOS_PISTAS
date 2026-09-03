@@ -39,7 +39,7 @@ SERVER.write_text(s,encoding='utf-8')
 e=EDITOR.read_text(encoding='utf-8')
 for x in [
     'strategy:j.strategy||"full"',
-    'const repeatMsg=j.strategy==="repeat_chunks"',
+    'const applied=Number(j.applied_words??(j.updates||[]).length)',
 ]:
     if x not in e:
         raise SystemExit('EDITOR_MISSING:'+x)
