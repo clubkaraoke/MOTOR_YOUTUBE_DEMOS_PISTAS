@@ -1,0 +1,185 @@
+name: Deploy CDG smart overwrite render plan V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-smart-overwrite-render-plan-v1.yml"
+      - "deploy/cdg_smart_overwrite_render_plan_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_smart_overwrite_render_plan_v1/patch_production.py
+
+      - name: Repo snapshot preflight
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/so-preflight
+          mkdir -p /tmp/so-preflight/editor_v1 /tmp/so-preflight/renderer /tmp/so-preflight/cdgmaker
+          cp diagnostics/cdg-prod-current-index.html /tmp/so-preflight/editor_v1/index.html
+          cp diagnostics/cdg-prod-current-normalize.py /tmp/so-preflight/renderer/normalize.py
+          cp diagnostics/cdg-prod-current-render.py /tmp/so-preflight/renderer/render.py
+          cp diagnostics/cdg-prod-current-composer.py /tmp/so-preflight/cdgmaker/composer.py
+          cp diagnostics/cdg-renderer-live/vendor/cdgmaker/config.py /tmp/so-preflight/cdgmaker/config.py
+          python3 deploy/cdg_smart_overwrite_render_plan_v1/patch_production.py             --root /tmp/so-preflight             --composer /tmp/so-preflight/cdgmaker/composer.py             --config /tmp/so-preflight/cdgmaker/config.py
+          python3 -m py_compile             /tmp/so-preflight/renderer/normalize.py             /tmp/so-preflight/renderer/render.py             /tmp/so-preflight/cdgmaker/composer.py             /tmp/so-preflight/cdgmaker/config.py
+          grep -Fq 'DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1' /tmp/so-preflight/editor_v1/index.html
+          grep -Fq 'CDG_RENDER_PLAN_V1' /tmp/so-preflight/editor_v1/index.html
+          grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V7' /tmp/so-preflight/editor_v1/index.html
+          grep -Fq 'explicit_timeline = true' /tmp/so-preflight/renderer/normalize.py
+          grep -Fq 'screen_clear_sync' /tmp/so-preflight/cdgmaker/config.py
+          grep -Fq 'using explicit SMART_OVERWRITE line timeline' /tmp/so-preflight/cdgmaker/composer.py
+
+          # Extrae el JS inline y comprueba sintaxis con Node.
+          python3 - <<'PY'
+          import re, pathlib
+          s=pathlib.Path('/tmp/so-preflight/editor_v1/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',s,re.S|re.I)
+          pathlib.Path('/tmp/so-preflight/editor-inline.js').write_text('\n'.join(blocks),encoding='utf-8')
+          print('SCRIPT_BLOCKS='+str(len(blocks)))
+          PY
+          node --check /tmp/so-preflight/editor-inline.js
+          echo "REPO_PREFLIGHT=PASS"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production safely
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_smart_overwrite_render_plan_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_smart_overwrite_render_plan_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-smart-overwrite-render-plan-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          NORMALIZE="$ROOT/renderer/normalize.py"
+          RENDER="$ROOT/renderer/render.py"
+          COMPOSER="$ROOT/renderer/vendor/cdgmaker/composer.py"
+          CONFIG="$ROOT/renderer/vendor/cdgmaker/config.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/smart_overwrite_render_plan_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          for p in "$EDITOR" "$NORMALIZE" "$RENDER" "$COMPOSER" "$CONFIG"; do sudo test -f "$p"; done
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer" "$BACKUP/cdgmaker"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$BACKUP/renderer/normalize.py"
+          sudo cp "$RENDER" "$BACKUP/renderer/render.py"
+          sudo cp "$COMPOSER" "$BACKUP/cdgmaker/composer.py"
+          sudo cp "$CONFIG" "$BACKUP/cdgmaker/config.py"
+          echo "BACKUP=$BACKUP"
+
+          STAGE=/tmp/djgabo-smart-overwrite-stage
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1" "$STAGE/renderer" "$STAGE/cdgmaker"
+          sudo cp "$EDITOR" "$STAGE/editor_v1/index.html"
+          sudo cp "$NORMALIZE" "$STAGE/renderer/normalize.py"
+          sudo cp "$RENDER" "$STAGE/renderer/render.py"
+          sudo cp "$COMPOSER" "$STAGE/cdgmaker/composer.py"
+          sudo cp "$CONFIG" "$STAGE/cdgmaker/config.py"
+
+          sudo python3 /tmp/patch_cdg_smart_overwrite_render_plan_v1.py             --root "$STAGE" --composer "$STAGE/cdgmaker/composer.py" --config "$STAGE/cdgmaker/config.py"
+          sudo python3 -m py_compile             "$STAGE/renderer/normalize.py" "$STAGE/renderer/render.py"             "$STAGE/cdgmaker/composer.py" "$STAGE/cdgmaker/config.py"
+
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V7' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'out.render_plan = buildRenderPlanDecision()' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'render_plan:buildRenderPlanDecision()' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_NORMALIZER_V1' "$STAGE/renderer/normalize.py"
+          sudo grep -Fq 'explicit_timeline = true' "$STAGE/renderer/normalize.py"
+          sudo grep -Fq 'style_run["clear_mode"] = "delayed"' "$STAGE/renderer/render.py"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_COMPOSER_V1' "$STAGE/cdgmaker/composer.py"
+          sudo grep -Fq 'explicit_timeline: bool = False' "$STAGE/cdgmaker/config.py"
+
+          # Política matemática del buffer circular: no corta la frase al llegar
+          # a N líneas; reemplaza el slot sólo cuando el ocupante ya terminó.
+          python3 - <<'PY'
+          N=6; read=2.5; hold=.18
+          starts=[10,12,14,16,18,20,22,24]
+          ends=[11,13,15,17,19,21,23,25]
+          last={}
+          display=[]
+          for i,(st,en) in enumerate(zip(starts,ends)):
+              slot=i%N
+              d=max(0,st-read)
+              if slot in last:
+                  d=max(d,last[slot][1]+hold)
+              display.append(d)
+              last[slot]=(st,en)
+          assert display[6] == max(22-read,11+hold)
+          assert display[6] < starts[6]
+          assert display[7] < starts[7]
+          # Frontera tipo Mix Llorarás: 0.10 s entre líneas, pero si el slot
+          # superior está libre, la nueva línea puede estar visible antes.
+          prev_end=60.44; next_start=60.54
+          preferred=next_start-read
+          assert preferred < prev_end
+          print("SMART_OVERWRITE_POLICY_TEST=PASS")
+          PY
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_cdg_smart_overwrite_render_plan_v1.py             --root "$ROOT" --composer "$COMPOSER" --config "$CONFIG"
+          sudo python3 -m py_compile "$NORMALIZE" "$RENDER" "$COMPOSER" "$CONFIG"
+
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1' "$EDITOR"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_NORMALIZER_V1' "$NORMALIZE"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_RENDERER_V1' "$RENDER"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_COMPOSER_V1' "$COMPOSER"
+          sudo grep -Fq 'DJGABO_SMART_OVERWRITE_CONFIG_V1' "$CONFIG"
+
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-smart-overwrite.html -w '%{http_code}' 'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'CDG_TOTAL_TIMELINE_DIAG_V7' /tmp/editor-smart-overwrite.html
+          grep -Fq 'CDG_RENDER_PLAN_V1' /tmp/editor-smart-overwrite.html
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/editor_v1/index.html' > diagnostics/cdg-prod-current-index.html
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/normalize.py' > diagnostics/cdg-prod-current-normalize.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/render.py' > diagnostics/cdg-prod-current-render.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py' > diagnostics/cdg-prod-current-composer.py
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo cat /opt/djgabo-cdg/renderer/vendor/cdgmaker/config.py' > diagnostics/cdg-prod-current-config.py
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-smart-overwrite-render-plan-v1-deploy.txt                   diagnostics/cdg-prod-current-index.html                   diagnostics/cdg-prod-current-normalize.py                   diagnostics/cdg-prod-current-render.py                   diagnostics/cdg-prod-current-composer.py                   diagnostics/cdg-prod-current-config.py 2>/dev/null || true
+          git commit -m "diag: record smart overwrite render plan deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
