@@ -1,11 +1,22 @@
-TIMESTAMP=2026-09-03T07:46:39+00:00
+TIMESTAMP=2026-09-03T07:47:18+00:00
 PROD_BEFORE=active
 TEST_BEFORE=active
 /tmp/patch_cdg_voicegap_instrumental_guard.py:18: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
   stamp=datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+preview_voicegap_guard=ALREADY_PATCHED
+diag_voicegap_guard=ALREADY_PATCHED
+diag_voicegap_fields=ALREADY_PATCHED
+renderer_signature=ALREADY_PATCHED
+renderer_voicegap_init=ALREADY_PATCHED
+renderer_voicegap_guard=ALREADY_PATCHED
+renderer_call_voicegaps=ALREADY_PATCHED
 PATCH_VOICE_GAP_SUPPRESSES_FALSE_INSTRUMENTAL=OK
 STATIC_MARKERS=PASS
 === SYNTHETIC RENDERER CHECK ===
-Traceback (most recent call last):
-  File "<stdin>", line 20, in <module>
-AssertionError: voice gap must suppress false instrumental
+NORMAL_6S_GAP=PASS
+VOICE_GAP_SUPPRESS=PASS
+EXPLICIT_SPOKEN_PRIORITY=PASS
+TEST_AFTER=active
+PROD_AFTER=active
+PROD_HTTP=200
+DEPLOY_VOICE_GAP_INSTRUMENTAL_GUARD=OK
