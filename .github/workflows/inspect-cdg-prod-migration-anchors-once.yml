@@ -1,0 +1,76 @@
+name: Inspect CDG production migration anchors once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-prod-migration-anchors-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Capture anchors
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-prod-migration-anchors.txt <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          T=/opt/djgabo-cdg-ia-test
+          echo "=== PROD PANEL NUEVA CANCION HANDLER ==="
+          sudo -u djgabo-cdg grep -n -A240 -B25 "btnEnviarNueva.*addEventListener" "$P/panel.html" | head -320 || true
+          echo "=== PROD SERVER CREATE JOB ==="
+          sudo -u djgabo-cdg grep -n -A290 -B35 "@app.post('/api/jobs/create')" "$P/server.py" | head -360 || true
+          echo "=== PROD SERVER PROJECT SAVE ==="
+          sudo -u djgabo-cdg grep -n -A220 -B35 "@app.post('/api/jobs/<jid>/project')" "$P/server.py" | head -290 || true
+          echo "=== TEST AI TASK HELPERS ==="
+          sudo -u djgabo-cdg grep -n -A520 -B35 "def _ai_task_set" "$T/server.py" | head -650 || true
+          echo "=== TEST AI CREATE START ==="
+          sudo -u djgabo-cdg grep -n -A330 -B35 "@app.post('/api/ai/create-job/start')" "$T/server.py" | head -420 || true
+          echo "=== TEST AI ALIGN BLOCK ==="
+          sudo -u djgabo-cdg grep -n -A330 -B35 "@app.post('/api/jobs/<jid>/ai-align-block')" "$T/server.py" | head -420 || true
+          echo "=== TEST PANEL AI PROGRESS/HANDLER ==="
+          sudo -u djgabo-cdg grep -n -A340 -B40 "function setIaProgress" "$T/panel.html" | head -440 || true
+          echo "=== PROD EDITOR LOAD/COUNTER ==="
+          sudo -u djgabo-cdg grep -n -A220 -B30 "function paintCounter" "$P/editor_v1/index.html" | head -300 || true
+          echo "=== TEST EDITOR COUNTER/HIGHLIGHT ==="
+          sudo -u djgabo-cdg grep -n -A260 -B30 "function paintCounter" "$T/editor_v1/index.html" | head -340 || true
+          echo "=== TEST PLAY HIGHLIGHT ==="
+          sudo -u djgabo-cdg grep -n -A100 -B25 "function isSongCompleteForReview" "$T/editor_v1/index.html" | head -160 || true
+          echo "=== SERVICE ENV PROD ==="
+          sudo systemctl show djgabo-cdg -p Environment -p EnvironmentFiles --no-pager | sed -E 's/(KEY|TOKEN|SECRET|PASSWORD)=[^ ]+/\1=<REDACTED>/g'
+          echo "=== HEALTH ==="
+          echo "PROD=$(sudo systemctl is-active djgabo-cdg) HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "TEST=$(sudo systemctl is-active djgabo-cdg-ia-test) HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8775/healthz)"
+          REMOTE
+      - name: Commit report
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-prod-migration-anchors.txt
+          git commit -m "diag: inspect CDG production migration anchors" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
