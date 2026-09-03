@@ -68,13 +68,21 @@ register_cdg_preview_routes(app, globals())
 
 def patch_editor(path: Path):
     text = path.read_text(encoding="utf-8")
-    if "cdg-final-preview.js" in text:
-        return
-    anchor = "</body>"
-    addition = """<!-- PROD_FINAL_CDG_PREVIEW_V1 · motor basado en CDG_PLAYER_ONLINE -->
+    if "cdg-final-preview.js" not in text:
+        anchor = "</body>"
+        addition = """<!-- PROD_FINAL_CDG_PREVIEW_V1 · motor basado en CDG_PLAYER_ONLINE -->
 <script src="/api/vendor/cdg-final-preview.js"></script>
 </body>"""
-    text = replace_once(text, anchor, addition, "editor preview asset")
+        text = replace_once(text, anchor, addition, "editor preview asset")
+
+    # Cuando el render se dispara desde la pestaña CDG debemos quedarnos en el
+    # mismo trabajo para poder revisar el archivo final. El flujo normal de
+    # Exportar conserva su avance automático al siguiente trabajo.
+    nav = """if(window.parent!==window) window.parent.postMessage({type:'panel:export-success',job_id:PANEL_JOB_ID,next_job_id:done.next_job_id||''},location.origin);"""
+    guarded = """if(!window.DJGABO_CDG_PREVIEW_RENDERING && window.parent!==window) window.parent.postMessage({type:'panel:export-success',job_id:PANEL_JOB_ID,next_job_id:done.next_job_id||''},location.origin);"""
+    if guarded not in text:
+        text = replace_once(text, nav, guarded, "editor preview keep current job")
+
     path.write_text(text, encoding="utf-8")
 
 
