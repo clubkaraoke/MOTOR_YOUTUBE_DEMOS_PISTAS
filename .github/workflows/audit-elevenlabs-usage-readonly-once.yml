@@ -78,6 +78,20 @@ jobs:
           print(f"SCRIBE_FULL_ATTEMPTS={len(scribe_starts)}")
           print(f"FORCED_ALIGNMENT_ATTEMPTS={len(forced_starts)}")
 
+          print("\n=== EXTERNAL RESULTS ===")
+          results = [r for r in rows if str(r.get("event", "")).endswith(("_done", "_error"))]
+          for index, row in enumerate(results, 1):
+              details = row.get("details") if isinstance(row.get("details"), dict) else {}
+              safe = {
+                  "n": index,
+                  "ts": row.get("ts"),
+                  "event": row.get("event"),
+                  "filename": row.get("filename"),
+                  "request_id": row.get("request_id"),
+                  "elapsed_s": details.get("elapsed_s"),
+              }
+              print(json.dumps(safe, ensure_ascii=False, sort_keys=True))
+
           print("\n=== EVERY EXTERNAL ATTEMPT (NO LYRICS, NO API KEYS) ===")
           for index, row in enumerate(starts, 1):
               details = row.get("details") if isinstance(row.get("details"), dict) else {}
