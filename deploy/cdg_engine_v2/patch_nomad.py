@@ -46,6 +46,74 @@ class SettingsLyric:
     line_erase: list[int] = field(factory=list)
 '''
     text = replace_once(text, old, new, "SettingsLyric")
+
+    old_inst = '''@define
+class SettingsInstrumental:
+    sync: int
+    line_tile_height: int
+
+    wait: bool = True
+    text: str = "INSTRUMENTAL"
+    text_align: TextAlign = TextAlign.CENTER
+    text_placement: TextPlacement = TextPlacement.MIDDLE
+    fill: RGBColor = field(converter=to_rgbcolor, default="#bbb")
+    stroke: RGBColor | None = field(
+        converter=to_rgbcolor_or_none,
+        default=None,
+    )
+    background: RGBColor | None = field(
+        converter=to_rgbcolor_or_none,
+        default=None,
+    )
+    image: Path | None = None
+    transition: str | None = None
+    x: int = 0
+    y: int = 0
+'''
+    new_inst = '''@define
+class SettingsInstrumental:
+    sync: int
+    line_tile_height: int
+
+    wait: bool = True
+    text: str = "INSTRUMENTAL"
+    text_align: TextAlign = TextAlign.CENTER
+    text_placement: TextPlacement = TextPlacement.MIDDLE
+    fill: RGBColor = field(converter=to_rgbcolor, default="#bbb")
+    stroke: RGBColor | None = field(
+        converter=to_rgbcolor_or_none,
+        default=None,
+    )
+    background: RGBColor | None = field(
+        converter=to_rgbcolor_or_none,
+        default=None,
+    )
+    image: Path | None = None
+    transition: str | None = None
+    x: int = 0
+    y: int = 0
+    # DJGABO_CDG_ENGINE_V2_PATCH
+    # Fin musical real de la pausa. _compose_instrumental conserva la
+    # preparación nativa de Nomad 3 s antes, sin +2 s ocultos.
+    end_sync: int | None = None
+'''
+    text = replace_once(text, old_inst, new_inst, "SettingsInstrumental end_sync")
+
+    old_outro_cfg = '''    intro_duration_seconds: float = 5.0
+    first_syllable_buffer_seconds: float = 3.0
+
+    outro_transition: str = "centertexttoplogobottomtext"
+'''
+    new_outro_cfg = '''    intro_duration_seconds: float = 5.0
+    first_syllable_buffer_seconds: float = 3.0
+    # DJGABO_CDG_ENGINE_V2_PATCH
+    # Si se define, el ending empieza dentro del reloj del audio original.
+    # No añade 8 s artificiales al archivo.
+    outro_start_sync: int | None = None
+
+    outro_transition: str = "centertexttoplogobottomtext"
+'''
+    text = replace_once(text, old_outro_cfg, new_outro_cfg, "Settings explicit outro start")
     path.write_text(text, encoding="utf-8")
 
 
@@ -135,6 +203,78 @@ def patch_composer(path: Path) -> None:
             # The first page is drawn 3 seconds before the first
 '''
     text = replace_once(text, old_times, new_times, "explicit timeline")
+
+    old_inst_end = '''            # The instrumental should end when the next line is drawn by
+            # default
+            if line_draw_time is not None:
+                instrumental_end = line_draw_time
+            else:
+                # NOTE A value of None here means this instrumental will
+                # never end (and once the screen is drawn, it will not
+                # pause), unless there is another instrumental after
+                # this.
+                instrumental_end = None
+'''
+    new_inst_end = '''            # DJGABO_CDG_ENGINE_V2_PATCH
+            # Si el V2 conoce el START siguiente, ese es el fin musical real
+            # del instrumental. Nomad mantiene su preparación nativa 3 s antes.
+            if getattr(instrumental, "end_sync", None) is not None:
+                instrumental_end = sync_to_cdg(int(instrumental.end_sync))
+            # Fallback upstream: terminar cuando se dibuja la siguiente línea.
+            elif line_draw_time is not None:
+                instrumental_end = line_draw_time
+            else:
+                instrumental_end = None
+'''
+    text = replace_once(text, old_inst_end, new_inst_end, "instrumental explicit end")
+
+    old_outro_sched = '''            # Calculate video padding before outro
+            OUTRO_DURATION = 2400
+            # This karaoke file ends at the later of:
+            # - The end of the audio (with the padded intro)
+            # - 8 seconds after the current video time
+            end = max(
+                int(self.audio.duration_seconds * CDG_FPS),
+                self.writer.packets_queued + OUTRO_DURATION,
+            )
+            self.logger.debug(f"song should be {end} frame(s) long")
+            padding_before_outro = (end - OUTRO_DURATION) - self.writer.packets_queued
+            self.logger.debug(f"queueing {padding_before_outro} packets before outro")
+            self.writer.queue_packets([no_instruction()] * padding_before_outro)
+
+            # Compose the outro (and thus, finish the video)
+            self._compose_outro(end)
+'''
+    new_outro_sched = '''            # DJGABO_CDG_ENGINE_V2_PATCH
+            # El panel DJGABO ya decide dónde empieza el Ending dentro del
+            # audio. Si se provee outro_start_sync, respetamos ese reloj y no
+            # añadimos una cola artificial de 8 segundos.
+            explicit_outro = getattr(self.config, "outro_start_sync", None)
+            if explicit_outro is not None:
+                end = max(int(self.audio.duration_seconds * CDG_FPS), self.writer.packets_queued)
+                outro_start = sync_to_cdg(int(explicit_outro))
+                if self.writer.packets_queued < outro_start:
+                    self.writer.queue_packets([no_instruction()] * (outro_start - self.writer.packets_queued))
+                self.logger.info(
+                    "CDG V2: explicit outro at %d, audio end %d",
+                    outro_start,
+                    end,
+                )
+                self._compose_outro(end)
+            else:
+                # Upstream behavior.
+                OUTRO_DURATION = 2400
+                end = max(
+                    int(self.audio.duration_seconds * CDG_FPS),
+                    self.writer.packets_queued + OUTRO_DURATION,
+                )
+                self.logger.debug(f"song should be {end} frame(s) long")
+                padding_before_outro = (end - OUTRO_DURATION) - self.writer.packets_queued
+                self.logger.debug(f"queueing {padding_before_outro} packets before outro")
+                self.writer.queue_packets([no_instruction()] * padding_before_outro)
+                self._compose_outro(end)
+'''
+    text = replace_once(text, old_outro_sched, new_outro_sched, "explicit outro schedule")
 
     old_intro = '''    def _compose_intro(self):
         # TODO Make it so the intro screen is not hardcoded
