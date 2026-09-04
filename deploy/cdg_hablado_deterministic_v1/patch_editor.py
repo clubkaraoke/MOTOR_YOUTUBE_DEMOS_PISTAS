@@ -26,7 +26,7 @@ def main():
   push(docSnapshot());
   ids.forEach(i=>applyWordRole(S.words[i], allTarget?"none":role));
   S.dirty=true; pvInvalidate(); paintNow(); paintLyrics(); draw(); scheduleSave();
-  if(!quiet) toast(\`\${ids.length} palabra\${ids.length===1?"":"s"} · \${allTarget?"SIN ROL":roleLabel(role)}\`,1100);
+  if(!quiet) toast(`${ids.length} palabra${ids.length===1?"":"s"} · ${allTarget?"SIN ROL":roleLabel(role)}`,1100);
   return true;
 }'''
 
@@ -42,7 +42,7 @@ function applyRoleToIndices(indices, role, quiet=false){
   push(docSnapshot());
   ids.forEach(i=>applyWordRole(S.words[i], role));
   S.dirty=true; pvInvalidate(); paintNow(); paintLyrics(); draw(); scheduleSave();
-  if(!quiet) toast(\`\${ids.length} palabra\${ids.length===1?"":"s"} · \${roleLabel(role)}\`,1100);
+  if(!quiet) toast(`${ids.length} palabra${ids.length===1?"":"s"} · ${roleLabel(role)}`,1100);
   return true;
 }'''
 
