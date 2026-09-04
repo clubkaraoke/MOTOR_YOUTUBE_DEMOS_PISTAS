@@ -1,0 +1,18 @@
+DJGABO CDG ENGINE V2 - upstream provenance
+
+Project: Nomad Karaoke / karaoke-gen
+Repository: https://github.com/nomadkaraoke/karaoke-gen
+Pinned commit: bedbcdc3bdba3aa475c5d8fb08c32fe799b3bf88
+Imported subtree at deploy time:
+  karaoke_gen/lyrics_transcriber/output/cdgmaker
+
+The deploy downloads that exact commit, copies cdgmaker into
+vendor/nomad_cdgmaker, and applies deploy/cdg_engine_v2/patch_nomad.py.
+
+V2-specific changes are intentionally small:
+- ElevenLabs word END timestamps are accepted explicitly (end_sync).
+- line draw/erase times come from one authoritative timeline shared by preview/CDG.
+- Nomad's internal intro_delay is never allowed to shift musical timings.
+- opening/ending are disabled in phase KARAOKE_CORE_FIRST.
+
+Nomad Karaoke license is preserved in LICENSE.nomad-karaoke.txt.
