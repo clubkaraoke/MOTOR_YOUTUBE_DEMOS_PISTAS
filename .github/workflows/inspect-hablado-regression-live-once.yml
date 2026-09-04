@@ -1,0 +1,71 @@
+name: Inspect HABLADO regression live once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-hablado-regression-live-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH inspect live production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          E="$P/editor_v1/index.html"
+          N="$P/renderer/normalize.py"
+          C="$P/renderer/vendor/cdgmaker/composer.py"
+
+          echo "=== HEALTH ==="
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+
+          echo "=== NOMAD HASHES ==="
+          sudo sha256sum "$N" "$C"
+
+          echo "=== ROLE FUNCTIONS ==="
+          sudo env E="$E" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["E"]).read_text(encoding="utf-8")
+          for start,end in [
+            ("function applyWordRole","function roleLabel"),
+            ("function applyRoleToIndices","function applyArmedRoleToCurrentSelection"),
+            ("function buildRenderPagesDecision","function buildRenderPlanDecision"),
+            ("function pvMergedSpokenIntervals","function _diagInstrumentalDecisions"),
+            ("function _diagInstrumentalDecisions","function pvOpeningDecision"),
+          ]:
+              a=t.find(start); b=t.find(end,a+1) if a>=0 else -1
+              print("\n---",start,a,"---")
+              if a>=0: print(t[a:(b if b>=0 else a+9000)])
+          PY
+
+          echo "=== NORMALIZER SPOKEN / COUNTDOWN ==="
+          sudo env N="$N" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["N"]).read_text(encoding="utf-8")
+          for key in ["def check_complete","def wrap_lines","def build_instrumentals","spoken_intervals","spoken_instrumental_min_seconds","DJGABO_COUNTDOWN_DOTS_ONLY"]:
+              i=t.find(key)
+              print("\n---",key,i,"---")
+              if i>=0: print(t[max(0,i-1200):i+8500])
+          PY
+          REMOTE
