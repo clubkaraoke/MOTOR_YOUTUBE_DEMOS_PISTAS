@@ -23,13 +23,15 @@ def patch_html(path: Path, is_panel: bool = False) -> None:
         # El player V1 queda fuera del LAB: el V2 trae su propio decoder CDG.
         text = re.sub(r'<script[^>]+cdg-final-preview\.js[^>]*></script>\s*', '', text, flags=re.I)
         script = f'<script src="{PREFIX}/api/vendor/cdg-v2-studio.js"></script>'
+        mobile = f'<script src="{PREFIX}/api/vendor/cdg-v2-mobile.js"></script>'
         if "</body>" not in text:
             raise RuntimeError(f"{path}: no encuentro </body>")
-        text = text.replace("</body>", script + "\n<!-- " + MARK + " -->\n</body>", 1)
+        text = text.replace("</body>", script + "\n" + mobile + "\n<!-- " + MARK + " -->\n</body>", 1)
         text = text.replace("Sincronizador de karaoke · DJGABO · IA TEST", "Sincronizador de karaoke · DJGABO · CDG ENGINE V2 LAB")
     if is_panel:
         script = f'<script src="{PREFIX}/api/vendor/cdg-v2-lab.js"></script>'
-        text = text.replace("</body>", script + "\n<!-- " + MARK + " -->\n</body>", 1)
+        mobile = f'<script src="{PREFIX}/api/vendor/cdg-v2-mobile.js"></script>'
+        text = text.replace("</body>", script + "\n" + mobile + "\n<!-- " + MARK + " -->\n</body>", 1)
     path.write_text(text, encoding="utf-8")
 
 
@@ -109,6 +111,7 @@ def main() -> int:
     (vendor / "__init__.py").write_text("# DJGABO CDG V2 vendor namespace\n", encoding="utf-8")
     shutil.copy2(src / "cdg-v2-studio.js", vendor / "cdg-v2-studio.js")
     shutil.copy2(src / "cdg-v2-lab.js", vendor / "cdg-v2-lab.js")
+    shutil.copy2(src / "cdg-v2-mobile.js", vendor / "cdg-v2-mobile.js")
     qr_src = src / "vendor"
     shutil.copy2(qr_src / "jsQR.js", vendor / "jsQR.js")
     shutil.copy2(qr_src / "jsQR.LICENSE.txt", vendor / "jsQR.LICENSE.txt")
