@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T08:00:45+00:00
+TIMESTAMP=2026-09-04T08:11:40+00:00
 PHASE=CDG_V2_EQUALITY_ONLY
 MP4_ENGINE=NOT_IMPLEMENTED
 PROD_HTTP_BEFORE=200
@@ -14,7 +14,7 @@ PROD_DB_RESOLVED=/var/lib/djgabo-cdg/local.db
 === SYSTEMD ISOLATED ===
 V2_HEALTH={"engine":"DJGABO_CDG_ENGINE_V2_0_1","external_backups":false,"isolated":true,"local_lab_upload":true,"ok":true,"publish_to_dropbox":false}
 === ENGINE SMOKE ===
-{"ok": true, "size": 121176, "lines": 2}
+{"ok": true, "size": 110616, "lines": 2}
 SMOKE=PASS
 === EL PERFUME EQUALITY TEST ===
 Not enough time to highlight lyric 0 line 0 syllable 2. Ideal duration is 0 column(s); actual duration is 8 column(s). Syllable text: EL PERFUME {QUE }USASTE
