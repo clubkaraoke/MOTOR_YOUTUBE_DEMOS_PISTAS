@@ -155,7 +155,7 @@ jobs:
           echo "SMOKE_JOB=$SMOKE_JOB"
 
           echo "=== VERIFY GENERATED TOML USES NOMAD LINE_DELAYED ==="
-          sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" python3 - <<'PY'
+          sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" "$PROD/.venv/bin/python" - <<'PY'
           import json, os, sys, tempfile
           from pathlib import Path
           stage=Path(os.environ["STAGE"])
