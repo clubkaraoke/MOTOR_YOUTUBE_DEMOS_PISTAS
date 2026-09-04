@@ -1,0 +1,172 @@
+=== AUTH ADMIN BLOCK ===
+    location = /_portal_auth_admin {
+        internal;
+        proxy_pass http://127.0.0.1:8765/api/portal/auth/admin;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Cookie $http_cookie;
+    }
+
+    location @login_required { return 302 /; }
+    location @admin_required { return 302 /?admin_required=1; }
+
+    location = /cdg { return 301 /cdg/; }
+    location /cdg/ {
+        auth_request /_portal_auth_any;
+        error_page 401 403 = @login_required;
+        proxy_pass http://127.0.0.1:8765/;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location = /cdg-lyrics { return 301 /cdg-lyrics/; }
+    location /cdg-lyrics/ {
+        client_max_body_size 20m;
+        auth_request /_portal_auth_admin;
+        error_page 401 403 = @admin_required;
+        rewrite ^/cdg-lyrics/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8090;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_connect_timeout 15s;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+=== METHOD RESTRICTIONS ===
+192:                       '"$request_method $uri $server_protocol" $status $body_bytes_sent '
+257:        auth_request /_portal_auth_any;
+258:        error_page 401 403 = @login_required;
+270:        auth_request /_portal_auth_admin;
+271:        error_page 401 403 = @admin_required;
+285:        auth_request /_portal_auth_admin;
+286:        error_page 401 403 = @admin_required;
+300:        auth_request /_portal_auth_admin;
+301:        error_page 401 403 = @admin_required;
+324:        auth_request /_portal_auth_admin;
+325:        error_page 401 403 = @admin_required;
+350:        auth_request /_portal_auth_any;
+351:        error_page 401 403 = @login_required;
+387:        auth_request /_portal_auth_admin;
+388:        error_page 401 403 = @admin_required;
+404:        auth_request /_portal_auth_admin;
+405:        error_page 401 403 = @admin_required;
+=== LOCAL PUT DUMMY ===
+HTTP/1.1 401 UNAUTHORIZED
+Server: Werkzeug/3.1.8 Python/3.12.3
+Date: Fri, 04 Sep 2026 07:37:25 GMT
+Content-Type: application/json
+Content-Length: 63
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Referrer-Policy: same-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://content.dropboxapi.com https://uvronline.app https://*.uvronline.app; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'
+Cache-Control: private, no-store
+Connection: close
+
+{"error":"Sesi\u00f3n vencida. Vuelve a ingresar.","ok":false}
+=== RECENT ACCESS AROUND V2 UPLOAD ===
+=== RECENT ERROR ===
+2026/09/04 04:17:57 [error] 397727#397727: *24538 open() "/usr/share/nginx/html/ssi.cgi/Login.htm" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /ssi.cgi/Login.htm HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:18:16 [error] 397727#397727: *24539 open() "/usr/share/nginx/html/static/historypage.js" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /static/historypage.js HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:18:28 [error] 397727#397727: *24540 open() "/usr/share/nginx/html/login/login" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /login/login HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:18:29 [error] 397727#397727: *24541 open() "/usr/share/nginx/html/console" failed (2: No such file or directory), client: 45.156.128.151, server: panel.kitkaraoke.com, request: "GET /console HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:18:41 [error] 397727#397727: *24542 open() "/usr/share/nginx/html/login" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /login HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:18:53 [error] 397727#397727: *24543 open() "/usr/share/nginx/html/zabbix/favicon.ico" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /zabbix/favicon.ico HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:19:21 [error] 397727#397727: *24548 open() "/usr/share/nginx/html/ext-js/app/common/zld_product_spec.js" failed (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /ext-js/app/common/zld_product_spec.js HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:19:21 [error] 397727#397727: *24549 "/usr/share/nginx/html/admin/index.html" is not found (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /admin/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:19:22 [error] 397727#397727: *24550 open() "/usr/share/nginx/html/Telerik.Web.UI.WebResource.axd" failed (2: No such file or directory), client: 45.156.128.151, server: panel.kitkaraoke.com, request: "GET /Telerik.Web.UI.WebResource.axd?type=rau HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:19:34 [error] 397727#397727: *24551 open() "/usr/share/nginx/html/license.txt" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /license.txt HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:19:51 [error] 397727#397727: *24552 open() "/usr/share/nginx/html/wp-json" failed (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /wp-json HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:08 [error] 397727#397727: *24553 open() "/usr/share/nginx/html/js/NewWindow_2_all.js" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /js/NewWindow_2_all.js HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:08 [error] 397729#397729: *24554 open() "/usr/share/nginx/html/cgi-bin/authLogin.cgi" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /cgi-bin/authLogin.cgi HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:28 [error] 397729#397729: *24555 open() "/usr/share/nginx/html/login.do" failed (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /login.do HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:43 [error] 397729#397729: *24556 "/usr/share/nginx/html/owa/index.html" is not found (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /owa/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:44 [error] 397729#397729: *24558 open() "/usr/share/nginx/html/css/images/PTZOptics_powerby.png" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /css/images/PTZOptics_powerby.png HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:20:44 [error] 397729#397729: *24559 "/usr/share/nginx/html/webfig/index.html" is not found (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /webfig/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:02 [error] 397729#397729: *24560 open() "/usr/share/nginx/html/progs/homepage" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /progs/homepage HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:02 [error] 397729#397729: *24561 open() "/usr/share/nginx/html/OA_HTML/AppsLocalLogin.jsp" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /OA_HTML/AppsLocalLogin.jsp HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:15 [error] 397729#397729: *24562 open() "/usr/share/nginx/html/cgi-bin/config.exp" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /cgi-bin/config.exp HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:26 [error] 397729#397729: *24563 open() "/usr/share/nginx/html/cf_scripts/scripts/ajax/ckeditor/ckeditor.js" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /cf_scripts/scripts/ajax/ckeditor/ckeditor.js HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:27 [error] 397729#397729: *24564 open() "/usr/share/nginx/html/identity/jsLibs/IdmBrandingBar.js" failed (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /identity/jsLibs/IdmBrandingBar.js HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:37 [error] 397729#397729: *24565 open() "/usr/share/nginx/html/identity" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /identity HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:50 [error] 397729#397729: *24566 open() "/usr/share/nginx/html/login.html" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /login.html HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:21:58 [error] 397729#397729: *24567 open() "/usr/share/nginx/html/jasperserver/login.html" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /jasperserver/login.html HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:05 [error] 397729#397729: *24568 open() "/usr/share/nginx/html/jasperserver-pro/login.html" failed (2: No such file or directory), client: 45.156.128.149, server: panel.kitkaraoke.com, request: "GET /jasperserver-pro/login.html HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:12 [error] 397729#397729: *24569 open() "/usr/share/nginx/html/jasperserverTest/login.html" failed (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /jasperserverTest/login.html HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:17 [error] 397730#397730: *24570 "/usr/share/nginx/html/solr/index.html" is not found (2: No such file or directory), client: 45.156.128.148, server: panel.kitkaraoke.com, request: "GET /solr/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:21 [error] 397730#397730: *24573 open() "/usr/share/nginx/html/sugar_version.json" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /sugar_version.json HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:25 [error] 397730#397730: *24575 open() "/usr/share/nginx/html/internal_forms_authentication" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /internal_forms_authentication HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:33 [error] 397730#397730: *24576 open() "/usr/share/nginx/html/sitecore/shell/sitecore.version.xml" failed (2: No such file or directory), client: 45.156.128.151, server: panel.kitkaraoke.com, request: "GET /sitecore/shell/sitecore.version.xml HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:22:37 [error] 397730#397730: *24577 open() "/usr/share/nginx/html/Web/Auth" failed (2: No such file or directory), client: 45.156.128.150, server: panel.kitkaraoke.com, request: "GET /Web/Auth HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:45:36 [error] 397730#397730: *24592 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 87.236.176.63, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/2.0", host: "149.56.96.226"
+2026/09/04 04:45:37 [error] 397730#397730: *24593 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 64.227.109.89, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/2.0", host: "149.56.96.226"
+2026/09/04 04:48:08 [error] 397730#397730: *24599 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 199.45.155.30, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 04:53:09 [error] 397724#397724: *24607 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 165.154.182.152, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/1.1", host: "149.56.96.226"
+2026/09/04 04:54:15 [error] 397724#397724: *24610 open() "/usr/share/nginx/html/_rNd9xZ7kL3" failed (2: No such file or directory), client: 104.28.200.40, server: panel.kitkaraoke.com, request: "GET /_rNd9xZ7kL3 HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:54:47 [error] 397724#397724: *24612 open() "/usr/share/nginx/html/robots.txt" failed (2: No such file or directory), client: 162.158.49.170, server: panel.kitkaraoke.com, request: "GET /robots.txt HTTP/2.0", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:54:57 [error] 397724#397724: *24613 open() "/usr/share/nginx/html/sitemap.xml" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "GET /sitemap.xml HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:07 [error] 397724#397724: *24614 open() "/usr/share/nginx/html/sitemap_index.xml" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "GET /sitemap_index.xml HTTP/1.1", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:55:10 [error] 397724#397724: *24616 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 165.154.182.152, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/1.1", host: "149.56.96.226", referrer: "http://149.56.96.226:80/favicon.ico"
+2026/09/04 04:55:15 [error] 397724#397724: *24617 open() "/usr/share/nginx/html/sitemap-index.xml" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "GET /sitemap-index.xml HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:31 [error] 397724#397724: *24619 open() "/usr/share/nginx/html/.env" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.env HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397725#397725: *24623 open() "/usr/share/nginx/html/.git/config" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.git/config HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397724#397724: *24620 open() "/usr/share/nginx/html/.env.backup" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.env.backup HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397724#397724: *24621 open() "/usr/share/nginx/html/.env.local" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.env.local HTTP/1.1", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397725#397725: *24622 open() "/usr/share/nginx/html/.env.production" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.env.production HTTP/1.1", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397725#397725: *24625 open() "/usr/share/nginx/html/wp-config.php.bak" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /wp-config.php.bak HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:32 [error] 397725#397725: *24624 open() "/usr/share/nginx/html/secrets.json" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /secrets.json HTTP/1.1", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:55:33 [error] 397725#397725: *24626 open() "/usr/share/nginx/html/.aws/credentials" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.aws/credentials HTTP/1.1", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 04:55:33 [error] 397725#397725: *24627 open() "/usr/share/nginx/html/.git/HEAD" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "HEAD /.git/HEAD HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:47 [error] 397725#397725: *24630 open() "/usr/share/nginx/html/wp-config.php" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "GET /wp-config.php HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:50 [error] 397725#397725: *24631 open() "/usr/share/nginx/html/config.json" failed (2: No such file or directory), client: 104.28.232.40, server: panel.kitkaraoke.com, request: "GET /config.json HTTP/1.1", host: "panel.kitkaraoke.com"
+2026/09/04 04:55:50 [error] 397725#397725: *24632 open() "/usr/share/nginx/html/.dev.vars" failed (2: No such file or directory), client: 162.158.38.184, server: panel.kitkaraoke.com, request: "GET /.dev.vars HTTP/2.0", host: "panel.kitkaraoke.com", referrer: "https://www.google.com/search?q=panel.kitkaraoke.com"
+2026/09/04 05:05:51 [error] 397726#397726: *24648 open() "/usr/share/nginx/html/.env" failed (2: No such file or directory), client: 195.63.6.42, server: panel.kitkaraoke.com, request: "GET /.env HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24650 open() "/usr/share/nginx/html/.env.save" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.save HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397730#397730: *24651 open() "/usr/share/nginx/html/.env.backup" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.backup HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24652 open() "/usr/share/nginx/html/.env.local" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.local HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397730#397730: *24654 open() "/usr/share/nginx/html/wp-config.php.swp" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /wp-config.php.swp HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24653 open() "/usr/share/nginx/html/.env" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24655 open() "/usr/share/nginx/html/wp-config.php~" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /wp-config.php~ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397730#397730: *24656 open() "/usr/share/nginx/html/actuator/env" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /actuator/env HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24657 open() "/usr/share/nginx/html/.env.prod" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.prod HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24659 open() "/usr/share/nginx/html/.env.old" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.old HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24658 open() "/usr/share/nginx/html/_ignition/health-check" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /_ignition/health-check HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24660 open() "/usr/share/nginx/html/.env.bak" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.bak HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24662 open() "/usr/share/nginx/html/env" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /env HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24661 open() "/usr/share/nginx/html/.env.production" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.production HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24663 open() "/usr/share/nginx/html/crusader-404-probe" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /crusader-404-probe HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24664 open() "/usr/share/nginx/html/.env.example" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.example HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24665 open() "/usr/share/nginx/html/actuator/configprops" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /actuator/configprops HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24666 open() "/usr/share/nginx/html/wp-config.php.bak" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /wp-config.php.bak HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397727#397727: *24667 open() "/usr/share/nginx/html/.env.dev" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /.env.dev HTTP/1.1", host: "149.56.96.226"
+2026/09/04 05:07:36 [error] 397726#397726: *24668 open() "/usr/share/nginx/html/storage/logs/laravel.log" failed (2: No such file or directory), client: 35.243.181.61, server: panel.kitkaraoke.com, request: "GET /storage/logs/laravel.log HTTP/1.1", host: "149.56.96.226"
+2026/09/04 06:34:59 [error] 397725#397725: *24755 "/usr/share/nginx/html/webui/index.html" is not found (2: No such file or directory), client: 184.105.139.70, server: panel.kitkaraoke.com, request: "GET /webui/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 06:43:53 [error] 820048#820048: *24771 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 184.105.139.70, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/1.1", host: "149.56.96.226"
+2026/09/04 06:50:25 [error] 821876#821876: *24788 open() "/usr/share/nginx/html/actuator/configprops" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /actuator/configprops HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821872#821872: *24789 open() "/usr/share/nginx/html/.env.old" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.old HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821875#821875: *24790 open() "/usr/share/nginx/html/.env" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821875#821875: *24791 open() "/usr/share/nginx/html/.env.local" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.local HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821874#821874: *24795 open() "/usr/share/nginx/html/wp-config.php.bak" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /wp-config.php.bak HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821875#821875: *24792 open() "/usr/share/nginx/html/.env.example" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.example HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821875#821875: *24793 open() "/usr/share/nginx/html/crusader-404-probe" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /crusader-404-probe HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821874#821874: *24796 open() "/usr/share/nginx/html/.env.bak" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.bak HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821873#821873: *24799 open() "/usr/share/nginx/html/_ignition/health-check" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /_ignition/health-check HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821871#821871: *24798 open() "/usr/share/nginx/html/.env.backup" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.backup HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821875#821875: *24794 open() "/usr/share/nginx/html/env" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /env HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821876#821876: *24801 open() "/usr/share/nginx/html/wp-config.php~" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /wp-config.php~ HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821874#821874: *24797 open() "/usr/share/nginx/html/wp-config.php.swp" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /wp-config.php.swp HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821873#821873: *24802 open() "/usr/share/nginx/html/.env.production" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.production HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821876#821876: *24806 open() "/usr/share/nginx/html/.env.prod" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.prod HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821874#821874: *24800 open() "/usr/share/nginx/html/.env.save" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.save HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821873#821873: *24804 open() "/usr/share/nginx/html/actuator/env" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /actuator/env HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821876#821876: *24805 open() "/usr/share/nginx/html/storage/logs/laravel.log" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /storage/logs/laravel.log HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:50:25 [error] 821876#821876: *24803 open() "/usr/share/nginx/html/.env.dev" failed (2: No such file or directory), client: 34.16.91.106, server: panel.kitkaraoke.com, request: "GET /.env.dev HTTP/1.1", host: "226.ip-149-56-96.net"
+2026/09/04 06:58:55 [error] 833747#833747: *24847 "/usr/share/nginx/html/geoserver/web/index.html" is not found (2: No such file or directory), client: 184.105.139.70, server: panel.kitkaraoke.com, request: "GET /geoserver/web/ HTTP/1.1", host: "149.56.96.226"
+2026/09/04 07:03:39 [error] 833744#833744: *24899 open() "/usr/share/nginx/html/.git/config" failed (2: No such file or directory), client: 184.105.139.70, server: panel.kitkaraoke.com, request: "GET /.git/config HTTP/1.1", host: "149.56.96.226"
+2026/09/04 07:16:32 [error] 833744#833744: *24927 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 188.166.82.175, server: panel.kitkaraoke.com, request: "GET /favicon.ico HTTP/2.0", host: "149.56.96.226"
+2026/09/04 07:18:41 [error] 833747#833747: *24946 open() "/usr/share/nginx/html/robots.txt" failed (2: No such file or directory), client: 51.8.102.111, server: panel.kitkaraoke.com, request: "GET /robots.txt HTTP/2.0", host: "panel.kitkaraoke.com"
+2026/09/04 07:18:42 [error] 833747#833747: *24946 open() "/usr/share/nginx/html/robots.txt" failed (2: No such file or directory), client: 51.8.102.111, server: panel.kitkaraoke.com, request: "GET /robots.txt HTTP/2.0", host: "panel.kitkaraoke.com"
