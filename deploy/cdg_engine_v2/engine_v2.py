@@ -202,13 +202,40 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
             instrumentals=[],singers=[singer],lyrics=[lyric],intro_duration_seconds=0.0,
             first_syllable_buffer_seconds=0.0,outro_text_line1="",outro_text_line2="",
         )
-        kc=KaraokeComposer(cfg,relative_dir=td); kc.compose()
+        kc=KaraokeComposer(cfg,relative_dir=td)
+        # Diagnóstico de compilación: geometría y reloj que Nomad recibió antes
+        # de escribir un solo paquete CDG. No modifica el render.
+        flat_timeline_words=[w for line in tl["lines"] for w in line["words"]]
+        flat_syllables=[(line,syll) for lyr in kc.lyrics for line in lyr.lines for syll in line.syllables]
+        if len(flat_timeline_words)!=len(flat_syllables):
+            raise EngineV2Error(f"V2 compile mismatch: {len(flat_timeline_words)} words vs {len(flat_syllables)} syllables")
+        compiled=[]
+        for tw,(line,syll) in zip(flat_timeline_words,flat_syllables):
+            bb=syll.mask.getbbox() or (0,0,0,0)
+            compiled.append({
+                "word_id":tw["id"],"text":tw["text"],
+                "timeline_start":float(tw["start"]),"timeline_end":float(tw["end"]),
+                "cdg_start_frame":int(syll.start_offset),"cdg_end_frame":int(syll.end_offset),
+                "cdg_start":round(float(syll.start_offset)/300.0,6),
+                "cdg_end":round(float(syll.end_offset)/300.0,6),
+                "bbox":[int(line.x+bb[0]),int(line.y+bb[1]),int(line.x+bb[2]),int(line.y+bb[3])],
+                "line_index":int(syll.line_index),"syllable_index":int(syll.syllable_index),
+                "active_fill_index":6
+            })
+        compile_diag={
+            "engine":ENGINE_VERSION,"upstream_commit":UPSTREAM_COMMIT,
+            "intro_delay_expected_frames":0,"sync_offset_frames":int(kc.sync_offset),
+            "compiled_words":compiled
+        }
+        kc.compose()
+        compile_diag["intro_delay_actual_frames"]=int(getattr(kc,"intro_delay",0))
+        (output_dir/"diagnostic_v2.json").write_text(json.dumps(compile_diag,ensure_ascii=False,indent=2),encoding="utf-8")
         zp=td/f"{outname}.zip"
         if not zp.is_file(): raise EngineV2Error("Nomad cdgmaker no produjo ZIP.")
         with zipfile.ZipFile(zp,"r") as zf: data=zf.read(f"{outname}.cdg")
     out=output_dir/"output_v2.cdg"; tmp=output_dir/"output_v2.tmp"; tmp.write_bytes(data); tmp.replace(out)
     return {"ok":True,"engine":ENGINE_VERSION,"timeline":tl,"timeline_path":str(output_dir/"timeline_v2.json"),
-            "cdg_path":str(out),"cdg_size":out.stat().st_size,"warnings":tl.get("warnings") or []}
+            "cdg_path":str(out),"cdg_size":out.stat().st_size,"diagnostic_path":str(output_dir/"diagnostic_v2.json"),"warnings":tl.get("warnings") or []}
 
 def smoke_project():
     return {"song":{"artist":"DJGABO","title":"V2 SMOKE","duration":8.0},
