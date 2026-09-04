@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T06:41:48+00:00
+TIMESTAMP=2026-09-04T06:43:20+00:00
 PHASE=CDG_V2_EQUALITY_ONLY
 MP4_ENGINE=NOT_IMPLEMENTED
 PROD_HTTP_BEFORE=200
@@ -8,3 +8,56 @@ CLONE_PATCH=OK
 ROOT=/tmp/djgabo-cdg-v2-stage
 === INSTALL ISOLATED APP ===
 === ISOLATED DATA SNAPSHOT ===
+PROD_DATA_RESOLVED=/var/lib/djgabo-cdg
+PROD_DB_RESOLVED=/var/lib/djgabo-cdg/local.db
+=== COPY LOGIN SECRETS ONLY, NO DROPBOX/DRIVE SECRETS ===
+=== SYSTEMD ISOLATED ===
+Created symlink /etc/systemd/system/multi-user.target.wants/djgabo-cdg-v2.service → /etc/systemd/system/djgabo-cdg-v2.service.
+V2_HEALTH={"engine":"DJGABO_CDG_ENGINE_V2_0_1","isolated":true,"ok":true,"publish_to_dropbox":false}
+=== ENGINE SMOKE ===
+{"ok": true, "size": 121176, "lines": 2}
+SMOKE=PASS
+=== EL PERFUME EQUALITY TEST ===
+Not enough time to highlight lyric 0 line 0 syllable 2. Ideal duration is 0 column(s); actual duration is 8 column(s). Syllable text: EL PERFUME {QUE }USASTE
+Not enough time to highlight lyric 0 line 2 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: ÚLTIMA NOCHE {DE }AMOR
+Not enough time to highlight lyric 0 line 6 syllable 1. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: TODAVÍA {TÚ }ERES EL
+Not enough time to highlight lyric 0 line 8 syllable 2. Ideal duration is 4 column(s); actual duration is 6 column(s). Syllable text: ESTE AMOR {HA }SEGUIDO
+Not enough time to highlight lyric 0 line 9 syllable 2. Ideal duration is 0 column(s); actual duration is 3 column(s). Syllable text: CRECIENDO DÍA {A }DÍA.
+Not enough time to highlight lyric 0 line 11 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: QUE NO {TE }OLVIDA.
+Not enough time to highlight lyric 0 line 24 syllable 2. Ideal duration is 0 column(s); actual duration is 8 column(s). Syllable text: EL PERFUME {QUE }USASTE
+Not enough time to highlight lyric 0 line 26 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: ÚLTIMA NOCHE {DE }AMOR
+Not enough time to highlight lyric 0 line 32 syllable 2. Ideal duration is 4 column(s); actual duration is 6 column(s). Syllable text: ESTE AMOR {HA }SEGUIDO
+Not enough time to highlight lyric 0 line 33 syllable 2. Ideal duration is 0 column(s); actual duration is 3 column(s). Syllable text: CRECIENDO DÍA {A }DÍA.
+Not enough time to highlight lyric 0 line 35 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: QUE NO {TE }OLVIDA.
+Not enough time to highlight lyric 0 line 44 syllable 1. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: TE {LO }DICE MI CORAZÓN.
+Not enough time to highlight lyric 0 line 54 syllable 1. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: Y {MI }FELICIDAAAD.
+JOB=LET-0088 Hermanos Silva - El Perfume
+WORDS source/canonical/rendered=216/179/179
+INTRO_DELAY_FRAMES=0
+SYNC_OFFSET_FRAMES=0
+MAX_SOURCE_TIMELINE_MS=0.0
+MAX_TIMELINE_COMPILED_MS=1.0
+WORD 0 'EL' SRC 30.35 30.6 TL 30.35 30.6 CDG_COMPILE 30.35 30.6 DECODED 30.37 30.563333 DELTA_MS 20.0 -36.667
+WORD 1 'PERFUME' SRC 30.62 31.14 TL 30.62 31.14 CDG_COMPILE 30.62 31.14 DECODED 30.65 31.106667 DELTA_MS 30.0 -33.333
+WORD 2 'QUE' SRC 31.2 31.26 TL 31.2 31.26 CDG_COMPILE 31.2 31.26 DECODED 31.23 31.286667 DELTA_MS 30.0 26.667
+WORD 44 'DE' SRC 59.02 59.24 TL 59.02 59.24 CDG_COMPILE 59.02 59.24 DECODED 59.04 59.216667 DELTA_MS 20.0 -23.333
+WORD 89 'LLEVO' SRC 130.34 130.6 TL 130.34 130.6 CDG_COMPILE 130.34 130.6 DECODED 130.37 130.586667 DELTA_MS 30.0 -13.333
+WORD 134 'DARME' SRC 162.16 162.56 TL 162.16 162.56 CDG_COMPILE 162.16 162.56 DECODED 162.17 162.516667 DELTA_MS 10.0 -43.333
+WORD 177 'MI' SRC 226.18 226.26 TL 226.18 226.26 CDG_COMPILE 226.18 226.26 DECODED 226.196667 226.233333 DELTA_MS 16.667 -26.667
+WORD 178 'FELICIDAAAD.' SRC 226.36 229.98 TL 226.36 229.98 CDG_COMPILE 226.36 229.98 DECODED 226.453333 229.74 DELTA_MS 93.333 -240.0
+REPORT=/var/lib/djgabo-cdg-v2/v2_renders/LET-0088/equality_report_v2.json
+EQUALITY_STRUCTURAL=PASS
+=== INSTALL /cdg-v2/ ROUTE ===
+NGINX_ROUTE=INSTALLED /etc/nginx/sites-available/panel.kitkaraoke.com
+NGINX_ROUTE=INSTALLED /etc/nginx/sites-available/djgabo-cdg
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+=== PRODUCTION SAFETY ===
+PROD_CODE_HASH_AFTER=8ada4556151547f095d9e2cf1471a8ad6ac3eef8b0f1f1e657024f3358842884
+PRODUCTION_CODE_UNCHANGED=YES
+PROD_HTTP_AFTER=200
+V2_SERVICE=active
+V2_HTTP=200
+SCRIBE_GATEWAY=1
+DEPLOY=OK
+PUBLIC_CDG_V2_HTTP=302
