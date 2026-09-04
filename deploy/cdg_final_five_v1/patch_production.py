@@ -66,6 +66,8 @@ def _backfill_master_fingerprints():
     except Exception as e:
         app.logger.warning('backfill huellas JSON: %s',e)
 
+_backfill_master_fingerprints()
+
 def recover_interrupted_renders():'''
     t=replace_once(t,anchor,repl,"server fingerprint helpers")
 
@@ -151,11 +153,6 @@ def save_project(jid):
     old="threading.Thread(target=_render_worker,args=(task_id,jid,token,timings_bytes,opts),daemon=True,name='render-'+jid).start()"
     new="threading.Thread(target=_render_worker,args=(task_id,jid,token,timings_bytes,opts,source_sha),daemon=True,name='render-'+jid).start()"
     t=replace_once(t,old,new,"server worker args")
-
-    # Backfill must run after _timings_local_path is defined. Hook immediately after that helper.
-    old="def _timings_local_path(jid): return JOBS/str(jid)/'proyecto.timings.json'\n\ndef backup_voice_to_drive"
-    new="def _timings_local_path(jid): return JOBS/str(jid)/'proyecto.timings.json'\n\n_backfill_master_fingerprints()\n\ndef backup_voice_to_drive"
-    t=replace_once(t,old,new,"server backfill hook")
 
     p.write_text(t,encoding="utf-8")
     print("SERVER_PATCH=OK")
