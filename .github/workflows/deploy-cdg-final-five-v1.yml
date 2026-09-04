@@ -130,16 +130,25 @@ jobs:
           src=Path("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
           if not src.is_file(): raise SystemExit("LET0095_MASTER_MISSING")
           doc=N.load(src)
-          before={str(w.get("id")):(w.get("start_time"),w.get("end_time"),bool(w.get("spoken"))) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          before_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          before_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[]) if w.get("end_time") is not None and w.get("start_time") is not None and float(w.get("end_time"))>float(w.get("start_time"))}
+          before_spoken={str(w.get("id")):bool(w.get("spoken")) for s in doc.get("segments",[]) for w in s.get("words",[])}
           style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
           font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
           style["font"]=font;style["font_fallback"]=font
           # El smoke debe usar exactamente el LPP del JSON maestro/Preview.
           style["lines_per_page"]=int((doc.get("render_pages") or {}).get("lines_per_page") or style.get("lines_per_page") or 6)
           n=N.normalize(doc,style)
-          after={str(w.get("id")):(w.get("start_time"),w.get("end_time"),bool(w.get("spoken"))) for s in doc.get("segments",[]) for w in s.get("words",[])}
-          print("PUMITA_START_END_UNCHANGED="+("YES" if before==after else "NO"))
-          assert before==after
+          after_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          after_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          after_spoken={str(w.get("id")):bool(w.get("spoken")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          starts_ok=before_start==after_start
+          explicit_ends_ok=all(after_end.get(k)==v for k,v in before_end.items())
+          spoken_ok=before_spoken==after_spoken
+          print("PUMITA_START_UNCHANGED="+("YES" if starts_ok else "NO"))
+          print("PUMITA_EXPLICIT_END_UNCHANGED="+("YES" if explicit_ends_ok else "NO"))
+          print("PUMITA_SPOKEN_UNCHANGED="+("YES" if spoken_ok else "NO"))
+          assert starts_ok and explicit_ends_ok and spoken_ok
           print("PUMITA_LANE_COUNT="+str(len(n.lyric_lanes)))
           assert len(n.lyric_lanes)>=2
           for lane in n.lyric_lanes:
@@ -273,15 +282,18 @@ jobs:
           P=Path(os.environ["P"]);sys.path.insert(0,str(P/"renderer"));sys.path.insert(0,str(P/"renderer/vendor"))
           import normalize as N
           doc=N.load("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
-          before={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          before_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          before_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[]) if w.get("end_time") is not None and w.get("start_time") is not None and float(w.get("end_time"))>float(w.get("start_time"))}
           style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
           font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";style["font"]=font;style["font_fallback"]=font
           style["lines_per_page"]=int((doc.get("render_pages") or {}).get("lines_per_page") or style.get("lines_per_page") or 6)
           n=N.normalize(doc,style)
-          after={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
-          assert before==after
+          after_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          after_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          assert before_start==after_start
+          assert all(after_end.get(k)==v for k,v in before_end.items())
           assert n.lyric_lanes
-          print("LIVE_PUMITA_NO_TIMING_SHIFT=YES")
+          print("LIVE_PUMITA_NO_EXPLICIT_TIMING_SHIFT=YES")
           print("LIVE_PUMITA_OVERLAP_LANES="+str(len(n.lyric_lanes)))
           PY
           REMOTE
@@ -304,3 +316,5 @@ jobs:
 # rerun after moving JS syntax validation to GitHub runner
 
 # rerun with master render_pages lines_per_page in Pumita smoke
+
+# rerun: validate authoritative starts and explicit ends, allowing legacy missing-end completion
