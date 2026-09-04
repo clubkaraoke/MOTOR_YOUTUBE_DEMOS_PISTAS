@@ -89,40 +89,70 @@ jobs:
           sudo grep -Fq '"screen_clear_sync = []"' "$STAGE/normalize.py"
           echo "STAGE_PATCH=PASS"
 
-          echo "=== LOCATE REAL EL PERFUME TEST ASSETS ==="
+          echo "=== BUILD READ-ONLY REAL PROJECT SMOKE FROM PRODUCTION DB ==="
           sudo python3 - <<'PY' >/tmp/nomad-smoke-paths
-          import json
+          import json, sqlite3, wave
           from pathlib import Path
-          root=Path("/var/lib/djgabo-cdg/jobs/LET-0088")
-          if not root.exists():
-              raise SystemExit("LET-0088 job directory not found")
-          timing=None
-          for p in sorted(root.rglob("*.timings.json")):
-              timing=p; break
-          if timing is None:
-              for p in sorted(root.rglob("*.json")):
-                  try:
-                      d=json.load(open(p,encoding="utf-8"))
-                  except Exception:
-                      continue
-                  if d.get("version")==1 and isinstance(d.get("segments"),list) and d.get("segments"):
-                      timing=p; break
-          if timing is None:
-              raise SystemExit("LET-0088 timings JSON not found")
-          audio_candidates=[]
-          for ext in ("*.mp3","*.wav","*.m4a"):
-              audio_candidates += list(root.rglob(ext))
-          audio_candidates=[p for p in audio_candidates if p.is_file() and p.stat().st_size>1000]
-          if not audio_candidates:
-              raise SystemExit("LET-0088 local audio not found")
-          audio=max(audio_candidates,key=lambda p:p.stat().st_size)
-          print(str(timing))
-          print(str(audio))
+
+          db_candidates=[
+              Path("/var/lib/djgabo-cdg/local.db"),
+              Path("/var/lib/djgabo-cdg/data/local.db"),
+              Path("/opt/djgabo-cdg/data/local.db"),
+          ]
+          db=next((p for p in db_candidates if p.is_file()),None)
+          if db is None:
+              raise SystemExit("production local.db not found")
+
+          con=sqlite3.connect(f"file:{db}?mode=ro",uri=True)
+          con.row_factory=sqlite3.Row
+          rows=[]
+          try:
+              rows=con.execute("SELECT id,artist,title,project_json,duration FROM jobs WHERE project_json IS NOT NULL AND length(project_json)>20 ORDER BY CASE WHEN id='LET-0088' THEN 0 ELSE 1 END, updated DESC").fetchall()
+          except Exception:
+              rows=con.execute("SELECT id,artist,title,project_json,duration FROM jobs WHERE project_json IS NOT NULL AND length(project_json)>20").fetchall()
+
+          picked=None
+          for row in rows:
+              raw=row["project_json"]
+              try:
+                  doc=json.loads(raw) if isinstance(raw,str) else raw
+              except Exception:
+                  continue
+              if not isinstance(doc,dict):
+                  continue
+              if doc.get("version")==1 and isinstance(doc.get("segments"),list) and doc.get("segments"):
+                  picked=(row,doc); break
+          con.close()
+          if picked is None:
+              raise SystemExit("no usable real project_json found in production DB")
+
+          row,doc=picked
+          out=Path("/tmp/nomad-real-project.timings.json")
+          out.write_text(json.dumps(doc,ensure_ascii=False),encoding="utf-8")
+
+          duration=float((doc.get("song") or {}).get("duration") or row["duration"] or 90.0)
+          duration=max(30.0,min(duration+1.0,600.0))
+          wav=Path("/tmp/nomad-real-project-silent.wav")
+          rate=8000
+          frames=int(duration*rate)
+          with wave.open(str(wav),"wb") as wf:
+              wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(rate)
+              block=b"\0\0"*rate
+              while frames:
+                  n=min(frames,rate)
+                  wf.writeframes(block[:n*2])
+                  frames-=n
+
+          print(str(out))
+          print(str(wav))
+          print(f"{row['id']}|{row['artist']}|{row['title']}")
           PY
           TIMINGS="$(sed -n '1p' /tmp/nomad-smoke-paths)"
           AUDIO="$(sed -n '2p' /tmp/nomad-smoke-paths)"
+          SMOKE_JOB="$(sed -n '3p' /tmp/nomad-smoke-paths)"
           echo "SMOKE_TIMINGS=$TIMINGS"
           echo "SMOKE_AUDIO=$AUDIO"
+          echo "SMOKE_JOB=$SMOKE_JOB"
 
           echo "=== VERIFY GENERATED TOML USES NOMAD LINE_DELAYED ==="
           sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" python3 - <<'PY'
