@@ -1,0 +1,158 @@
+name: Verify HABLADO preview final contract once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-hablado-preview-final-contract-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Verify live preview and renderer contract
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          E="$P/editor_v1/index.html"
+          N="$P/renderer/normalize.py"
+          T=/tmp/hablado-contract-smoke
+
+          echo "=== LIVE HEALTH ==="
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+
+          echo "=== PREVIEW CONTRACT ==="
+          sudo env E="$E" python3 - <<'PY'
+          from pathlib import Path
+          import os,re,json
+          t=Path(os.environ["E"]).read_text(encoding="utf-8")
+          checks={
+            "PREVIEW_FILTERS_SPOKEN":'const renderWords=(seg.words||[]).filter(w=>!w.spoken);' in t,
+            "PREVIEW_SUNG_FILTER":'S.words.filter(w=>!w.spoken && w.start_time!==null)' in t,
+            "PREVIEW_MERGES_SPOKEN_INTERVALS":'.filter(w=>w.spoken && w.start_time!==null)' in t,
+            "PREVIEW_LONG_SPOKEN_6S":'const longSpoken=hasSpoken && gap>=(c.spokenMin??6);' in t,
+            "PREVIEW_DOTS_ONLY":"DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" in t,
+            "PREVIEW_NEXT_START_UNCHANGED":'const hideAt=Number(next.start_time)-Number(lead);' in t,
+            "ROLE_DETERMINISTIC":"DJGABO_HABLADO_DETERMINISTIC_V1" in t and 'allTarget?"none":role' not in t,
+          }
+          for k,v in checks.items():
+              print(k+"="+("PASS" if v else "FAIL")); assert v,k
+          # Extrae valores de configuración por defecto/cargados desde style cuando existen.
+          for pat,label in [
+            (r'spokenMin\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_SPOKEN_MIN"),
+            (r'spokenLead\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_SPOKEN_LEAD"),
+            (r'minGap\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_MIN_GAP"),
+            (r'lead\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_LEAD"),
+            (r'span\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_SPAN"),
+            (r'dots\s*:\s*([0-9.]+)',"EDITOR_DEFAULT_DOTS"),
+          ]:
+              m=re.search(pat,t)
+              if m: print(label+"="+m.group(1))
+          PY
+
+          echo "=== STYLE VALUES ==="
+          sudo "$P/.venv/bin/python" - <<'PY'
+          import json
+          s=json.load(open("/opt/djgabo-cdg/renderer/style.json",encoding="utf-8"))
+          for k in ["instrumental_min_gap","instrumental_span_seconds","instrumental_lead_seconds","spoken_instrumental_min_seconds","spoken_instrumental_lead_seconds","spoken_block_join_seconds","instrumental_dots"]:
+              print(f"{k}={s.get(k)}")
+          PY
+
+          echo "=== FINAL RENDERER SYNTHETIC CONTRACT ==="
+          sudo rm -rf "$T"; sudo mkdir -p "$T"; sudo chmod 0777 "$T"
+          sudo env T="$T" P="$P" "$P/.venv/bin/python" - <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          T=Path(os.environ["T"]); P=Path(os.environ["P"])
+          # Caso exacto pedido: HABLADO desde 00:03 hasta 01:04; canto a 01:05.
+          doc={
+            "version":1,
+            "song":{"artist":"TEST","title":"HABLADO CONTRACT","duration":70.0},
+            "segments":[
+              {"id":"s0","kind":"lyric","text":"PRESENTACION HABLADA","words":[
+                {"id":"h1","text":"PRESENTACION","start_time":3.0,"end_time":35.0,"locked":True,"spoken":True,"vocal_role":None},
+                {"id":"h2","text":"HABLADA","start_time":35.0,"end_time":64.0,"locked":True,"spoken":True,"vocal_role":None}
+              ]},
+              {"id":"s1","kind":"lyric","text":"AHORA CANTO","words":[
+                {"id":"c1","text":"AHORA","start_time":65.0,"end_time":65.5,"locked":True,"spoken":False,"vocal_role":None},
+                {"id":"c2","text":"CANTO","start_time":65.5,"end_time":66.2,"locked":True,"spoken":False,"vocal_role":None}
+              ]}
+            ],
+            "calibration_ms":0,
+            "cdg_settings":{"lines_per_page":6,"opening_preview_enabled":False,"opening_cdg_enabled":False,"ending_preview_enabled":False,"ending_cdg_enabled":False}
+          }
+          (T/"case.json").write_text(json.dumps(doc),encoding="utf-8")
+          style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
+          # Fuente estable para smoke.
+          font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          style["font"]=font; style["font_fallback"]=font; style["lines_per_page"]=6
+          sys.path.insert(0,str(P/"renderer"));sys.path.insert(0,str(P/"renderer/vendor"))
+          import normalize as N
+          d=N.load(T/"case.json")
+          N.check_complete(d)
+          before=[(w["id"],w["start_time"],w["end_time"],w.get("spoken")) for s in d["segments"] for w in s["words"]]
+          work_style=dict(style)
+          n=N.normalize(d,work_style)
+          after=[(w["id"],w["start_time"],w["end_time"],w.get("spoken")) for s in d["segments"] for w in s["words"]]
+          print("START_END_UNCHANGED="+("YES" if before==after else "NO"))
+          assert before==after
+
+          # Aplanado visual normalizado: HABLADO no debe estar; canto sí; dots sí.
+          vis=n.visual
+          items=[w for line in vis for w in line]
+          ids=[str(w.get("id")) for w in items]
+          texts=[str(w.get("text")) for w in items]
+          print("NORMALIZED_IDS="+",".join(ids))
+          print("NORMALIZED_TEXTS="+",".join(texts))
+          print("SPOKEN_IN_FINAL_VISUAL="+("YES" if any(x in ids for x in ["h1","h2"]) else "NO"))
+          print("SUNG_IN_FINAL_VISUAL="+("YES" if all(x in ids for x in ["c1","c2"]) else "NO"))
+          dot_items=[w for w in items if w.get("_inst")]
+          print("INSTRUMENTAL_SYNTHETIC_ITEMS="+str(len(dot_items)))
+          print("DOTS_ONLY_VISUAL="+("YES" if dot_items and all(str(w.get("text")) in ("§","_") for w in dot_items) else "NO"))
+
+          # El normalizador conserva spoken_intervals internamente y el siguiente canto permanece en 65.0.
+          print("NEXT_SUNG_START="+str(next(w["start_time"] for s in d["segments"] for w in s["words"] if w["id"]=="c1")))
+          assert not any(x in ids for x in ["h1","h2"])
+          assert all(x in ids for x in ["c1","c2"])
+          assert dot_items
+          assert next(w["start_time"] for s in d["segments"] for w in s["words"] if w["id"]=="c1")==65.0
+
+          # TOML: prueba de entrada real al compositor.
+          toml=N.to_toml(n,work_style,T/"dummy.wav","hablado-contract",P/"renderer")
+          (T/"out.toml").write_text(toml,encoding="utf-8")
+          print("TOML_HAS_SPOKEN_TEXT="+("YES" if "PRESENTACION" in toml or "HABLADA" in toml else "NO"))
+          print("TOML_HAS_SUNG_TEXT="+("YES" if "AHORA" in toml and "CANTO" in toml else "NO"))
+          print("TOML_HAS_DOTS="+("YES" if "§" in toml else "NO"))
+          assert "PRESENTACION" not in toml and "HABLADA" not in toml
+          assert "AHORA" in toml and "CANTO" in toml
+          assert "§" in toml
+          PY
+
+          echo "VERIFY=OK"
+          REMOTE
