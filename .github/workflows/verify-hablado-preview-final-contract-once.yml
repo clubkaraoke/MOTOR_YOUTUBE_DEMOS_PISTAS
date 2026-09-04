@@ -123,28 +123,23 @@ jobs:
           print("START_END_UNCHANGED="+("YES" if before==after else "NO"))
           assert before==after
 
-          # Aplanado visual normalizado: HABLADO no debe estar; canto sí; dots sí.
-          vis=n.visual
-          items=[w for line in vis for w in line]
-          ids=[str(w.get("id")) for w in items]
-          texts=[str(w.get("text")) for w in items]
-          print("NORMALIZED_IDS="+",".join(ids))
-          print("NORMALIZED_TEXTS="+",".join(texts))
-          print("SPOKEN_IN_FINAL_VISUAL="+("YES" if any(x in ids for x in ["h1","h2"]) else "NO"))
-          print("SUNG_IN_FINAL_VISUAL="+("YES" if all(x in ids for x in ["c1","c2"]) else "NO"))
-          dot_items=[w for w in items if w.get("_inst")]
-          print("INSTRUMENTAL_SYNTHETIC_ITEMS="+str(len(dot_items)))
-          print("DOTS_ONLY_VISUAL="+("YES" if dot_items and all(str(w.get("text")) in ("§","_") for w in dot_items) else "NO"))
+          # La salida normalizada es exactamente el texto/sync que recibe cdgmaker.
+          text=n.text
+          print("NORMALIZED_TEXT="+text.replace("\\n"," | "))
+          print("SPOKEN_IN_FINAL_TEXT="+("YES" if "PRESENTACION" in text or "HABLADA" in text else "NO"))
+          print("SUNG_IN_FINAL_TEXT="+("YES" if "AHORA" in text and "CANTO" in text else "NO"))
+          print("DOTS_IN_FINAL_TEXT="+("YES" if "§" in text else "NO"))
 
-          # El normalizador conserva spoken_intervals internamente y el siguiente canto permanece en 65.0.
-          print("NEXT_SUNG_START="+str(next(w["start_time"] for s in d["segments"] for w in s["words"] if w["id"]=="c1")))
-          assert not any(x in ids for x in ["h1","h2"])
-          assert all(x in ids for x in ["c1","c2"])
-          assert dot_items
-          assert next(w["start_time"] for s in d["segments"] for w in s["words"] if w["id"]=="c1")==65.0
+          # El siguiente canto conserva su START original.
+          nxt=next(w["start_time"] for s in d["segments"] for w in s["words"] if w["id"]=="c1")
+          print("NEXT_SUNG_START="+str(nxt))
+          assert "PRESENTACION" not in text and "HABLADA" not in text
+          assert "AHORA" in text and "CANTO" in text
+          assert "§" in text
+          assert nxt==65.0
 
-          # TOML: prueba de entrada real al compositor.
-          toml=N.to_toml(n,work_style,T/"dummy.wav","hablado-contract",P/"renderer")
+          # TOML: entrada real al compositor Nomad/cdgmaker.
+          toml=N.to_toml(n,work_style,T/"silent.wav","hablado-contract",P/"renderer")
           (T/"out.toml").write_text(toml,encoding="utf-8")
           print("TOML_HAS_SPOKEN_TEXT="+("YES" if "PRESENTACION" in toml or "HABLADA" in toml else "NO"))
           print("TOML_HAS_SUNG_TEXT="+("YES" if "AHORA" in toml and "CANTO" in toml else "NO"))
@@ -154,5 +149,23 @@ jobs:
           assert "§" in toml
           PY
 
+          echo "=== FULL CDG RENDER SMOKE ==="
+          sudo env T="$T" "$P/.venv/bin/python" - <<'PY'
+          import os,wave
+          from pathlib import Path
+          T=Path(os.environ["T"])
+          with wave.open(str(T/"silent.wav"),"wb") as wf:
+              wf.setnchannels(1);wf.setsampwidth(2);wf.setframerate(8000)
+              wf.writeframes(b"\\0\\0"*(8000*70))
+          PY
+          sudo mkdir -p "$T/render"; sudo chmod 0777 "$T/render"
+          sudo timeout 240 "$P/.venv/bin/python" "$P/renderer/render.py" "$T/case.json" "$T/silent.wav" -s "$P/renderer/style.json" -o "$T/render" > "$T/render.log" 2>&1
+          CDG="$(find "$T/render" -maxdepth 1 -type f -name '*.cdg' | head -1)"
+          test -n "$CDG"
+          SIZE="$(stat -c %s "$CDG")"
+          test "$SIZE" -gt 0
+          test $((SIZE%24)) -eq 0
+          echo "FULL_CDG_RENDER=PASS"
+          echo "CDG_BYTES=$SIZE"
           echo "VERIFY=OK"
           REMOTE
