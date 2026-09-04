@@ -23,21 +23,17 @@ block=r'''    # DJGABO_CDG_ENGINE_V2_CLONE
 
 '''
 if marker in s:
-    # Actualiza el bloque existente sin tocar ninguna otra location de producción.
-    start=s.index(marker)
-    loc_start=s.rfind("    location = /cdg-v2",0,start)
-    if loc_start < 0:
-        raise SystemExit("Marcador V2 encontrado pero no su location inicial")
-    tail=s.find("\n    }",start)
-    if tail < 0:
-        raise SystemExit("No pude cerrar bloque V2 existente")
-    # block contiene dos locations; encontrar el cierre del segundo.
-    second=s.find("location ^~ /cdg-v2/",loc_start)
+    # Actualiza exactamente el bloque V2 existente; el marcador está antes
+    # de las dos locations, así que usamos su inicio como límite seguro.
+    start=s.index("    # DJGABO_CDG_ENGINE_V2_CLONE")
+    second=s.find("    location ^~ /cdg-v2/",start)
+    if second < 0:
+        raise SystemExit("Bloque V2 existente sin location proxy")
     tail=s.find("\n    }",second)
-    if second < 0 or tail < 0:
+    if tail < 0:
         raise SystemExit("Bloque V2 existente incompleto")
     end=tail+len("\n    }\n")
-    s=s[:loc_start]+block+s[end:]
+    s=s[:start]+block+s[end:]
     p.write_text(s,encoding="utf-8")
     print("NGINX_ROUTE=UPDATED "+str(p))
     raise SystemExit(0)
