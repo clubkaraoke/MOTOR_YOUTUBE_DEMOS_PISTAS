@@ -1,0 +1,37 @@
+name: Inspect five final anchors once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-five-final-anchors-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect exact anchors
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          echo "=== NORMALIZER TOML ==="
+          sudo grep -n -A120 -B10 '^def to_toml' /opt/djgabo-cdg/renderer/normalize.py | head -150
+          echo "=== SERVER SAVE ROUTES ==="
+          sudo sed -n '2960,3035p' /opt/djgabo-cdg/server.py
+          echo "=== EDITOR PANEL SAVE ==="
+          sudo grep -n -A50 -B15 'async function panelSaveProject' /opt/djgabo-cdg/editor_v1/index.html || true
+          REMOTE
