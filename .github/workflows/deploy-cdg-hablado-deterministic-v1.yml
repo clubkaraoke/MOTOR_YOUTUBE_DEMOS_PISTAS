@@ -1,0 +1,168 @@
+name: Deploy CDG HABLADO deterministic v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-hablado-deterministic-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          scp -P "$OVH_PORT" deploy/cdg_hablado_deterministic_v1/patch_editor.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_hablado_deterministic_v1.py"
+
+      - name: Stage on live OVH source
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          STAGE=/tmp/cdg-hablado-deterministic-v1
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE"
+          sudo cp "$P/editor_v1/index.html" "$STAGE/index.html"
+          sudo chmod 0666 "$STAGE/index.html"
+          sudo python3 /tmp/patch_cdg_hablado_deterministic_v1.py "$STAGE/index.html"
+
+          sudo env E="$STAGE/index.html" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["E"]).read_text(encoding="utf-8")
+          checks={
+            "MARKER":"DJGABO_HABLADO_DETERMINISTIC_V1" in t,
+            "NO_ROLE_TOGGLE":'allTarget?"none":role' not in t,
+            "HABLADO_SETS_TRUE":'if(role==="hablado")' in t and 'w.spoken=true; w.vocal_role=null;' in t,
+            "SIN_ROL_CLEARS":'w.spoken=false;' in t and 'role==="hombre"?"male":role==="mujer"?"female":role==="duo"?"duet":null' in t,
+            "EXPORT_PRESERVES_DOC":'JSON.parse(JSON.stringify(S.doc' in t,
+            "PREVIEW_EXCLUDES_SPOKEN":'.filter(w=>!w.spoken' in t,
+            "HABLADO_GAP_6S":'longSpoken=hasSpoken && gap>=(c.spokenMin??6)' in t,
+            "DOTS_ONLY":"DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" in t,
+          }
+          for k,v in checks.items():
+              print(k+"="+("PASS" if v else "FAIL"))
+              assert v,k
+          PY
+          REMOTE
+
+      - name: Copy staged editor for JS syntax validation
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/tmp/cdg-hablado-deterministic-v1/index.html" /tmp/hablado-index.html
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          t=Path('/tmp/hablado-index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',t,re.S|re.I)
+          if not blocks:
+              raise SystemExit('No inline scripts found')
+          out=Path('/tmp/hablado-js');out.mkdir(exist_ok=True)
+          for i,b in enumerate(blocks):
+              (out/f'{i}.js').write_text(b,encoding='utf-8')
+          print('SCRIPT_BLOCKS',len(blocks))
+          PY
+          for f in /tmp/hablado-js/*.js; do node --check "$f"; done
+          echo "JS_SYNTAX=PASS"
+
+      - name: Backup install verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-hablado-deterministic-v1.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          STAGE=/tmp/cdg-hablado-deterministic-v1
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$P/backups/hablado_deterministic_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SCOPE=EDITOR_ONLY_HABLADO"
+          NORMALIZE_BEFORE="$(sudo sha256sum "$P/renderer/normalize.py" | awk '{print $1}')"
+          COMPOSER_BEFORE="$(sudo sha256sum "$P/renderer/vendor/cdgmaker/composer.py" | awk '{print $1}')"
+          SERVER_BEFORE="$(sudo sha256sum "$P/server.py" | awk '{print $1}')"
+          STYLE_BEFORE="$(sudo sha256sum "$P/renderer/style.json" | awk '{print $1}')"
+
+          sudo mkdir -p "$BACKUP/editor_v1"
+          sudo cp -a "$P/editor_v1/index.html" "$BACKUP/editor_v1/index.html"
+          echo "BACKUP=$BACKUP"
+
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/index.html" "$P/editor_v1/index.html"
+
+          NORMALIZE_AFTER="$(sudo sha256sum "$P/renderer/normalize.py" | awk '{print $1}')"
+          COMPOSER_AFTER="$(sudo sha256sum "$P/renderer/vendor/cdgmaker/composer.py" | awk '{print $1}')"
+          SERVER_AFTER="$(sudo sha256sum "$P/server.py" | awk '{print $1}')"
+          STYLE_AFTER="$(sudo sha256sum "$P/renderer/style.json" | awk '{print $1}')"
+
+          test "$NORMALIZE_BEFORE" = "$NORMALIZE_AFTER"
+          test "$COMPOSER_BEFORE" = "$COMPOSER_AFTER"
+          test "$SERVER_BEFORE" = "$SERVER_AFTER"
+          test "$STYLE_BEFORE" = "$STYLE_AFTER"
+
+          sudo grep -q "DJGABO_HABLADO_DETERMINISTIC_V1" "$P/editor_v1/index.html"
+          ! sudo grep -Fq 'allTarget?"none":role' "$P/editor_v1/index.html"
+          sudo grep -q 'w.spoken=true; w.vocal_role=null;' "$P/editor_v1/index.html"
+          sudo grep -q 'longSpoken=hasSpoken && gap>=(c.spokenMin??6)' "$P/editor_v1/index.html"
+          sudo grep -q 'DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1' "$P/editor_v1/index.html"
+
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+
+          echo "HABLADO_DETERMINISTIC=YES"
+          echo "HABLADO_AS_GAP=YES"
+          echo "COUNTDOWN_6S_RULE=YES"
+          echo "DOTS_ONLY=YES"
+          echo "START_END_MUTATION=NO"
+          echo "NORMALIZER_UNCHANGED=YES"
+          echo "NOMAD_COMPOSER_UNCHANGED=YES"
+          echo "SERVER_UNCHANGED=YES"
+          echo "STYLE_UNCHANGED=YES"
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP=200"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save safe diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-hablado-deterministic-v1.txt ]; then
+            grep -E '^(TIMESTAMP|SCOPE|BACKUP|HABLADO_|COUNTDOWN_|DOTS_|START_|NORMALIZER_|NOMAD_|SERVER_|STYLE_|SERVICE_|HTTP=|DEPLOY=)' diagnostics/cdg-hablado-deterministic-v1.txt > diagnostics/cdg-hablado-deterministic-v1.safe.txt || true
+            rm -f diagnostics/cdg-hablado-deterministic-v1.txt
+            git add diagnostics/cdg-hablado-deterministic-v1.safe.txt
+            git commit -m "diag: record HABLADO deterministic deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
