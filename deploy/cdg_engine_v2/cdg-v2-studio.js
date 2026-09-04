@@ -72,7 +72,7 @@ async function refresh(force){
   if(M.busy)return;var jid=job();if(!jid){status("Abre un trabajo guardado del panel.","warn");return}
   if(!editorReady()){status("El proyecto aún se está cargando. Espera un momento y vuelve a Recalcular.","warn");return}
   M.busy=true;status("Construyendo timeline desde el JSON actual…","warn");
-  try{var p=project();var d=await request("/api/v2/jobs/"+encodeURIComponent(jid)+"/timeline",{project:p,options:opts()});M.timeline=d.timeline;M.cdg=null;resetDecoder();status("Timeline V2 lista · START/END de ElevenLabs conservados.","ok");paintPanel();paint()}
+  try{var p=project();var d=await request("/api/v2/jobs/"+encodeURIComponent(jid)+"/timeline",{project:p,options:opts()});M.timeline=d.timeline;M.cdg=null;resetDecoder();status("Timeline V2 lista · filas NOMAD LINE_DELAYED · START/END conservados.","ok");paintPanel();paint()}
   catch(e){status(e.message||String(e),"bad")}finally{M.busy=false}
 }
 async function render(){
@@ -88,17 +88,19 @@ function paint(){
   if(M.mode==="cdg"&&M.cdg){renderCdg(t);return}
   var lay=tl.layout||{},lpp=Number(lay.lines_per_screen||6),fs=Number(lay.font_size||18),lth=Number(lay.line_tile_height||2),row=Number(lay.row||2);
   x.font="900 "+fs+"px Impact, Arial Black, sans-serif";x.textBaseline="middle";x.textAlign="left";x.lineJoin="round";x.lineWidth=Math.max(2,Number(lay.stroke_width||1)*2);
-  tl.lines.forEach(function(line){if(t<line.display_at||t>=line.remove_at)return;var y=(row*12)+((Number(line.slot)-1)*lth*12)+(lth*6),parts=line.words||[],total=0,widths=[];
-    parts.forEach(function(w,i){var z=x.measureText(w.text).width+(i?x.measureText(" ").width:0);widths.push(z);total+=z});var px=(300-total)/2;
+  tl.lines.forEach(function(line){if(t<line.display_at||t>=line.remove_at)return;
+    var ng=line.nomad||{},y=Number.isFinite(Number(ng.y))?(Number(ng.y)+Math.max(1,Number(ng.height||fs))/2):((row*12)+((Number(line.slot)-1)*lth*12)+(lth*6)),parts=line.words||[],total=0,widths=[];
+    parts.forEach(function(w,i){var z=x.measureText(w.text).width+(i?x.measureText(" ").width:0);widths.push(z);total+=z});
+    var px=Number.isFinite(Number(ng.x))?Number(ng.x):((300-total)/2);
     parts.forEach(function(w,i){if(i){var sp=x.measureText(" ").width;px+=sp}var ww=x.measureText(w.text).width;x.strokeStyle="#000";x.fillStyle="#fff";x.strokeText(w.text,px,y);x.fillText(w.text,px,y);
       var q=t<=w.start?0:t>=w.end?1:(t-w.start)/Math.max(.001,w.end-w.start);if(q>0){x.save();x.beginPath();x.rect(px-2,y-fs,ww*q+4,fs*2);x.clip();x.strokeStyle="#000";x.fillStyle=roleColor(w.role);x.strokeText(w.text,px,y);x.fillText(w.text,px,y);x.restore()}px+=ww});
   });
 }
 function paintPanel(){
   var p=el("v2panel"),tl=M.timeline;if(!p)return;if(!tl){p.innerHTML='<div class="v2meta">Sin timeline.</div>';return}
-  if(M.mode==="karaoke"){var t=current(),act=tl.lines.find(function(l){return t>=l.display_at&&t<l.remove_at});p.innerHTML='<div class="v2meta">'+(act?('<b>'+act.text+'</b><br>pantalla '+act.page_index+' · slot '+act.slot+' · aparece '+ftime(act.display_at)+' · voz '+ftime(act.sweep_start)+' → '+ftime(act.sweep_end)):'Esperando línea activa')+'<br>OFFSET OCULTO: 0.000 s · '+tl.source_word_count+' palabras</div>';return}
-  if(M.mode==="pages"){p.innerHTML='<div class="v2scroll">'+tl.lines.map(function(l){return '<div class="v2row"><b>P'+l.page_index+' · L'+l.slot+'</b> '+l.text+'<br>show '+ftime(l.display_at)+' · sweep '+ftime(l.sweep_start)+'–'+ftime(l.sweep_end)+' · remove '+ftime(l.remove_at)+'</div>'}).join("")+'</div>';return}
-  if(M.mode==="diag"){var warn=tl.warnings||[];p.innerHTML='<div class="v2scroll"><div class="v2diag">ENGINE: '+tl.engine+'\nUPSTREAM: '+tl.upstream_commit+'\nSTART/END INMUTABLES: SI\nPREVIEW = CDG TIMELINE: SI\nINTRO_DELAY: 0.000 s\nOFFSETS OCULTOS: NO\nLINEAS: '+tl.rendered_line_count+'\nWARNINGS: '+warn.length+'\n\n'+warn.map(function(w){return '⚠ '+(w.text||w.kind)+' · '+(w.detail||"")}).join("\n")+'</div></div>';return}
+  if(M.mode==="karaoke"){var t=current(),act=tl.lines.find(function(l){return t>=l.display_at&&t<l.remove_at});p.innerHTML='<div class="v2meta">'+(act?('<b>'+act.text+'</b><br>pantalla '+act.page_index+' · slot '+act.slot+' · NOMAD draw '+ftime(act.display_at)+' · erase '+ftime(act.remove_at)+'<br>voz '+ftime(act.sweep_start)+' → '+ftime(act.sweep_end)):'Esperando línea activa')+'<br>FILAS: NOMAD LINE_DELAYED · OFFSET OCULTO: 0.000 s · '+tl.source_word_count+' palabras</div>';return}
+  if(M.mode==="pages"){p.innerHTML='<div class="v2scroll">'+tl.lines.map(function(l){var n=l.nomad||{};return '<div class="v2row"><b>P'+l.page_index+' · L'+l.slot+' · NOMAD</b> '+l.text+'<br>draw '+ftime(l.display_at)+' ['+(n.line_draw_frame??"?")+'f] · sweep '+ftime(l.sweep_start)+'–'+ftime(l.sweep_end)+' · erase '+ftime(l.remove_at)+' ['+(n.line_erase_frame??"?")+'f]</div>'}).join("")+'</div>';return}
+  if(M.mode==="diag"){var warn=tl.warnings||[],rm=tl.render_metadata||{},lay=tl.layout||{};p.innerHTML='<div class="v2scroll"><div class="v2diag">ENGINE: '+tl.engine+'\nUPSTREAM: '+tl.upstream_commit+'\nROW SCHEDULER: '+(rm.cdg_row_scheduler||lay.row_scheduler||"N/A")+'\nCLEAR MODE: '+(lay.clear_mode||"N/A")+'\nSTART/END INMUTABLES: SI\nPREVIEW = CDG TIMELINE: SI\nINTRO_DELAY: 0.000 s\nOFFSETS OCULTOS: NO\nLINEAS: '+tl.rendered_line_count+'\nWARNINGS: '+warn.length+'\n\n'+warn.map(function(w){return '⚠ '+(w.text||w.kind)+' · '+(w.detail||"")}).join("\n")+'</div></div>';return}
   p.innerHTML='<div class="v2meta">CDG real a 300 paquetes/s, usando el mismo reloj del audio.<br><button class="v2btn" id="v2download" type="button">Descargar CDG V2</button></div>';setTimeout(function(){var b=el("v2download");if(b)b.onclick=download},0)
 }
 async function loadCdg(){
