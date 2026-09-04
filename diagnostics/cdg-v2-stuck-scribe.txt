@@ -1,0 +1,47 @@
+set -euo pipefail
+echo "NOW=$(date -Is)"
+echo "=== SERVICES ==="
+sudo systemctl is-active djgabo-cdg-v2 || true
+sudo systemctl is-active djgabo-cdg || true
+sudo ss -ltnp | grep -E ':8787|:8765|:8097' || true
+
+echo "=== LATEST V2 JOBS ==="
+sudo python3 - <<'PY'
+import sqlite3, json
+db="/var/lib/djgabo-cdg-v2/local.db"
+c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+rows=c.execute("SELECT id,artist,title,status,origin,created,updated,voice_filename,instrumental_filename,project_json FROM jobs ORDER BY rowid DESC LIMIT 8").fetchall()
+for r in rows:
+    d=dict(r)
+    pj=d.pop("project_json",None)
+    print(json.dumps(d,ensure_ascii=False))
+    if pj:
+        try:
+            j=json.loads(pj)
+            print("  project_words=",sum(len(s.get("words") or []) for s in (j.get("segments") or []) if isinstance(s,dict)))
+        except Exception as e: print("  project_json_error",e)
+c.close()
+PY
+
+echo "=== AI TASKS TABLES ==="
+sudo python3 - <<'PY'
+import sqlite3, json
+db="/var/lib/djgabo-cdg-v2/local.db"
+c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+tabs=[r[0] for r in c.execute("select name from sqlite_master where type='table' order by name")]
+print("tables",tabs)
+for t in tabs:
+    if "task" in t.lower() or "ai" in t.lower():
+        print("TABLE",t)
+        try:
+            rows=c.execute(f'SELECT * FROM "{t}" ORDER BY rowid DESC LIMIT 10').fetchall()
+            for r in rows: print(json.dumps(dict(r),ensure_ascii=False,default=str)[:6000])
+        except Exception as e: print("ERR",e)
+c.close()
+PY
+
+echo "=== V2 JOURNAL LAST 250 ==="
+sudo journalctl -u djgabo-cdg-v2 -n 250 --no-pager || true
+
+echo "=== SCRIBE RELATED PROCESSES ==="
+ps auxww | grep -E 'scribe|8097|eleven|python' | grep -v grep | tail -80 || true
