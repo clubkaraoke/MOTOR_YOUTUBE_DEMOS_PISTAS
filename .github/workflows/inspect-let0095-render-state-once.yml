@@ -1,0 +1,58 @@
+name: Inspect LET0095 render state once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0095-render-state-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect LET0095
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          sudo "$P/.venv/bin/python" - <<'PY'
+          import sqlite3,time,json,os
+          from pathlib import Path
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db");db.row_factory=sqlite3.Row
+          r=db.execute("select * from jobs where id='LET-0095'").fetchone()
+          print("FOUND="+str(bool(r)))
+          if r:
+              d=dict(r)
+              for k in ["id","artist","title","updated","status","render_status","render_progress","render_error","cdg_local_filename","cdg_dropbox_path","cdg_dropbox_id","dropbox_status","version"]:
+                  print(k.upper()+"="+str(d.get(k) or ""))
+              for root in [Path("/var/lib/djgabo-cdg/output/LET-0095"),Path("/opt/djgabo-cdg/output/LET-0095"),Path("/var/lib/djgabo-cdg/jobs/LET-0095")]:
+                  print("ROOT="+str(root)+" EXISTS="+str(root.exists()))
+                  if root.exists():
+                      for f in sorted(root.glob("**/*")):
+                          if f.is_file() and f.suffix.lower() in [".cdg",".json",".toml",".log"]:
+                              st=f.stat()
+                              print("FILE="+str(f))
+                              print("MTIME="+time.strftime("%Y-%m-%dT%H:%M:%S",time.localtime(st.st_mtime)))
+                              print("SIZE="+str(st.st_size))
+              logs=db.execute("select action,state,at from logs where job_id='LET-0095' order by id desc limit 20").fetchall()
+              for i,l in enumerate(logs):
+                  print(f"LOG{i}_ACTION={l['action']}")
+                  print(f"LOG{i}_STATE={str(l['state'])[:500]}")
+                  print(f"LOG{i}_AT={l['at']}")
+          PY
+          REMOTE
