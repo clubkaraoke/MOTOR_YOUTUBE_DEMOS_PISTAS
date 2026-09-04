@@ -41,6 +41,16 @@ def patch_server(path: Path) -> None:
     if old not in text:
         raise RuntimeError("server.py: no encuentro editor-data URLs")
     text = text.replace(old, new, 1)
+    # Puerto propio del clon; producción conserva 8765.
+    old_run = "app.run(host='127.0.0.1',port=8765,debug=False,threaded=True)"
+    if old_run not in text:
+        raise RuntimeError("server.py: no encuentro app.run de producción")
+    text = text.replace(
+        old_run,
+        "app.run(host='127.0.0.1',port=int(os.getenv('DJGABO_BIND_PORT') or 8787),debug=False,threaded=True)",
+        1,
+    )
+
     old_status = "status_url='/api/render/status/'+task_id"
     if old_status not in text:
         raise RuntimeError("server.py: no encuentro render status_url")
