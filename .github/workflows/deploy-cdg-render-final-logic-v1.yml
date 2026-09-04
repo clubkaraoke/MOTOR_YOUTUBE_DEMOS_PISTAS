@@ -73,9 +73,9 @@ jobs:
 
       - name: Configure SSH
         env:
-          OVH_HOST: \${{ secrets.OVH_HOST }}
-          OVH_PORT: \${{ secrets.OVH_PORT }}
-          OVH_SSH_KEY: \${{ secrets.OVH_SSH_KEY }}
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
         run: |
           set -euo pipefail
           install -m 700 -d "$HOME/.ssh"
@@ -85,9 +85,9 @@ jobs:
 
       - name: Patch production safely
         env:
-          OVH_HOST: \${{ secrets.OVH_HOST }}
-          OVH_PORT: \${{ secrets.OVH_PORT }}
-          OVH_USER: \${{ secrets.OVH_USER }}
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
         run: |
           set -euo pipefail
           mkdir -p diagnostics
@@ -161,7 +161,7 @@ jobs:
               -printf '%T@ %p\n' 2>/dev/null \
               | sort -nr | head -1 | cut -d' ' -f2-
           )"
-          echo "LATEST_PROJECT=\${LATEST_PROJECT:-NONE}"
+          echo "LATEST_PROJECT=${LATEST_PROJECT:-NONE}"
 
           echo "DEPLOY=OK"
           REMOTE
