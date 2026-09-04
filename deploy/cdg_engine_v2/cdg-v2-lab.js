@@ -33,15 +33,23 @@ function progress(pct,stage,detail){
   const box=byId("uploadProgress"),st=byId("iaProgressStage"),pe=byId("iaProgressPct"),fi=byId("iaProgressFill"),de=byId("iaProgressDetail");
   if(box)box.style.display="block";if(st)st.textContent=stage||"";if(pe)pe.textContent=Math.round(pct||0)+"%";if(fi)fi.style.width=Math.max(0,Math.min(100,pct||0))+"%";if(de)de.textContent=detail||"";
 }
+function ensureLabCss(){
+  if(document.getElementById("v2LabEssentialCss"))return;
+  const st=document.createElement("style");st.id="v2LabEssentialCss";
+  st.textContent="#dropboxNuevaStatus{color:#63d6a3!important}.dropbox-dest-card{border-color:rgba(99,214,163,.45)!important}.v2-lab-hidden{display:none!important}";
+  document.head.appendChild(st);
+}
 function applyLabUI(){
+  ensureLabCss();
   const modal=byId("modalNueva"); if(!modal)return;
   const name=byId("dropboxDestName"),path=byId("dropboxDestPath"),stat=byId("dropboxNuevaStatus"),pick=byId("btnElegirDropbox");
   if(name&&name.textContent!=="OVH · LAB CDG V2")name.textContent="OVH · LAB CDG V2";
   if(path&&path.textContent!=="/var/lib/djgabo-cdg-v2/jobs/")path.textContent="/var/lib/djgabo-cdg-v2/jobs/";
   if(stat){
     const txt="✓ SOLO LAB · Dropbox / Drive / Sheet desactivados";
-    if(stat.textContent!==txt)stat.textContent=txt;
+    stat.textContent=txt;
     stat.style.color="#63d6a3";
+    stat.style.display="block";
   }
   if(pick)pick.style.display="none";
   const label=[...modal.querySelectorAll("label")].find(x=>/Destino Dropbox actual/i.test(x.textContent||""));
@@ -65,23 +73,72 @@ async function ensureQrReader(){
     s.onerror=()=>resolve(false);document.head.appendChild(s);
   });
 }
-async function xhrCreate(fd){
-  return await new Promise((resolve,reject)=>{
-    const xhr=new XMLHttpRequest();
-    xhr.open("POST",PREFIX+"/api/v2/jobs/create-local",true);
-    xhr.upload.onprogress=(e)=>{
-      if(!e.lengthComputable)return;
-      const frac=e.loaded/Math.max(1,e.total);
-      progress(4+frac*44,"Subiendo VOZ + INSTRUMENTAL al LAB…",(e.loaded/1048576).toFixed(1)+" / "+(e.total/1048576).toFixed(1)+" MB");
-      const btn=byId("btnEnviarNueva");if(btn)btn.textContent="OVH "+Math.round(frac*100)+"%";
-    };
-    xhr.upload.onload=()=>progress(49,"Archivos recibidos en OVH","Creando trabajo aislado…");
-    xhr.onload=()=>{let d={};try{d=JSON.parse(xhr.responseText||"{}")}catch(_){}
-      if(xhr.status>=200&&xhr.status<300&&d.ok!==false)resolve(d);else reject(new Error(d.error||("Error "+xhr.status)));
-    };
-    xhr.onerror=()=>reject(new Error("Se cortó la subida al LAB. Nada fue enviado a producción."));
-    xhr.send(fd);
+async function apiJson(path,method,body,headers){
+  const r=await fetch(PREFIX+path,{
+    method:method||"GET",
+    headers:Object.assign({"Content-Type":"application/json"},headers||{}),
+    body:body===undefined?undefined:JSON.stringify(body),
+    cache:"no-store"
   });
+  let d={};try{d=await r.json()}catch(_){}
+  if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));
+  return d;
+}
+async function uploadBlobChunks(uploadId,kind,file,chunkSize,state){
+  let offset=0;
+  while(offset<file.size){
+    const end=Math.min(file.size,offset+chunkSize);
+    const blob=file.slice(offset,end);
+    const r=await fetch(PREFIX+"/api/v2/uploads/"+encodeURIComponent(uploadId)+"/"+kind,{
+      method:"PUT",
+      headers:{
+        "Content-Type":"application/octet-stream",
+        "X-Session-Token":getToken(),
+        "X-Upload-Offset":String(offset)
+      },
+      body:blob,
+      cache:"no-store"
+    });
+    let d={};try{d=await r.json()}catch(_){}
+    if(!r.ok||d.ok===false){
+      if(r.status===409&&Number.isFinite(Number(d.expected_offset))){
+        offset=Number(d.expected_offset);continue;
+      }
+      throw new Error(d.error||("Error subiendo "+kind+" ("+r.status+")"));
+    }
+    offset=Number(d.received||end);
+    state.sent += blob.size;
+    const frac=state.sent/Math.max(1,state.total);
+    const btn=byId("btnEnviarNueva");
+    if(btn)btn.textContent="OVH "+Math.round(frac*100)+"%";
+    progress(
+      4+frac*44,
+      "Subiendo al OVH del LAB…",
+      (state.sent/1048576).toFixed(1)+" / "+(state.total/1048576).toFixed(1)+" MB · bloques de "+Math.round(chunkSize/1048576)+" MB"
+    );
+  }
+}
+async function createChunkedLab(artist,title,lyrics,voice,inst,voiceDuration){
+  const init=await apiJson("/api/v2/uploads/init","POST",{
+    token:getToken(),artist:artist,title:title,lyrics:lyrics,
+    voice_name:voice.name,voice_size:voice.size,
+    instrumental_name:inst.name,instrumental_size:inst.size,
+    voice_duration:Number(voiceDuration||0)
+  });
+  const state={sent:0,total:voice.size+inst.size};
+  try{
+    await uploadBlobChunks(init.upload_id,"voice",voice,Number(init.chunk_size||8388608),state);
+    await uploadBlobChunks(init.upload_id,"instrumental",inst,Number(init.chunk_size||8388608),state);
+    progress(49,"✓ Archivos recibidos en OVH","Creando trabajo aislado…");
+    return await apiJson("/api/v2/uploads/"+encodeURIComponent(init.upload_id)+"/finalize","POST",{token:getToken()});
+  }catch(e){
+    try{
+      await fetch(PREFIX+"/api/v2/uploads/"+encodeURIComponent(init.upload_id),{
+        method:"DELETE",headers:{"X-Session-Token":getToken()},cache:"no-store"
+      });
+    }catch(_){}
+    throw e;
+  }
 }
 async function pollTask(taskId){
   try{
@@ -116,11 +173,7 @@ async function submitLab(e){
   let jid="";
   try{
     progress(2,"Preparando archivos…","Destino: OVH del clon · Dropbox/Drive/Sheet OFF");
-    const fd=new FormData();
-    fd.append("session_token",getToken());fd.append("artist",artist);fd.append("title",title);
-    fd.append("voice",voice,voice.name);fd.append("instrumental",inst,inst.name);
-    fd.append("lyrics",lyrics);fd.append("voice_duration",String(getVoiceDuration()||0));
-    const created=await xhrCreate(fd);jid=created.idTrabajo;
+    const created=await createChunkedLab(artist,title,lyrics,voice,inst,getVoiceDuration()||0);jid=created.idTrabajo;
     progress(52,"✓ Trabajo LAB guardado","Iniciando ElevenLabs Scribe v2…");
     const sr=await fetch(PREFIX+"/api/jobs/"+encodeURIComponent(jid)+"/ai-sync/start",{
       method:"POST",headers:{"Content-Type":"application/json"},
