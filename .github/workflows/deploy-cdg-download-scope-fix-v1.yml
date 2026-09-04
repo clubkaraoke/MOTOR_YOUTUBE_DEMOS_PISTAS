@@ -1,0 +1,119 @@
+name: Deploy CDG download scope fix v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-download-scope-fix-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          scp -P "$OVH_PORT" deploy/cdg_download_scope_fix_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_download_scope_fix_v1.py"
+
+      - name: Stage backup install verify
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-download-scope-fix-v1.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          STAGE=/tmp/cdg-download-scope-fix-v1
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$P/backups/download_scope_fix_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "CAUSE=DROPBOX_TOKEN_MISSING_files.content.read"
+
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/vendor"
+          sudo cp "$P/server.py" "$STAGE/server.py"
+          sudo cp "$P/cdg_preview_routes.py" "$STAGE/cdg_preview_routes.py"
+          sudo cp "$P/vendor/cdg-final-preview.js" "$STAGE/vendor/cdg-final-preview.js"
+          sudo chmod -R 0666 "$STAGE/server.py" "$STAGE/cdg_preview_routes.py" "$STAGE/vendor/cdg-final-preview.js"
+
+          sudo python3 /tmp/patch_cdg_download_scope_fix_v1.py "$STAGE/server.py" "$STAGE/cdg_preview_routes.py" "$STAGE/vendor/cdg-final-preview.js"
+          sudo python3 -m py_compile "$STAGE/server.py" "$STAGE/cdg_preview_routes.py"
+
+          sudo env STAGE="$STAGE" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          root=Path(os.environ["STAGE"])
+          s=(root/"server.py").read_text(encoding="utf-8")
+          r=(root/"cdg_preview_routes.py").read_text(encoding="utf-8")
+          j=(root/"vendor/cdg-final-preview.js").read_text(encoding="utf-8")
+          checks={
+            "OAUTH_INCREMENTAL_SCOPE":"'scope':'files.content.read'" in s and "'include_granted_scopes':'user'" in s,
+            "SAVE_GRANTED_SCOPES":"granted_scopes" in s,
+            "ROUTE_SCOPE_GUARD":"DJGABO_DOWNLOAD_SCOPE_GUARD_V1" in r,
+            "WAV_409":'DROPBOX_CONTENT_READ_REQUIRED' in r and 'download/wav' in r,
+            "ZIP_409":'download/zip' in r and 'except PermissionError as e' in r,
+            "UI_SCOPE_STATE":"DJGABO_DOWNLOAD_SCOPE_UI_V1" in j and "wav_downloadable" in j,
+          }
+          for k,v in checks.items():
+              print(k+"="+("PASS" if v else "FAIL"));assert v,k
+          PY
+
+          sudo mkdir -p "$BACKUP/vendor"
+          sudo cp -a "$P/server.py" "$BACKUP/server.py"
+          sudo cp -a "$P/cdg_preview_routes.py" "$BACKUP/cdg_preview_routes.py"
+          sudo cp -a "$P/vendor/cdg-final-preview.js" "$BACKUP/vendor/cdg-final-preview.js"
+          echo "BACKUP=$BACKUP"
+
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/server.py" "$P/server.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/cdg_preview_routes.py" "$P/cdg_preview_routes.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/vendor/cdg-final-preview.js" "$P/vendor/cdg-final-preview.js"
+
+          sudo systemctl restart djgabo-cdg
+          sleep 2
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+          sudo grep -q "DJGABO_DROPBOX_CONTENT_READ_SCOPE_V1" "$P/server.py"
+          sudo grep -q "DJGABO_DOWNLOAD_SCOPE_GUARD_V1" "$P/cdg_preview_routes.py"
+          sudo grep -q "DJGABO_DOWNLOAD_SCOPE_UI_V1" "$P/vendor/cdg-final-preview.js"
+
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP=200"
+          echo "ZIP_WAV_500_GUARD=YES"
+          echo "DROPBOX_RECONNECT_REQUESTS_CONTENT_READ=YES"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save safe diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-download-scope-fix-v1.txt ]; then
+            grep -E '^(TIMESTAMP|CAUSE|OAUTH_|SAVE_|ROUTE_|WAV_|ZIP_|UI_|BACKUP|SERVICE_|HTTP=|DROPBOX_|DEPLOY)' diagnostics/cdg-download-scope-fix-v1.txt > diagnostics/cdg-download-scope-fix-v1.safe.txt || true
+            rm -f diagnostics/cdg-download-scope-fix-v1.txt
+            git add diagnostics/cdg-download-scope-fix-v1.safe.txt
+            git commit -m "diag: record CDG download scope fix" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
