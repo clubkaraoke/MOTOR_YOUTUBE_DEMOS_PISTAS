@@ -1,47 +1,213 @@
-set -euo pipefail
-echo "NOW=$(date -Is)"
-echo "=== SERVICES ==="
-sudo systemctl is-active djgabo-cdg-v2 || true
-sudo systemctl is-active djgabo-cdg || true
-sudo ss -ltnp | grep -E ':8787|:8765|:8097' || true
-
-echo "=== LATEST V2 JOBS ==="
-sudo python3 - <<'PY'
-import sqlite3, json
-db="/var/lib/djgabo-cdg-v2/local.db"
-c=sqlite3.connect(db); c.row_factory=sqlite3.Row
-rows=c.execute("SELECT id,artist,title,status,origin,created,updated,voice_filename,instrumental_filename,project_json FROM jobs ORDER BY rowid DESC LIMIT 8").fetchall()
-for r in rows:
-    d=dict(r)
-    pj=d.pop("project_json",None)
-    print(json.dumps(d,ensure_ascii=False))
-    if pj:
-        try:
-            j=json.loads(pj)
-            print("  project_words=",sum(len(s.get("words") or []) for s in (j.get("segments") or []) if isinstance(s,dict)))
-        except Exception as e: print("  project_json_error",e)
-c.close()
-PY
-
-echo "=== AI TASKS TABLES ==="
-sudo python3 - <<'PY'
-import sqlite3, json
-db="/var/lib/djgabo-cdg-v2/local.db"
-c=sqlite3.connect(db); c.row_factory=sqlite3.Row
-tabs=[r[0] for r in c.execute("select name from sqlite_master where type='table' order by name")]
-print("tables",tabs)
-for t in tabs:
-    if "task" in t.lower() or "ai" in t.lower():
-        print("TABLE",t)
-        try:
-            rows=c.execute(f'SELECT * FROM "{t}" ORDER BY rowid DESC LIMIT 10').fetchall()
-            for r in rows: print(json.dumps(dict(r),ensure_ascii=False,default=str)[:6000])
-        except Exception as e: print("ERR",e)
-c.close()
-PY
-
-echo "=== V2 JOURNAL LAST 250 ==="
-sudo journalctl -u djgabo-cdg-v2 -n 250 --no-pager || true
-
-echo "=== SCRIBE RELATED PROCESSES ==="
-ps auxww | grep -E 'scribe|8097|eleven|python' | grep -v grep | tail -80 || true
+NOW=2026-09-04T07:27:15+00:00
+=== SERVICES ===
+active
+active
+LISTEN 0      4096       127.0.0.1:8097      0.0.0.0:*    users:(("docker-proxy",pid=4006928,fd=8))                                                                                                                                                     
+LISTEN 0      128        127.0.0.1:8787      0.0.0.0:*    users:(("python",pid=852531,fd=3))                                                                                                                                                            
+LISTEN 0      2048       127.0.0.1:8765      0.0.0.0:*    users:(("gunicorn",pid=592838,fd=3),("gunicorn",pid=592836,fd=3))                                                                                                                             
+=== LATEST V2 JOBS ===
+{"id": "LET-0088", "artist": "Hermanos Silva", "title": "El Perfume", "status": "EN CORRECCIÓN", "origin": "LOCAL", "created": "04/09/2026 02:46", "updated": "04/09/2026 05:47", "voice_filename": "Hermanos Silva - El Perfume (Voz).mp3", "instrumental_filename": "Hermanos Silva - El Perfume KARAOKE.wav"}
+  project_words= 216
+{"id": "LET-0087", "artist": "Arcoiris del Peru", "title": "Mix mi diccionario (En vivo)", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "04/09/2026 02:19", "updated": "04/09/2026 02:46", "voice_filename": "Arcoiris del Peru - Mix mi diccionario (En vivo) (Voz).mp3", "instrumental_filename": "Arcoiris del Peru - Mix mi diccionario (En vivo) KARAOKE.wav"}
+  project_words= 1567
+{"id": "LET-0086", "artist": "Julia Illanes", "title": "Callate KARAOKE", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "04/09/2026 02:06", "updated": "04/09/2026 02:46", "voice_filename": "Julia Illanes - Callate KARAOKE (Voz).mp3", "instrumental_filename": "Julia Illanes - Callate KARAOKE.wav"}
+  project_words= 187
+{"id": "LET-0085", "artist": "Los Rebeldes de la cumbia", "title": "Mix Si me ibas a dejas, Yo lo queria, Solamente un amor", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "04/09/2026 00:29", "updated": "04/09/2026 02:46", "voice_filename": "Los Rebeldes de la cumbia - Mix Si me ibas a dejas, Yo lo queria, Solamente un amor (Voz).mp3", "instrumental_filename": "Los Rebeldes de la cumbia - Mix Si me ibas a dejas, Yo lo queria, Solamente un amor KARAOKE (En vivo) 2026.wav"}
+  project_words= 516
+{"id": "LET-0084", "artist": "Las Estrellas de la Cumbia", "title": "Mix Lloraras", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "03/09/2026 17:23", "updated": "04/09/2026 02:46", "voice_filename": "Las Estrellas de la Cumbia - Mix Lloraras (Voz).mp3", "instrumental_filename": "Las Estrellas de la Cumbia - Mix Lloraras KARAOKE (Coro).wav"}
+  project_words= 427
+{"id": "LET-0083", "artist": "Los Claveles de la Cumbia", "title": "Es amor KARAOKE", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "03/09/2026 12:11", "updated": "04/09/2026 02:46", "voice_filename": "Los Claveles de la Cumbia - Es amor KARAOKE (Voz).mp3", "instrumental_filename": "Los Claveles de la Cumbia - Es amor KARAOKE.wav"}
+  project_words= 218
+{"id": "LET-0082", "artist": "Grupo Amor Serrano", "title": "Asi es la vida", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "03/09/2026 11:58", "updated": "04/09/2026 02:46", "voice_filename": "Grupo Amor Serrano - Asi es la vida (Voz).mp3", "instrumental_filename": "Grupo Amor Serrano - Asi es la vida KARAOKE.wav"}
+  project_words= 271
+{"id": "LET-0081", "artist": "Marisol", "title": "No me mientas KARAOKE", "status": "KARAOKE TERMINADO", "origin": "LOCAL", "created": "03/09/2026 11:51", "updated": "04/09/2026 02:46", "voice_filename": "Marisol - No me mientas KARAOKE (Voz).mp3", "instrumental_filename": "Marisol - No me mientas KARAOKE.wav"}
+  project_words= 306
+=== AI TASKS TABLES ===
+tables ['jobs', 'logs', 'sqlite_sequence']
+=== V2 JOURNAL LAST 250 ===
+Sep 04 06:43:23 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]:  * Serving Flask app 'server'
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]:  * Debug mode: off
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]:  * Running on http://127.0.0.1:8787
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: Press CTRL+C to quit
+Sep 04 06:43:24 vps-3a3efbf9 python[819835]: 127.0.0.1 - - [04/Sep/2026 06:43:24] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:43:31 vps-3a3efbf9 python[819835]: 127.0.0.1 - - [04/Sep/2026 06:43:31] "GET / HTTP/1.1" 200 -
+Sep 04 06:45:41 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:45:41 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:45:41 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:45:41 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]:  * Serving Flask app 'server'
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]:  * Debug mode: off
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]:  * Running on http://127.0.0.1:8787
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: Press CTRL+C to quit
+Sep 04 06:45:42 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:45:42] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:45:48 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:45:48] "GET / HTTP/1.1" 200 -
+Sep 04 06:49:08 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:49:08] "GET / HTTP/1.0" 200 -
+Sep 04 06:49:08 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:49:08] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 06:49:08 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:49:08] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 06:49:11 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:49:11] "POST /api/call/iniciarSesionConsola HTTP/1.0" 200 -
+Sep 04 06:52:33 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:52:33] "GET / HTTP/1.0" 200 -
+Sep 04 06:52:34 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:52:34] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 06:52:34 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:52:34] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 06:52:36 vps-3a3efbf9 python[821758]: 127.0.0.1 - - [04/Sep/2026 06:52:36] "POST /api/call/iniciarSesionConsola HTTP/1.0" 200 -
+Sep 04 06:55:52 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:55:52 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:55:52 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:52 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]:  * Serving Flask app 'server'
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]:  * Debug mode: off
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]:  * Running on http://127.0.0.1:8787
+Sep 04 06:55:52 vps-3a3efbf9 python[829404]: Press CTRL+C to quit
+Sep 04 06:55:53 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:55:53 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:55:53 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:53 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]:  * Serving Flask app 'server'
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]:  * Debug mode: off
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]:  * Running on http://127.0.0.1:8787
+Sep 04 06:55:53 vps-3a3efbf9 python[829548]: Press CTRL+C to quit
+Sep 04 06:55:54 vps-3a3efbf9 python[829548]: 127.0.0.1 - - [04/Sep/2026 06:55:54] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:55:54 vps-3a3efbf9 python[829548]: 127.0.0.1 - - [04/Sep/2026 06:55:54] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:55:54 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:55:54 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:55:54 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:54 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]:  * Serving Flask app 'server'
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]:  * Debug mode: off
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]:  * Running on http://127.0.0.1:8787
+Sep 04 06:55:54 vps-3a3efbf9 python[829697]: Press CTRL+C to quit
+Sep 04 06:55:55 vps-3a3efbf9 python[829697]: 127.0.0.1 - - [04/Sep/2026 06:55:55] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:56:01 vps-3a3efbf9 python[829697]: 127.0.0.1 - - [04/Sep/2026 06:56:01] "GET / HTTP/1.1" 200 -
+Sep 04 06:56:02 vps-3a3efbf9 python[829697]: 127.0.0.1 - - [04/Sep/2026 06:56:02] "GET / HTTP/1.1" 200 -
+Sep 04 06:56:03 vps-3a3efbf9 python[829697]: 127.0.0.1 - - [04/Sep/2026 06:56:03] "GET / HTTP/1.1" 200 -
+Sep 04 06:57:17 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:57:17 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:57:17 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:57:17 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]:  * Serving Flask app 'server'
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]:  * Debug mode: off
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]:  * Running on http://127.0.0.1:8787
+Sep 04 06:57:17 vps-3a3efbf9 python[832050]: Press CTRL+C to quit
+Sep 04 06:57:18 vps-3a3efbf9 python[832050]: 127.0.0.1 - - [04/Sep/2026 06:57:18] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:57:24 vps-3a3efbf9 python[832050]: 127.0.0.1 - - [04/Sep/2026 06:57:24] "GET / HTTP/1.1" 200 -
+Sep 04 06:57:55 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:57:55 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:57:55 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:57:55 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]:  * Serving Flask app 'server'
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]:  * Debug mode: off
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]:  * Running on http://127.0.0.1:8787
+Sep 04 06:57:55 vps-3a3efbf9 python[832935]: Press CTRL+C to quit
+Sep 04 06:57:56 vps-3a3efbf9 python[832935]: 127.0.0.1 - - [04/Sep/2026 06:57:56] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:58:03 vps-3a3efbf9 python[832935]: 127.0.0.1 - - [04/Sep/2026 06:58:03] "GET / HTTP/1.1" 200 -
+Sep 04 06:58:13 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 06:58:13 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 06:58:13 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:58:13 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]:  * Serving Flask app 'server'
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]:  * Debug mode: off
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]:  * Running on http://127.0.0.1:8787
+Sep 04 06:58:13 vps-3a3efbf9 python[833655]: Press CTRL+C to quit
+Sep 04 06:58:14 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:58:14] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 06:58:20 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:58:20] "GET / HTTP/1.1" 200 -
+Sep 04 06:59:52 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:52] "GET / HTTP/1.0" 200 -
+Sep 04 06:59:52 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:52] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 06:59:52 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:52] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 06:59:52 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:52] "GET /api/vendor/cdg-v2-lab.js HTTP/1.0" 200 -
+Sep 04 06:59:52 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:52] "GET /api/vendor/jsQR.js HTTP/1.0" 200 -
+Sep 04 06:59:58 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 06:59:58] "GET / HTTP/1.0" 304 -
+Sep 04 07:00:07 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:07] "GET / HTTP/1.0" 304 -
+Sep 04 07:00:33 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:33] "GET / HTTP/1.0" 304 -
+Sep 04 07:00:33 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:33] "GET /api/vendor/cdg-v2-lab.js HTTP/1.0" 304 -
+Sep 04 07:00:33 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:33] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 07:00:33 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:33] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 07:00:33 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:00:33] "GET /api/vendor/jsQR.js HTTP/1.0" 304 -
+Sep 04 07:01:08 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:08] "GET / HTTP/1.0" 304 -
+Sep 04 07:01:40 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:40] "GET / HTTP/1.0" 304 -
+Sep 04 07:01:40 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:40] "GET /api/vendor/cdg-v2-lab.js HTTP/1.0" 304 -
+Sep 04 07:01:40 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:40] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 07:01:40 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:40] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 07:01:40 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:40] "GET /api/vendor/jsQR.js HTTP/1.0" 304 -
+Sep 04 07:01:54 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:01:54] "GET / HTTP/1.0" 304 -
+Sep 04 07:03:04 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:03:04] "GET / HTTP/1.0" 304 -
+Sep 04 07:03:38 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:03:38] "GET / HTTP/1.0" 304 -
+Sep 04 07:09:55 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:09:55] "GET / HTTP/1.0" 304 -
+Sep 04 07:10:14 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:10:14] "GET / HTTP/1.0" 304 -
+Sep 04 07:13:25 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:13:25] "GET / HTTP/1.0" 304 -
+Sep 04 07:14:05 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:05] "GET / HTTP/1.0" 304 -
+Sep 04 07:14:20 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:20] "GET / HTTP/1.0" 200 -
+Sep 04 07:14:21 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:21] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 07:14:21 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:21] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 07:14:21 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:21] "GET /api/vendor/cdg-v2-lab.js HTTP/1.0" 304 -
+Sep 04 07:14:21 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:21] "GET /api/vendor/jsQR.js HTTP/1.0" 304 -
+Sep 04 07:14:37 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:14:37] "GET / HTTP/1.0" 304 -
+Sep 04 07:17:49 vps-3a3efbf9 python[833655]: 127.0.0.1 - - [04/Sep/2026 07:17:49] "GET / HTTP/1.0" 304 -
+Sep 04 07:18:54 vps-3a3efbf9 systemd[1]: Stopping djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated...
+Sep 04 07:18:54 vps-3a3efbf9 systemd[1]: djgabo-cdg-v2.service: Deactivated successfully.
+Sep 04 07:18:54 vps-3a3efbf9 systemd[1]: Stopped djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 07:18:54 vps-3a3efbf9 systemd[1]: Started djgabo-cdg-v2.service - DJGABO CDG Engine V2 clone - isolated.
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]: [LOCAL 16.2 ONLINE] Históricos pendientes indexados: 0 · audios permanecen en Google Drive
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]: CONTROL CDG DJGABO LOCAL 16.14 ONLINE: http://127.0.0.1:8765
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]: LOCAL 16.14: carga única en backend + waveform cache + HTTP Range en memoria.
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]:  * Serving Flask app 'server'
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]:  * Debug mode: off
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]:  * Running on http://127.0.0.1:8787
+Sep 04 07:18:54 vps-3a3efbf9 python[852531]: Press CTRL+C to quit
+Sep 04 07:18:55 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:18:55] "GET /api/v2/healthz HTTP/1.1" 200 -
+Sep 04 07:19:01 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:19:01] "GET / HTTP/1.1" 200 -
+Sep 04 07:20:03 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:03] "GET / HTTP/1.0" 200 -
+Sep 04 07:20:03 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:03] "GET /api/public-config HTTP/1.0" 200 -
+Sep 04 07:20:03 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:03] "POST /api/call/validarSesionConsola HTTP/1.0" 200 -
+Sep 04 07:20:03 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:03] "GET /api/vendor/cdg-v2-lab.js HTTP/1.0" 200 -
+Sep 04 07:20:03 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:03] "GET /api/vendor/jsQR.js HTTP/1.0" 200 -
+Sep 04 07:20:06 vps-3a3efbf9 python[852531]: 127.0.0.1 - - [04/Sep/2026 07:20:06] "POST /api/call/iniciarSesionConsola HTTP/1.0" 200 -
+=== SCRIBE RELATED PROCESSES ===
+root         818  0.0  0.1 110052 12852 ?        Ssl  Aug30   0:00 /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+djgabo-+  397683  0.0  0.2 110712 26592 ?        Ss   Sep03   0:08 /opt/djgabo-cdg-render-lab/.venv/bin/python3 /opt/djgabo-cdg-render-lab/.venv/bin/gunicorn --config /opt/djgabo-cdg-render-lab/app/gunicorn.conf.py app:app
+djgabo-+  397688  0.0  0.3 211700 45568 ?        Sl   Sep03   0:10 /opt/djgabo-cdg-render-lab/.venv/bin/python3 /opt/djgabo-cdg-render-lab/.venv/bin/gunicorn --config /opt/djgabo-cdg-render-lab/app/gunicorn.conf.py app:app
+djgabo-+  592836  0.0  0.2 110808 26508 ?        Ssl  00:48   0:04 /opt/djgabo-cdg/.venv/bin/python3 /opt/djgabo-cdg/.venv/bin/gunicorn --config /opt/djgabo-cdg/deploy/gunicorn.conf.py server:app
+djgabo-+  592838  0.3  2.8 629744 344468 ?       Sl   00:48   1:13 /opt/djgabo-cdg/.venv/bin/python3 /opt/djgabo-cdg/.venv/bin/gunicorn --config /opt/djgabo-cdg/deploy/gunicorn.conf.py server:app
+djgabo-+  852531  0.1  0.4 223284 57128 ?        Ss   07:18   0:00 /opt/djgabo-cdg-v2/.venv/bin/python /opt/djgabo-cdg-v2/server.py
+root     1763981  1.3  3.9 1470060 475672 ?      Ssl  Sep01  65:55 /usr/local/bin/python3.12 /usr/local/bin/uvicorn app.api.main:app --host 0.0.0.0 --port 8088 --proxy-headers --forwarded-allow-ips *
+root     1764147  0.0  0.3 130256 44692 ?        Ssl  Sep01   0:04 python -m app.workers.worker
+root     1764274  0.0  0.2 130232 33180 ?        S    Sep01   3:57 python -m app.workers.worker
+root     2154671  0.0  0.6 296016 82392 ?        Ss   Sep01   0:53 python app.py
+10001    3058863  0.2  0.4 234696 51544 ?        Ssl  Sep02   6:28 /usr/local/bin/python3.12 /usr/local/bin/uvicorn app.api:app --host 0.0.0.0 --port 8091
+root     3804646  0.2  2.2 1024376 269508 ?      Ssl  Sep02   4:02 /usr/local/bin/python /usr/local/bin/uvicorn app:app --host 0.0.0.0 --port 8001
+root     4006889  0.2  0.6 451760 75228 ?        Ssl  Sep03   3:37 /usr/local/bin/python3.12 /usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+root     4006928  0.0  0.0 1747108 5544 ?        Sl   Sep03   0:00 /usr/bin/docker-proxy -proto tcp -host-ip 127.0.0.1 -host-port 8097 -container-ip 172.26.0.3 -container-port 8000 -use-listen-fd
+djgabo-+ 4153134  0.0  0.2 110812 26616 ?        Ss   Sep03   0:17 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
+djgabo-+ 4153138  0.0  1.7 566296 213004 ?       Sl   Sep03   0:27 /opt/djgabo-cdg-ia-test/.venv/bin/python3 /opt/djgabo-cdg-ia-test/.venv/bin/gunicorn --config /opt/djgabo-cdg-ia-test/deploy/gunicorn.conf.py server:app
