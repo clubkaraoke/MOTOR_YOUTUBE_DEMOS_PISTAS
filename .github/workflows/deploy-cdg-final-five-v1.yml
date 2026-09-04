@@ -56,19 +56,6 @@ jobs:
           python3 -m py_compile "$ST/server.py" "$ST/renderer/normalize.py" "$ST/cdg_preview_routes.py"
           echo "PY_SYNTAX=PASS"
 
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-          t=Path("/tmp/cdg-final-five-v1/editor_v1/index.html").read_text(encoding="utf-8")
-          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',t,re.S|re.I)
-          out=Path("/tmp/cdg-final-five-js");out.mkdir(exist_ok=True)
-          for i,b in enumerate(blocks):(out/f"{i}.js").write_text(b,encoding="utf-8")
-          print("SCRIPT_BLOCKS="+str(len(blocks)))
-          PY
-          for f in /tmp/cdg-final-five-js/*.js; do node --check "$f"; done
-          node --check "$ST/vendor/cdg-final-preview.js"
-          echo "JS_SYNTAX=PASS"
-
           env E="$ST/editor_v1/index.html" S="$ST/server.py" N="$ST/renderer/normalize.py" R="$ST/cdg_preview_routes.py" J="$ST/vendor/cdg-final-preview.js" python3 - <<'PY'
           from pathlib import Path
           import os
@@ -95,6 +82,30 @@ jobs:
               assert v,k
           PY
           REMOTE
+
+      - name: Validate staged JavaScript on runner
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cdg-final-five-local /tmp/cdg-final-five-js
+          mkdir -p /tmp/cdg-final-five-local
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/tmp/cdg-final-five-v1/editor_v1/index.html" /tmp/cdg-final-five-local/index.html
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/tmp/cdg-final-five-v1/vendor/cdg-final-preview.js" /tmp/cdg-final-five-local/cdg-final-preview.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          t=Path("/tmp/cdg-final-five-local/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',t,re.S|re.I)
+          out=Path("/tmp/cdg-final-five-js");out.mkdir(exist_ok=True)
+          for i,b in enumerate(blocks):(out/f"{i}.js").write_text(b,encoding="utf-8")
+          print("SCRIPT_BLOCKS="+str(len(blocks)))
+          PY
+          for f in /tmp/cdg-final-five-js/*.js; do node --check "$f"; done
+          node --check /tmp/cdg-final-five-local/cdg-final-preview.js
+          echo "JS_SYNTAX=PASS"
 
       - name: Stage Pumita overlap + full CDG smoke
         env:
@@ -286,3 +297,5 @@ jobs:
             git pull --rebase origin main || true
             git push origin HEAD:main || true
           fi
+
+# rerun after moving JS syntax validation to GitHub runner
