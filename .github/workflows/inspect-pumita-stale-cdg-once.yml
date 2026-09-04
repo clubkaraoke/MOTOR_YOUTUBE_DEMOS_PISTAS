@@ -1,0 +1,96 @@
+name: Inspect Pumita stale CDG once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-pumita-stale-cdg-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH inspect project vs current CDG
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          sudo env P="$P" "$P/.venv/bin/python" - <<'PY'
+          import sqlite3,os,json,time
+          from pathlib import Path
+          P=Path(os.environ["P"])
+          # Read effective env from systemd to resolve data paths without printing secrets.
+          import subprocess,re
+          env=subprocess.check_output(["systemctl","show","djgabo-cdg","-p","Environment","--value"],text=True)
+          def e(name,default):
+              m=re.search(r'(?:^|\s)'+re.escape(name)+r'=([^\s]+)',env)
+              return m.group(1).strip('"') if m else str(default)
+          DATA=Path(e("DJGABO_DATA_DIR",P/"data"))
+          DB=Path(e("DJGABO_DB_PATH",DATA/"local.db"))
+          JOBS=Path(e("DJGABO_JOBS_DIR",DATA/"jobs"))
+          con=sqlite3.connect(DB);con.row_factory=sqlite3.Row
+          rows=con.execute("select * from jobs where lower(artist) like ? and lower(title) like ? order by id desc",("%pumita%","%escritorio%")).fetchall()
+          print("MATCHES="+str(len(rows)))
+          for row in rows:
+              d=dict(row);jid=d["id"]
+              print("JOB_ID="+jid)
+              for k in ["artist","title","status","updated","render_status","render_progress","render_error","cdg_local_filename","cdg_dropbox_path","dropbox_status","version"]:
+                  v=d.get(k)
+                  if k=="render_error": v=(str(v)[:500] if v else "")
+                  print(k.upper()+"="+str(v))
+              proj=JOBS/jid/"proyecto.timings.json"
+              print("PROJECT_EXISTS="+str(proj.is_file()))
+              if proj.is_file():
+                  st=proj.stat();print("PROJECT_MTIME_EPOCH="+str(st.st_mtime));print("PROJECT_MTIME="+time.strftime("%Y-%m-%dT%H:%M:%S",time.localtime(st.st_mtime)))
+                  doc=json.loads(proj.read_text(encoding="utf-8"))
+                  words=[w for s in doc.get("segments",[]) for w in s.get("words",[])]
+                  sp=[w for w in words if w.get("spoken")]
+                  print("WORDS="+str(len(words)))
+                  print("SPOKEN_COUNT="+str(len(sp)))
+                  print("SPOKEN_FIRST_START="+str(min([w.get("start_time") for w in sp if w.get("start_time") is not None],default=None)))
+                  print("SPOKEN_LAST_END="+str(max([w.get("end_time") for w in sp if w.get("end_time") is not None],default=None)))
+                  sung=[w for w in words if not w.get("spoken") and w.get("start_time") is not None]
+                  print("FIRST_SUNG_START="+str(min([w.get("start_time") for w in sung],default=None)))
+                  rp=doc.get("render_pages") or {}
+                  ids={str(w.get("id")) for w in sp}
+                  leaked=[]
+                  for page in rp.get("pages") or []:
+                      for line in page.get("lines") or []:
+                          for wid in line.get("word_ids") or []:
+                              if str(wid) in ids: leaked.append(str(wid))
+                  print("RENDER_PAGES_SPOKEN_LEAK_COUNT="+str(len(set(leaked))))
+              # pending CDG persistent cache
+              key=re.sub(r'[^A-Za-z0-9_.-]+','_',str(jid))
+              meta=DATA/"pending"/"cdg"/(key+".json");binp=DATA/"pending"/"cdg"/(key+".bin")
+              print("PENDING_CDG_META_EXISTS="+str(meta.is_file()))
+              if meta.is_file():
+                  m=json.loads(meta.read_text(encoding="utf-8"))
+                  print("CDG_CACHE_UPDATED_EPOCH="+str(m.get("updated")))
+                  if m.get("updated"): print("CDG_CACHE_UPDATED="+time.strftime("%Y-%m-%dT%H:%M:%S",time.localtime(float(m["updated"]))))
+                  print("CDG_CACHE_NAME="+str(m.get("name")))
+                  print("CDG_CACHE_SIZE="+str(m.get("size")))
+              print("PENDING_CDG_BIN_EXISTS="+str(binp.is_file()))
+              # recent render logs only states/actions, no lyrics
+              logs=con.execute("select action,state,at from logs where job_id=? order by id desc limit 12",(jid,)).fetchall()
+              for i,l in enumerate(logs):
+                  print(f"LOG{i}_ACTION={l['action']}")
+                  print(f"LOG{i}_STATE={str(l['state'])[:300]}")
+                  print(f"LOG{i}_AT={l['at']}")
+              print("---")
+          PY
+          REMOTE
