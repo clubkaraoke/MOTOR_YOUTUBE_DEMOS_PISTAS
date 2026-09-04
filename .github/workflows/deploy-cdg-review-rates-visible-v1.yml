@@ -1,0 +1,98 @@
+name: Deploy CDG review rates visible v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-review-rates-visible-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Stage validate backup install
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_review_rates_visible_v1/patch_production.py             "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_review_rates_visible_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-review-rates-visible-v1.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          EDITOR="$PROD/editor_v1/index.html"
+          STAGE=/tmp/cdg-review-rates-visible-v1.html
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/review_rates_visible_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+
+          sudo cp -a "$EDITOR" "$STAGE"
+          sudo python3 /tmp/patch_cdg_review_rates_visible_v1.py "$STAGE"
+
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          t=Path("/tmp/cdg-review-rates-visible-v1.html").read_text(encoding="utf-8")
+          assert "DJGABO_REVIEW_RATES_VISIBLE_V1" in t
+          assert "body.phase2 #transport .rates{display:flex!important}" in t
+          assert 'data-rate="1"' in t
+          assert 'data-rate="2"' in t
+          assert 'data-rate="3"' in t
+          assert 'data-rate="4"' in t
+          assert 'data-rate="5"' in t
+          assert "reviewRateEnabled()" in t
+          print("STAGE_CHECK=PASS")
+          PY
+
+          sudo mkdir -p "$BACKUP/editor_v1"
+          sudo cp -a "$EDITOR" "$BACKUP/editor_v1/index.html"
+          echo "BACKUP=$BACKUP"
+
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE" "$EDITOR"
+
+          LIVE="$(sudo cat "$EDITOR")"
+          grep -q "DJGABO_REVIEW_RATES_VISIBLE_V1" <<<"$LIVE"
+          grep -q 'body.phase2 #transport .rates{display:flex!important}' <<<"$LIVE"
+          grep -q 'data-rate="5"' <<<"$LIVE"
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          echo "RATES_VISIBLE_IN_PHASE2=YES"
+          echo "FAST_RATES_STILL_GATED_BY_SYNC=YES"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-review-rates-visible-v1.txt
+          git commit -m "diag: record review rates visibility deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
