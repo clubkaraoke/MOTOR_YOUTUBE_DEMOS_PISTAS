@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T09:00:37+00:00
+TIMESTAMP=2026-09-04T09:01:06+00:00
 PHASE=CDG_V2_EQUALITY_ONLY
 MP4_ENGINE=NOT_IMPLEMENTED
 PROD_HTTP_BEFORE=200
@@ -14,11 +14,59 @@ PROD_DB_RESOLVED=/var/lib/djgabo-cdg/local.db
 === SYSTEMD ISOLATED ===
 V2_HEALTH={"engine":"DJGABO_CDG_ENGINE_V2_0_2","external_backups":false,"isolated":true,"local_lab_upload":true,"ok":true,"publish_to_dropbox":false}
 === ENGINE SMOKE ===
-Traceback (most recent call last):
-  File "/opt/djgabo-cdg-v2/engine_v2.py", line 594, in <module>
-    r=render_cdg(p,a.out); print(json.dumps({"ok":r["ok"],"size":r["cdg_size"],"lines":r["timeline"]["rendered_line_count"]}))
-      ^^^^^^^^^^^^^^^^^^^
-  File "/opt/djgabo-cdg-v2/engine_v2.py", line 518, in render_cdg
-    cfg=Settings(
-        ^^^^^^^^^
-TypeError: Settings.__init__() got an unexpected keyword argument 'outro_start_sync'
+{"ok": true, "size": 79608, "lines": 2}
+SMOKE=PASS
+=== EL PERFUME EQUALITY TEST ===
+Not enough time to highlight lyric 0 line 1 syllable 1. Ideal duration is 0 column(s); actual duration is 17 column(s). Syllable text: EL {PERFUME }QUE USASTE
+Not enough time to highlight lyric 0 line 3 syllable 1. Ideal duration is 4 column(s); actual duration is 12 column(s). Syllable text: ÚLTIMA {NOCHE }DE AMOR
+Not enough time to highlight lyric 0 line 7 syllable 0. Ideal duration is 4 column(s); actual duration is 16 column(s). Syllable text: {TODAVÍA }TÚ ERES EL
+Not enough time to highlight lyric 0 line 9 syllable 1. Ideal duration is 4 column(s); actual duration is 11 column(s). Syllable text: ESTE {AMOR }HA SEGUIDO
+Not enough time to highlight lyric 0 line 10 syllable 1. Ideal duration is 0 column(s); actual duration is 7 column(s). Syllable text: CRECIENDO {DÍA }A DÍA.
+Not enough time to highlight lyric 0 line 11 syllable 4. Ideal duration is 16 column(s); actual duration is 17 column(s). Syllable text: TE LO DICE MI {CORAZÓN}
+Not enough time to highlight lyric 0 line 12 syllable 1. Ideal duration is 4 column(s); actual duration is 6 column(s). Syllable text: QUE {NO }TE OLVIDA.
+Not enough time to highlight lyric 0 line 17 syllable 0. Ideal duration is 12 column(s); actual duration is 16 column(s). Syllable text: {AMOOOR}
+Not enough time to highlight lyric 0 line 26 syllable 0. Ideal duration is 0 column(s); actual duration is 5 column(s). Syllable text: {EL }PERFUME QUE USASTE
+Not enough time to highlight lyric 0 line 28 syllable 0. Ideal duration is 4 column(s); actual duration is 13 column(s). Syllable text: {ÚLTIMA }NOCHE DE AMOR
+Not enough time to highlight lyric 0 line 30 syllable 0. Ideal duration is 20 column(s); actual duration is 23 column(s). Syllable text: {IMPREGNADO }AÚN EN MI
+Not enough time to highlight lyric 0 line 31 syllable 0. Ideal duration is 8 column(s); actual duration is 16 column(s). Syllable text: {CUERPO.}
+Not enough time to highlight lyric 0 line 33 syllable 0. Ideal duration is 8 column(s); actual duration is 11 column(s). Syllable text: {AMOR }DE MI VIDA.
+Not enough time to highlight lyric 0 line 34 syllable 0. Ideal duration is 4 column(s); actual duration is 9 column(s). Syllable text: {ESTE }AMOR HA SEGUIDO
+Not enough time to highlight lyric 0 line 35 syllable 0. Ideal duration is 0 column(s); actual duration is 20 column(s). Syllable text: {CRECIENDO }DÍA A DÍA.
+Not enough time to highlight lyric 0 line 36 syllable 4. Ideal duration is 8 column(s); actual duration is 17 column(s). Syllable text: TE LO DICE MI {CORAZÓN}
+Not enough time to highlight lyric 0 line 37 syllable 0. Ideal duration is 4 column(s); actual duration is 8 column(s). Syllable text: {QUE }NO TE OLVIDA.
+Not enough time to highlight lyric 0 line 41 syllable 3. Ideal duration is 12 column(s); actual duration is 13 column(s). Syllable text: SOLO TÚ PODRÁS {DARME}
+Not enough time to highlight lyric 0 line 45 syllable 0. Ideal duration is 4 column(s); actual duration is 10 column(s). Syllable text: {VIDA.}
+Not enough time to highlight lyric 0 line 48 syllable 0. Ideal duration is 8 column(s); actual duration is 12 column(s). Syllable text: {DARME}
+Not enough time to highlight lyric 0 line 49 syllable 0. Ideal duration is 12 column(s); actual duration is 16 column(s). Syllable text: {AMOOOR }Y MI
+Not enough time to highlight lyric 0 line 55 syllable 3. Ideal duration is 8 column(s); actual duration is 14 column(s). Syllable text: AY, SOLO TÚ {PODRÁS}
+Not enough time to highlight lyric 0 line 56 syllable 0. Ideal duration is 4 column(s); actual duration is 13 column(s). Syllable text: {DARME }AMOOOR
+JOB=LET-0088 Hermanos Silva - El Perfume
+WORDS source/canonical/rendered=216/179/179
+INTRO_DELAY_FRAMES=0
+SYNC_OFFSET_FRAMES=0
+MAX_SOURCE_TIMELINE_MS=0.0
+MAX_TIMELINE_COMPILED_MS=1.0
+WORD 0 'EL' SRC 30.35 30.6 TL 30.35 30.6 CDG_COMPILE 30.35 30.6 DECODED 30.39 30.566667 DELTA_MS 40.0 -33.333
+WORD 1 'PERFUME' SRC 30.62 31.14 TL 30.62 31.14 CDG_COMPILE 30.62 31.14 DECODED 30.656667 31.096667 DELTA_MS 36.667 -43.333
+WORD 2 'QUE' SRC 31.2 31.26 TL 31.2 31.26 CDG_COMPILE 31.2 31.26 DECODED 31.23 31.36 DELTA_MS 30.0 100.0
+WORD 44 'DE' SRC 59.02 59.24 TL 59.02 59.24 CDG_COMPILE 59.02 59.24 DECODED 59.03 59.226667 DELTA_MS 10.0 -13.333
+WORD 89 'LLEVO' SRC 130.34 130.6 TL 130.34 130.6 CDG_COMPILE 130.34 130.6 DECODED 130.363333 130.59 DELTA_MS 23.333 -10.0
+WORD 134 'DARME' SRC 162.16 162.56 TL 162.16 162.56 CDG_COMPILE 162.16 162.56 DECODED 162.183333 162.506667 DELTA_MS 23.333 -53.333
+WORD 177 'MI' SRC 226.18 226.26 TL 226.18 226.26 CDG_COMPILE 226.18 226.26 DECODED 226.196667 226.3 DELTA_MS 16.667 40.0
+WORD 178 'FELICIDAAAD.' SRC 226.36 229.98 TL 226.36 229.98 CDG_COMPILE 226.36 229.98 DECODED 226.416667 229.903333 DELTA_MS 56.667 -76.667
+REPORT=/var/lib/djgabo-cdg-v2/v2_renders/LET-0088/equality_report_v2.json
+EQUALITY_STRUCTURAL=PASS
+=== INSTALL /cdg-v2/ ROUTE ===
+NGINX_ROUTE=UPDATED /etc/nginx/sites-available/panel.kitkaraoke.com
+NGINX_ROUTE=UPDATED /etc/nginx/sites-available/djgabo-cdg
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+=== PRODUCTION SAFETY ===
+PROD_CODE_HASH_AFTER=256743bec6a7276cb3439873e757a6bfe46487e69f1fcf45643c9fa6e2e60c16
+PRODUCTION_CODE_UNCHANGED=YES
+PROD_HTTP_AFTER=200
+V2_SERVICE=active
+V2_HTTP=200
+SCRIBE_GATEWAY=1
+DEPLOY=OK
+PUBLIC_CDG_V2_HTTP=200
