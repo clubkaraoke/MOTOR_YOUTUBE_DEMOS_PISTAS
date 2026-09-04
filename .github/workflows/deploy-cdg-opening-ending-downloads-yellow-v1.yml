@@ -49,6 +49,7 @@ jobs:
           STAGE=/tmp/djgabo-opening-ending-downloads-yellow-v1
           sudo rm -rf "$STAGE"
           sudo mkdir -p "$STAGE/renderer/vendor/cdgmaker" "$STAGE/vendor"
+          sudo cp -a "$PROD/renderer/." "$STAGE/renderer/"
           sudo cp "$PROD/editor_v1/index.html" "$STAGE/index.html"
           sudo cp "$PROD/renderer/style.json" "$STAGE/renderer/style.json"
           sudo cp "$PROD/renderer/normalize.py" "$STAGE/renderer/normalize.py"
