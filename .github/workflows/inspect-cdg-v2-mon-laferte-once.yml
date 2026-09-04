@@ -223,3 +223,88 @@ jobs:
 
           print("\nDONE=READ_ONLY")
           PY
+
+
+      - name: Read-only inspect LET-0089 timeline structure
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json
+          from pathlib import Path
+
+          p=Path("/var/lib/djgabo-cdg-v2/v2_renders/LET-0089/timeline_v2.json")
+          d=json.load(open(p,encoding="utf-8"))
+
+          print("=== LET-0089 TIMELINE DETAIL ===")
+          print("SCHEMA", d.get("schema"), d.get("schema_version"))
+          print("ENGINE", d.get("engine"))
+          print("UPSTREAM_COMMIT", d.get("upstream_commit"))
+          print("SONG", json.dumps(d.get("song"),ensure_ascii=False))
+          print("AUDIO", json.dumps(d.get("audio"),ensure_ascii=False))
+          print("DURATION", d.get("duration"))
+          print("SOURCE_WORD_COUNT", d.get("source_word_count"))
+          print("RENDERED_LINE_COUNT", d.get("rendered_line_count"))
+          print("POLICY", json.dumps(d.get("policy"),ensure_ascii=False))
+          print("RENDER_METADATA", json.dumps(d.get("render_metadata"),ensure_ascii=False))
+
+          layouts=d.get("layouts")
+          print("LAYOUTS_TYPE", type(layouts).__name__)
+          if isinstance(layouts,dict):
+              print("LAYOUT_KEYS", list(layouts.keys()))
+              cdg=layouts.get("cdg")
+              print("CDG_LAYOUT", json.dumps(cdg,ensure_ascii=False)[:50000])
+
+          layout=d.get("layout")
+          print("LEGACY_LAYOUT_TYPE", type(layout).__name__)
+          print("LEGACY_LAYOUT", json.dumps(layout,ensure_ascii=False)[:30000])
+
+          lines=d.get("lines") or []
+          print("TOP_LEVEL_LINES_COUNT", len(lines) if isinstance(lines,list) else "NA")
+          if isinstance(lines,list):
+              print("ALL_LINES_COMPACT")
+              for i,line in enumerate(lines):
+                  if not isinstance(line,dict):
+                      print(i,repr(line)); continue
+                  out={}
+                  for k in ("id","line_id","page","page_id","slot","row","x","y","text","draw_at","erase_at","show_at","hide_at","start","end"):
+                      if k in line: out[k]=line.get(k)
+                  words=line.get("words")
+                  if isinstance(words,list):
+                      out["word_ids"]=[w.get("id") if isinstance(w,dict) else w for w in words]
+                      starts=[w.get("start") for w in words if isinstance(w,dict) and isinstance(w.get("start"),(int,float))]
+                      ends=[w.get("end") for w in words if isinstance(w,dict) and isinstance(w.get("end"),(int,float))]
+                      if starts: out["first_start"]=min(starts)
+                      if ends: out["last_end"]=max(ends)
+                  print(i,json.dumps(out,ensure_ascii=False,default=str))
+
+          segs=d.get("segments") or []
+          print("SEGMENTS_COUNT", len(segs) if isinstance(segs,list) else "NA")
+          if isinstance(segs,list):
+              print("FIRST_30_SEGMENTS")
+              for i,s in enumerate(segs[:30]):
+                  if isinstance(s,dict):
+                      out={k:s.get(k) for k in ("id","text","start","end","line","kind","spoken") if k in s}
+                      print(i,json.dumps(out,ensure_ascii=False,default=str))
+
+          diag=Path("/var/lib/djgabo-cdg-v2/v2_renders/LET-0089/diagnostic_v2.json")
+          if diag.is_file():
+              x=json.load(open(diag,encoding="utf-8"))
+              print("DIAG_ENGINE", x.get("engine"))
+              print("DIAG_INTRO_EXPECTED", x.get("intro_delay_expected_frames"))
+              print("DIAG_INTRO_ACTUAL", x.get("intro_delay_actual_frames"))
+              print("DIAG_SYNC_OFFSET", x.get("sync_offset_frames"))
+              cw=x.get("compiled_words")
+              print("COMPILED_WORDS_COUNT", len(cw) if isinstance(cw,list) else "NA")
+              if isinstance(cw,list):
+                  print("FIRST_20_COMPILED_WORDS")
+                  for w in cw[:20]:
+                      if isinstance(w,dict):
+                          out={k:w.get(k) for k in ("id","text","start","end","compiled_start","compiled_end","line","page","slot") if k in w}
+                          print(json.dumps(out,ensure_ascii=False,default=str))
+
+          print("DETAIL_DONE=READ_ONLY")
+          PY
