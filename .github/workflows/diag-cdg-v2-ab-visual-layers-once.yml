@@ -134,9 +134,7 @@ jobs:
               byid={w["word_id"]:w for w in comp}
               if base_words is None:
                   base_words={k:(float(v["timeline_start"]),float(v["timeline_end"]),float(v["cdg_start"]),float(v["cdg_end"])) for k,v in byid.items()}
-                  n=len(comp)
-                  idx=sorted(set([0,1,max(0,n//5),max(0,n//2),max(0,(4*n)//5),max(0,n-2),max(0,n-1)]))
-                  sample_ids=[comp[i]["word_id"] for i in idx if i<n]
+                  sample_ids=[w["word_id"] for w in comp]
               structural=0.0
               for wid,b in base_words.items():
                   if wid not in byid:continue
@@ -150,7 +148,7 @@ jobs:
                   if d["end"] is not None:deltas.append(abs(d["end"]-d["timeline_end"])*1000)
               results[name]={
                   "structural_max_ms":round(structural*1000,3),
-                  "decoded_sample_max_abs_ms":round(max(deltas),3) if deltas else None,
+                  "decoded_all_words_max_abs_ms":round(max(deltas),3) if deltas else None,
                   "intro_delay":diag.get("intro_delay_actual_frames"),
                   "sync_offset":diag.get("sync_offset_frames"),
                   "features":diag.get("features"),
