@@ -35,6 +35,7 @@ jobs:
           cp -a /tmp/nomad-v2/karaoke_gen/lyrics_transcriber/output/cdgmaker/. /tmp/nomad-cdgmaker/
           python3 deploy/cdg_engine_v2/patch_nomad.py /tmp/nomad-cdgmaker
           grep -Fq DJGABO_CDG_ENGINE_V2_PATCH /tmp/nomad-cdgmaker/composer.py
+          python3 -m py_compile /tmp/nomad-cdgmaker/composer.py /tmp/nomad-cdgmaker/config.py
           echo "SOURCE_PREFLIGHT=PASS"
 
       - name: Package isolated clone payload
