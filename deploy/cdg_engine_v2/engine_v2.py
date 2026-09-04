@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from PIL import Image, ImageFont
 
-ENGINE_VERSION="DJGABO_CDG_ENGINE_V2_0_2"
+ENGINE_VERSION="DJGABO_CDG_ENGINE_V2_0_3"
 UPSTREAM_COMMIT="bedbcdc3bdba3aa475c5d8fb08c32fe799b3bf88"
 CDG_VISIBLE_WIDTH=280
 
@@ -97,6 +97,59 @@ PANEL_ACTIVE_FEMALE="#FF4FA3"
 PANEL_ACTIVE_DUET="#7ED957"
 CLEAR_MODES={"eager","delayed","page"}
 
+def _opt_bool(options,key,default=True):
+    v=options.get(key,default)
+    if isinstance(v,str):
+        return v.strip().lower() not in {"0","false","no","off",""}
+    return bool(v)
+
+def _hex_color(v,default):
+    raw=str(v or "").strip()
+    return raw if re.fullmatch(r"#[0-9A-Fa-f]{6}",raw) else default
+
+def _style_spec(project,options):
+    s=project.get("cdg_settings") or {}
+    roles=s.get("role_active") if isinstance(s.get("role_active"),dict) else {}
+    return {
+        "background":NOMAD_BG,
+        "border":NOMAD_BG,
+        "title_color":_hex_color(options.get("title_color") or s.get("title_color"),"#FFFFFF"),
+        "artist_color":_hex_color(options.get("artist_color") or s.get("artist_color"),PANEL_ACTIVE_DEFAULT),
+        "inactive_fill":_hex_color(options.get("inactive_fill") or s.get("inactive_fill"),"#FFFFFF"),
+        "inactive_stroke":_hex_color(options.get("inactive_stroke") or s.get("inactive_stroke"),"#000000"),
+        "active_stroke":_hex_color(options.get("active_stroke") or s.get("active_stroke"),"#000000"),
+        "role_active":{
+            "none":_hex_color(roles.get("none") or s.get("active_fill"),PANEL_ACTIVE_DEFAULT),
+            "male":_hex_color(roles.get("male") or roles.get("hombre") or s.get("male_active_fill"),PANEL_ACTIVE_MALE),
+            "female":_hex_color(roles.get("female") or roles.get("mujer") or s.get("female_active_fill"),PANEL_ACTIVE_FEMALE),
+            "duet":_hex_color(roles.get("duet") or roles.get("duo") or s.get("duet_active_fill"),PANEL_ACTIVE_DUET),
+        },
+        "instrumental_fill":_hex_color(options.get("instrumental_fill") or s.get("instrumental_font_color"),PANEL_ACTIVE_DEFAULT),
+        "outro_line1_color":_hex_color(options.get("outro_line1_color") or s.get("outro_line1_color"),"#FFFFFF"),
+        "outro_line2_color":_hex_color(options.get("outro_line2_color") or s.get("outro_line2_color"),PANEL_ACTIVE_DEFAULT),
+    }
+
+def _norm_role(raw):
+    r=str(raw or "").strip().lower()
+    if r in {"hombre","male","man"}: return "male"
+    if r in {"mujer","female","woman"}: return "female"
+    if r in {"duo","duet","dúo"}: return "duet"
+    return "none"
+
+def _line_role(words):
+    for w in words:
+        if not w.get("_v2_synthetic"):
+            return _norm_role(w.get("vocal_role"))
+    return _norm_role(words[0].get("vocal_role")) if words else "none"
+
+def _feature_flags(options):
+    return {
+        "opening":_opt_bool(options,"show_title_artist",True),
+        "instrumental":_opt_bool(options,"show_instrumental",True),
+        "ending":_opt_bool(options,"show_ending",True),
+        "lead_in":_opt_bool(options,"show_lead_in",True),
+    }
+
 def _clamp(v,a,b):
     return a if v<a else b if v>b else v
 
@@ -176,8 +229,10 @@ def _overlaps(a,b,x,y):
     return max(float(a),float(x)) < min(float(b),float(y))
 
 def _instrumentals(project,sung_words,opening):
-    if not sung_words:
+    if len(sung_words)<2:
         return []
+    s=project.get("cdg_settings") or {}
+    threshold=max(3.0,float(num(s.get("instrumental_gap_threshold"),6.0) or 6.0))
     all_words=_all_timed_words(project)
     spoken=[(float(w["start_time"]),float(w["end_time"])) for w in all_words if w.get("spoken")]
     voice=[]
@@ -186,11 +241,10 @@ def _instrumentals(project,sung_words,opening):
         b=num(g.get("end") if isinstance(g,dict) else None)
         if a is not None and b is not None and b>a:
             voice.append((float(a),float(b)))
-    threshold=6.0
     out=[]
-    prev_end=float(opening.get("end") or 0.0)+.25
-    prev_id=None
-    for nxt in sung_words:
+    prev=sung_words[0]
+    for nxt in sung_words[1:]:
+        prev_end=float(prev["end_time"])
         ns=float(nxt["start_time"])
         gap=ns-prev_end
         blocked=any(_overlaps(prev_end,ns,a,b) for a,b in spoken) or any(_overlaps(prev_end,ns,a,b) for a,b in voice)
@@ -200,15 +254,15 @@ def _instrumentals(project,sung_words,opening):
             if prepare-start>=.40:
                 out.append({
                     "id":f"inst-{len(out)+1}",
-                    "prev_word_id":prev_id,
+                    "prev_word_id":str(prev["id"]),
                     "next_word_id":str(nxt["id"]),
                     "gap_start":round(prev_end,3),"gap_end":round(ns,3),"gap_seconds":round(gap,3),
                     "start":round(start,3),"end":round(ns,3),"prepare_at":round(prepare,3),
-                    "text":"INSTRUMENTAL","transition":"topleftmusicalnotes",
+                    "text":str(s.get("instrumental_text") or "INSTRUMENTAL"),
+                    "transition":str(s.get("instrumental_transition") or "topleftmusicalnotes"),
                     "source":"REAL_END_TO_NEXT_START","hidden_plus_2_seconds":False,
                 })
-        prev_end=float(nxt["end_time"])
-        prev_id=str(nxt["id"])
+        prev=nxt
     return out
 
 def _lead_in_targets(sung_words,opening):
@@ -269,6 +323,34 @@ def _inject_lead_ins(visual, targets, font, uppercase):
 def _flat_line_words(lines):
     return [w for line in lines for w in (line.get("words") or [])]
 
+def _singer_plan(tl,SettingsSinger):
+    style=tl.get("style") or {}
+    role_colors=style.get("role_active") or {}
+    roles=[]
+    for line in tl.get("lines") or []:
+        role=_norm_role(line.get("render_role"))
+        if role not in roles:
+            roles.append(role)
+    # cdgmaker upstream has room for three singer palettes. Prefer explicitly
+    # assigned roles; if a song actually uses four, SIN ROL shares singer 1.
+    preferred=[r for r in ("male","female","duet","none") if r in roles]
+    kept=preferred[:3] or ["none"]
+    mapping={r:i+1 for i,r in enumerate(kept)}
+    fallback=mapping.get("none") or 1
+    for r in roles:
+        mapping.setdefault(r,fallback)
+    singers=[
+        SettingsSinger(
+            inactive_fill=style.get("inactive_fill") or "#FFFFFF",
+            inactive_stroke=style.get("inactive_stroke") or "#000000",
+            active_fill=role_colors.get(r) or PANEL_ACTIVE_DEFAULT,
+            active_stroke=style.get("active_stroke") or "#000000",
+        )
+        for r in kept
+    ]
+    text="\n".join(f"{mapping.get(_norm_role(line.get('render_role')),fallback)}|{line['text']}" for line in (tl.get("lines") or []))
+    return mapping,singers,text
+
 def _make_scheduler(project,tl,options):
     try:
         from vendor.nomad_cdgmaker.composer import KaraokeComposer
@@ -282,15 +364,12 @@ def _make_scheduler(project,tl,options):
             sync.append(int(round(float(w["start"])*100)))
             ends.append(int(round(float(w["end"])*100)))
     song=project.get("song") or {}
+    singer_map,singers,lyric_text=_singer_plan(tl,SettingsSinger)
     lyric=SettingsLyric(
-        sync=sync,end_sync=ends,text="\n".join(x["text"] for x in tl["lines"]),
+        sync=sync,end_sync=ends,text=lyric_text,
         line_tile_height=int(layout["line_tile_height"]),
         lines_per_page=int(layout["lines_per_screen"]),
         singer=1,row=int(layout["row"]),explicit_timeline=False,
-    )
-    singer=SettingsSinger(
-        inactive_fill="#FFFFFF",inactive_stroke="#000000",
-        active_fill=PANEL_ACTIVE_DEFAULT,active_stroke="#000000",
     )
     cfg=Settings(
         title=str(song.get("title") or "CDG V2"),artist=str(song.get("artist") or "DJGABO"),
@@ -301,7 +380,7 @@ def _make_scheduler(project,tl,options):
         draw_bandwidth=int(options.get("draw_bandwidth") or 1),
         background=NOMAD_BG,border=NOMAD_BG,
         font_size=int(layout["font_size"]),stroke_width=int(layout["stroke_width"]),stroke_type="octagon",
-        instrumentals=[],singers=[singer],lyrics=[lyric],intro_duration_seconds=0.0,
+        instrumentals=[],singers=singers,lyrics=[lyric],intro_duration_seconds=0.0,
         first_syllable_buffer_seconds=0.0,outro_text_line1="",outro_text_line2="",
     )
     return KaraokeComposer(cfg,relative_dir=Path("."))
@@ -371,6 +450,8 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
     if not isinstance(project,dict):
         raise EngineV2Error("Proyecto V2 invalido.")
     options=dict(options or {}); s=project.get("cdg_settings") or {}
+    features=_feature_flags(options)
+    style=_style_spec(project,options)
     uppercase=bool(options.get("uppercase",s.get("uppercase",True)))
     fs=max(12,min(28,int(options.get("font_size") or s.get("font_size") or 18)))
     lpp=max(2,min(8,int(options.get("lines_per_screen") or s.get("lines_per_page") or 6)))
@@ -378,39 +459,59 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
     fp=font_path(project,options); font=ImageFont.truetype(str(fp),fs)
     words,warnings=valid_words(project)
     all_words=_all_timed_words(project)
-    opening=_opening_spec(project,all_words)
+
+    opening_candidate=_opening_spec(project,all_words)
+    opening=dict(opening_candidate)
+    if not features["opening"]:
+        opening.update({"enabled":False,"start":0.0,"end":0.0,"duration":0.0,"rule":"AB_DISABLED"})
+
     duration=num((project.get("song") or {}).get("duration"))
     last=max((w["end_time"] for w in words),default=0)
     if duration is None or duration<last:
         duration=last+3
-    ending=_ending_spec(project,float(duration))
-    instrumentals=_instrumentals(project,words,opening)
+
+    ending_candidate=_ending_spec(project,float(duration))
+    ending=dict(ending_candidate)
+    if not features["ending"]:
+        ending.update({"enabled":False,"start":round(float(duration),3),"end":round(float(duration),3),"duration":0.0})
+
+    instrumental_candidates=_instrumentals(project,words,opening_candidate)
+    instrumentals=instrumental_candidates if features["instrumental"] else []
+
     visual,ww=visual_lines(project,font,uppercase); warnings.extend(ww)
     if not visual:
         raise EngineV2Error("No hay palabras cantadas con timing para CDG V2.")
-    visual,lead_ins=_inject_lead_ins(visual,_lead_in_targets(words,opening),font,uppercase)
+
+    lead_targets=_lead_in_targets(words,opening)
+    if features["lead_in"]:
+        visual,lead_ins=_inject_lead_ins(visual,lead_targets,font,uppercase)
+    else:
+        lead_ins=[]
+
     lines=[]
     for i,ws in enumerate(visual):
         st=min(float(w["start_time"]) for w in ws); en=max(float(w["end_time"]) for w in ws)
         real=[w for w in ws if not w.get("_v2_synthetic")]
         vst=min((float(w["start_time"]) for w in real),default=st)
         ven=max((float(w["end_time"]) for w in real),default=en)
+        role=_line_role(ws)
         item={
             "line_id":f"v2-line-{i+1}","visual_index":i,"page_index":i//lpp+1,"slot":i%lpp+1,
             "text":" ".join((str(w.get("text") or "").strip().upper() if uppercase else str(w.get("text") or "").strip()) for w in ws),
             "word_ids":[str(w["id"]) for w in ws],"display_at":0.0,"remove_at":round(float(duration)+.5,3),
             "sweep_start":round(st,3),"sweep_end":round(en,3),"voice_start":round(vst,3),"voice_end":round(ven,3),
-            "read_ahead_seconds":0.0,"shortfall_seconds":0.0,
+            "read_ahead_seconds":0.0,"shortfall_seconds":0.0,"render_role":role,
             "words":[{
                 "id":str(w["id"]),
                 "text":(str(w.get("text") or "").strip().upper() if uppercase else str(w.get("text") or "").strip()),
                 "start":round(float(w["start_time"]),3),"end":round(float(w["end_time"]),3),
-                "role":str(w.get("vocal_role") or "none"),
+                "role":_norm_role(w.get("vocal_role")),
                 "synthetic":bool(w.get("_v2_synthetic")),
                 "synthetic_kind":w.get("synthetic_kind"),
             } for w in ws],
         }
         lines.append(item)
+
     yoff=int(num(options.get("lyric_y_offset"),num(s.get("lyric_y_offset"),0)) or 0)
     maxrow=max(0,18-lpp*lth)
     base=max(0,(18-lpp*lth)//2)
@@ -421,13 +522,14 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
         "font_size":fs,"font_family":str(s.get("font_family") or "impact"),"font_path_server":str(fp),
         "line_tile_height":lth,"row":row,"lyric_y_offset":yoff,
         "stroke_width":int(options.get("stroke_width") if options.get("stroke_width") is not None else s.get("stroke_width") or 1),
-        "clear_mode":mode,"background":NOMAD_BG,"border":NOMAD_BG,
-        "preview_scales":[1,2,4],
+        "clear_mode":mode,"background":style["background"],"border":style["border"],
+        "preview_scales":[1,2,4],"preview_horizontal_policy":"BROWSER_CENTERED_NOMAD_Y",
     }
+
     master_words=[{
         "id":w["id"],"text":str(w.get("text") or "").strip(),
         "start":round(float(w["start_time"]),3),"end":round(float(w["end_time"]),3),
-        "role":str(w.get("vocal_role") or "none"),"spoken":bool(w.get("spoken",False))
+        "role":_norm_role(w.get("vocal_role")),"spoken":bool(w.get("spoken",False))
     } for w in words]
     master_segments=[]
     for seg in project.get("segments") or []:
@@ -436,26 +538,37 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
             "id":str(seg.get("id") or ""),"kind":str(seg.get("kind") or "lyrics"),"text":str(seg.get("text") or ""),
             "word_ids":[str(w.get("id") or "") for w in (seg.get("words") or []) if isinstance(w,dict)]
         })
+
     timeline={
         "schema":"djgabo.timeline.v2","schema_version":2,
         "engine":ENGINE_VERSION,"upstream":"nomadkaraoke/karaoke-gen","upstream_commit":UPSTREAM_COMMIT,
         "policy":{
             "elevenlabs_word_start_end_are_immutable":True,"preview_and_cdg_share_this_timeline":True,
-            "future_mp4_must_share_this_timeline":True,"intro_delay_seconds":0,"hidden_offsets":False,
-            "word_start_end_still_immutable":True,"instrumental_gap_uses_previous_end_to_next_start":True,
+            "future_mp4_must_share_this_timeline":True,"intro_delay_seconds":0,"sync_offset_seconds":0,
+            "hidden_offsets":False,"word_start_end_still_immutable":True,
+            "visual_layer_toggles_must_not_change_word_times":True,
+            "instrumental_gap_uses_previous_end_to_next_start":True,
             "nomad_hidden_plus_2_seconds_disabled":True,"mp4_engine_status":"NOT_IMPLEMENTED",
         },
+        "features":features,
         "audio":{"duration":round(float(duration),3),"source_file":str((project.get("song") or {}).get("audio_file") or "")},
         "song":project.get("song") or {},"duration":round(float(duration),3),
         "words":master_words,"segments":master_segments,
         "opening":opening,"instrumentals":instrumentals,"lead_ins":lead_ins,"ending":ending,
-        "style":{
-            "background":NOMAD_BG,"title_color":"#FFFFFF","artist_color":PANEL_ACTIVE_DEFAULT,
-            "inactive_fill":"#FFFFFF","inactive_stroke":"#000000",
-            "role_active":{"none":PANEL_ACTIVE_DEFAULT,"male":PANEL_ACTIVE_MALE,"female":PANEL_ACTIVE_FEMALE,"duet":PANEL_ACTIVE_DUET},
-            "instrumental_fill":PANEL_ACTIVE_DEFAULT,"outro_line1_color":"#FFFFFF","outro_line2_color":PANEL_ACTIVE_DEFAULT,
+        "ab_candidates":{
+            "opening":opening_candidate,
+            "instrumentals":instrumental_candidates,
+            "lead_in_targets":lead_targets,
+            "ending":ending_candidate,
         },
-        "render_metadata":{"source":"ELEVENLABS_START_END","time_unit":"seconds","word_times_mutable":False},
+        "style":style,
+        "render_metadata":{
+            "source":"ELEVENLABS_START_END","time_unit":"seconds","word_times_mutable":False,
+            "feature_signature":"O%d-I%d-L%d-E%d"%(
+                1 if features["opening"] else 0,1 if features["instrumental"] else 0,
+                1 if features["lead_in"] else 0,1 if features["ending"] else 0
+            ),
+        },
         "layouts":{"cdg":{"layout":cdg_layout,"lines":lines},"mp4":None},
         "layout":cdg_layout,"lines":lines,
         "warnings":warnings,"source_word_count":len(words),
@@ -473,6 +586,9 @@ def silent_wav(path:Path, seconds:float, rate:int=44100):
             n=min(frames,rate); wf.writeframes(block[:n*2]); frames-=n
 
 def _nomad_instrumentals(tl,SettingsInstrumental,bg):
+    if not (tl.get("features") or {}).get("instrumental",True):
+        return []
+    style=tl.get("style") or {}
     out=[]
     for it in tl.get("instrumentals") or []:
         out.append(SettingsInstrumental(
@@ -481,7 +597,8 @@ def _nomad_instrumentals(tl,SettingsInstrumental,bg):
             line_tile_height=int(tl["layout"]["line_tile_height"]),
             wait=False,text=str(it.get("text") or "INSTRUMENTAL"),
             text_align="center",text_placement="bottom middle",
-            fill=PANEL_ACTIVE_DEFAULT,stroke=None,background=NOMAD_BG,
+            fill=style.get("instrumental_fill") or PANEL_ACTIVE_DEFAULT,
+            stroke=None,background=style.get("background") or NOMAD_BG,
             image=bg,transition=str(it.get("transition") or "topleftmusicalnotes"),x=0,y=0,
         ))
     return out
@@ -495,24 +612,25 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
         from vendor.nomad_cdgmaker.config import Settings,SettingsLyric,SettingsSinger,SettingsInstrumental
     except Exception as e:
         raise EngineV2Error("No se pudo cargar Nomad cdgmaker V2: "+str(e)) from e
+
     sync=[]; ends=[]
     for line in tl["lines"]:
         for w in line["words"]:
-            sync.append(int(round(float(w["start"])*100))); ends.append(int(round(float(w["end"])*100)))
-    layout=tl["layout"]; song=project.get("song") or {}
+            sync.append(int(round(float(w["start"])*100)))
+            ends.append(int(round(float(w["end"])*100)))
+
+    layout=tl["layout"]; song=project.get("song") or {}; style=tl.get("style") or {}; features=tl.get("features") or {}
     title=str(song.get("title") or "CDG V2"); artist=str(song.get("artist") or "DJGABO")
     outname=re.sub(r"[^A-Za-z0-9._-]+","_",f"{artist}-{title}-V2").strip("_") or "cdg-v2"
+
     with tempfile.TemporaryDirectory(prefix="djgabo-cdg-v2-") as td0:
         td=Path(td0); audio=td/"clock.wav"; silent_wav(audio,float(tl["duration"]))
-        bg=td/"nomad-bg.png"; Image.new("RGB",(300,216),NOMAD_BG).save(bg)
+        bg=td/"nomad-bg.png"; Image.new("RGB",(300,216),style.get("background") or NOMAD_BG).save(bg)
+        singer_map,singers,lyric_text=_singer_plan(tl,SettingsSinger)
         lyric=SettingsLyric(
-            sync=sync,end_sync=ends,text="\n".join(x["text"] for x in tl["lines"]),
+            sync=sync,end_sync=ends,text=lyric_text,
             line_tile_height=int(layout["line_tile_height"]),lines_per_page=int(layout["lines_per_screen"]),
             singer=1,row=int(layout["row"]),explicit_timeline=False,
-        )
-        singer=SettingsSinger(
-            inactive_fill="#FFFFFF",inactive_stroke="#000000",
-            active_fill=PANEL_ACTIVE_DEFAULT,active_stroke="#000000",
         )
         opening=tl.get("opening") or {}; ending=tl.get("ending") or {}
         cfg=Settings(
@@ -521,26 +639,32 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
             clear_mode=str(layout["clear_mode"]),sync_offset=0,
             highlight_bandwidth=int(options.get("highlight_bandwidth") or 4),
             draw_bandwidth=int(options.get("draw_bandwidth") or 1),
-            background=NOMAD_BG,border=NOMAD_BG,
+            background=style.get("background") or NOMAD_BG,border=style.get("border") or NOMAD_BG,
             font_size=int(layout["font_size"]),stroke_width=int(layout["stroke_width"]),stroke_type="octagon",
             instrumentals=_nomad_instrumentals(tl,SettingsInstrumental,bg),
-            singers=[singer],lyrics=[lyric],
-            title_color="#FFFFFF",artist_color=PANEL_ACTIVE_DEFAULT,
+            singers=singers,lyrics=[lyric],
+            title_color=style.get("title_color") or "#FFFFFF",
+            artist_color=style.get("artist_color") or PANEL_ACTIVE_DEFAULT,
             title_screen_transition=str(opening.get("transition") or "centertexttoplogobottomtext"),
             title_artist_gap=10,title_top_padding=0,
-            intro_duration_seconds=float(opening.get("duration") or 0.0),
+            intro_duration_seconds=float(opening.get("duration") or 0.0) if features.get("opening",True) else 0.0,
             first_syllable_buffer_seconds=0.0,
+            outro_enabled=bool(features.get("ending",True)),
             outro_start_sync=int(round(float(ending.get("start") or tl["duration"])*100)),
             outro_transition=str(ending.get("transition") or "centertexttoplogobottomtext"),
-            outro_text_line1=str(ending.get("line1") or ""),
-            outro_text_line2=str(ending.get("line2") or ""),
-            outro_line1_line2_gap=30,outro_line1_color="#FFFFFF",outro_line2_color=PANEL_ACTIVE_DEFAULT,
+            outro_text_line1=str(ending.get("line1") or "") if features.get("ending",True) else "",
+            outro_text_line2=str(ending.get("line2") or "") if features.get("ending",True) else "",
+            outro_line1_line2_gap=30,
+            outro_line1_color=style.get("outro_line1_color") or "#FFFFFF",
+            outro_line2_color=style.get("outro_line2_color") or PANEL_ACTIVE_DEFAULT,
         )
         kc=KaraokeComposer(cfg,relative_dir=td)
+
         flat_timeline_words=[w for line in tl["lines"] for w in line["words"]]
         flat_syllables=[(line,syll) for lyr in kc.lyrics for line in lyr.lines for syll in line.syllables]
         if len(flat_timeline_words)!=len(flat_syllables):
             raise EngineV2Error(f"V2 compile mismatch: {len(flat_timeline_words)} events vs {len(flat_syllables)} syllables")
+
         compiled=[]; synthetic=[]
         for tw,(line,syll) in zip(flat_timeline_words,flat_syllables):
             bb=syll.mask.getbbox() or (0,0,0,0)
@@ -552,12 +676,16 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
                 "cdg_end":round(float(syll.end_offset)/300.0,6),
                 "bbox":[int(line.x+bb[0]),int(line.y+bb[1]),int(line.x+bb[2]),int(line.y+bb[3])],
                 "line_index":int(syll.line_index),"syllable_index":int(syll.syllable_index),
-                "active_fill_index":6,"synthetic":bool(tw.get("synthetic")),
+                "singer":int(line.singer),
+                "active_fill_index":int(line.singer)<<2|2,
+                "synthetic":bool(tw.get("synthetic")),
             }
             (synthetic if tw.get("synthetic") else compiled).append(row)
+
         compile_diag={
             "engine":ENGINE_VERSION,"upstream_commit":UPSTREAM_COMMIT,
-            "clear_mode":layout["clear_mode"],"background":NOMAD_BG,
+            "feature_signature":(tl.get("render_metadata") or {}).get("feature_signature"),
+            "features":features,"clear_mode":layout["clear_mode"],"background":style.get("background") or NOMAD_BG,
             "intro_delay_expected_frames":0,"sync_offset_frames":int(kc.sync_offset),
             "opening":opening,"instrumentals":tl.get("instrumentals") or [],
             "lead_ins":tl.get("lead_ins") or [],"ending":ending,
@@ -565,12 +693,15 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
         }
         kc.compose()
         compile_diag["intro_delay_actual_frames"]=int(getattr(kc,"intro_delay",0))
+        compile_diag["writer_packet_count"]=int(getattr(kc.writer,"packets_queued",len(getattr(kc.writer,"packets",[]))))
         (output_dir/"diagnostic_v2.json").write_text(json.dumps(compile_diag,ensure_ascii=False,indent=2),encoding="utf-8")
+
         zp=td/f"{outname}.zip"
         if not zp.is_file():
             raise EngineV2Error("Nomad cdgmaker no produjo ZIP.")
         with zipfile.ZipFile(zp,"r") as zf:
             data=zf.read(f"{outname}.cdg")
+
     out=output_dir/"output_v2.cdg"; tmp=output_dir/"output_v2.tmp"; tmp.write_bytes(data); tmp.replace(out)
     return {
         "ok":True,"engine":ENGINE_VERSION,"timeline":tl,
