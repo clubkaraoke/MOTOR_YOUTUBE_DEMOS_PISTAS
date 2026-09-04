@@ -1,0 +1,42 @@
+name: Verify live CDG Opening Ending downloads yellow once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-live-cdg-opening-ending-downloads-yellow-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH verify live production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          sudo grep -q "DJGABO_OPENING_ENDING_CONTROLS_V1" "$P/editor_v1/index.html" && echo "CONTROLS=YES"
+          sudo grep -q '"highlight_default": "#FFFF00"' "$P/renderer/style.json" && echo "YELLOW=YES"
+          sudo grep -q "DJGABO_ENDING_ENABLE_NORMALIZER_V1" "$P/renderer/normalize.py" && echo "ENDING_NORMALIZER=YES"
+          sudo grep -q "DJGABO_ENDING_ENABLE_COMPOSER_V1" "$P/renderer/vendor/cdgmaker/composer.py" && echo "ENDING_COMPOSER=YES"
+          sudo grep -q "DJGABO_CDG_DOWNLOADS_V1" "$P/cdg_preview_routes.py" && echo "DOWNLOAD_ROUTES=YES"
+          sudo grep -q "DJGABO_CDG_DOWNLOADS_UI_V1" "$P/vendor/cdg-final-preview.js" && echo "DOWNLOAD_UI=YES"
+          sudo test -d "$P/backups/opening_ending_downloads_yellow_v1_20260904-174534" && echo "BACKUP=YES"
+          REMOTE
