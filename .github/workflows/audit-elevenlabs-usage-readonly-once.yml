@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p diagnostics
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'python3 -' > diagnostics/elevenlabs-usage-readonly.txt <<'PY'
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' > diagnostics/elevenlabs-usage-readonly.txt <<'PY'
           import collections
           import json
           import sqlite3
