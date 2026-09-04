@@ -1,0 +1,318 @@
+name: Deploy CDG editor review + Nomad preview v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-editor-review-nomad-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repository preflight on current snapshots
+        run: |
+          set -euo pipefail
+          TMP=/tmp/djgabo-editor-review-preflight
+          rm -rf "$TMP"; mkdir -p "$TMP"
+          cp diagnostics/cdg-prod-current-index.html "$TMP/index.html"
+          cp diagnostics/cdg-prod-current-normalize.py "$TMP/normalize.py"
+          cp diagnostics/cdg-prod-current-composer.py "$TMP/composer.py"
+          python3 deploy/cdg_editor_review_nomad_v1/patch_production.py "$TMP/index.html" "$TMP/normalize.py" "$TMP/composer.py"
+          python3 -m py_compile "$TMP/normalize.py" "$TMP/composer.py"
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html=Path("/tmp/djgabo-editor-review-preflight/index.html").read_text(encoding="utf-8")
+          scripts="\n".join(re.findall(r"<script[^>]*>(.*?)</script>",html,re.S|re.I))
+          Path("/tmp/djgabo-editor-review-preflight/scripts.js").write_text(scripts,encoding="utf-8")
+          for marker in (
+              "DJGABO_EDITOR_REVIEW_NOMAD_V1",
+              "DJGABO_NOMAD_LINE_DELAYED_PREVIEW_V1",
+              'data-rate="5"',
+              'id="aiToolsBar"',
+          ):
+              assert marker in html, marker
+          assert 'mode:"NOMAD_LINE_DELAYED"' in html
+          assert 'data-rate="1.25"' not in html
+          print("HTML_PREFLIGHT=PASS")
+          PY
+          node --check "$TMP/scripts.js"
+          echo "SOURCE_PREFLIGHT=PASS"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Stage, validate, backup, install
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_editor_review_nomad_v1/patch_production.py \
+            "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_editor_review_nomad_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 <<'REMOTE' | tee diagnostics/cdg-editor-review-nomad-v1-deploy.txt
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          EDITOR="$PROD/editor_v1/index.html"
+          RENDER="$PROD/renderer"
+          STAGE=/tmp/djgabo-editor-review-nomad-v1
+          SMOKE=/tmp/djgabo-editor-review-nomad-smoke
+          SERVICE=djgabo-cdg
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/editor_review_nomad_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SCOPE=EDITOR_PREVIEW_REVIEW_UI_PLUS_INSTRUMENTAL_UNIT"
+          echo "FINAL_CDG_SCHEDULER=NOMAD_LINE_DELAYED"
+          echo "START_END_MUTATION=NO"
+
+          test "$(sudo systemctl is-active "$SERVICE")" = active
+          BEFORE_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$BEFORE_HTTP" = 200
+
+          PROTECTED_BEFORE="$(sudo sha256sum \
+            "$PROD/server.py" "$PROD/panel.html" "$RENDER/render.py" "$RENDER/preview.py" "$RENDER/style.json" | sha256sum | awk '{print $1}')"
+          EDITOR_BEFORE="$(sudo sha256sum "$EDITOR" | awk '{print $1}')"
+          NORMALIZE_BEFORE="$(sudo sha256sum "$RENDER/normalize.py" | awk '{print $1}')"
+          COMPOSER_BEFORE="$(sudo sha256sum "$RENDER/vendor/cdgmaker/composer.py" | awk '{print $1}')"
+
+          sudo rm -rf "$STAGE" "$SMOKE"
+          sudo mkdir -p "$STAGE/renderer" "$SMOKE"
+          sudo cp -a "$EDITOR" "$STAGE/index.html"
+          sudo cp -a "$RENDER/." "$STAGE/renderer/"
+
+          sudo python3 /tmp/patch_cdg_editor_review_nomad_v1.py \
+            "$STAGE/index.html" "$STAGE/renderer/normalize.py" "$STAGE/renderer/vendor/cdgmaker/composer.py"
+
+          sudo python3 -m py_compile "$STAGE/renderer/normalize.py" "$STAGE/renderer/vendor/cdgmaker/composer.py"
+          sudo python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html=Path("/tmp/djgabo-editor-review-nomad-v1/index.html").read_text(encoding="utf-8")
+          scripts="\n".join(re.findall(r"<script[^>]*>(.*?)</script>",html,re.S|re.I))
+          Path("/tmp/djgabo-editor-review-nomad-v1/scripts.js").write_text(scripts,encoding="utf-8")
+          checks={
+            "EDITOR_MARKER":"DJGABO_EDITOR_REVIEW_NOMAD_V1",
+            "PREVIEW_SCHEDULER":"DJGABO_NOMAD_LINE_DELAYED_PREVIEW_V1",
+            "AI_TOOLBAR":'id="aiToolsBar"',
+            "RATE_5X":'data-rate="5"',
+            "RENDER_PLAN":'mode:"NOMAD_LINE_DELAYED"',
+          }
+          for key,val in checks.items():
+              assert val in html,(key,val)
+              print(key+"=PASS")
+          assert 'data-rate="1.25"' not in html
+          PY
+          sudo node --check "$STAGE/scripts.js"
+          echo "EDITOR_JS_SYNTAX=PASS"
+
+          echo "=== VERIFY JS NOMAD SCHEDULER == PYTHON COMPOSER ==="
+          sudo env STAGE="$STAGE" "$PROD/.venv/bin/python" - <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          stage=Path(os.environ["STAGE"])/"renderer"
+          sys.path.insert(0,str(stage/"vendor"))
+          from cdgmaker.composer import KaraokeComposer
+          from cdgmaker.config import Settings,SettingsLyric,SettingsSinger
+          font=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+          assert font.is_file()
+          sync=[1000,1120,1240,1360,1480,1600,1720,1840,1960,2080,2200,2320]
+          lyric=SettingsLyric(sync=sync,text="\n".join("L"+str(i+1) for i in range(12)),line_tile_height=2,lines_per_page=6,singer=1,row=3,explicit_timeline=False)
+          singer=SettingsSinger(inactive_fill="#FFFFFF",inactive_stroke="#000000",active_fill="#F2A900",active_stroke="#000000")
+          cfg=Settings(title="T",artist="A",file=Path("/tmp/unused.wav"),font=font,
+              title_screen_background=Path("/tmp/unused.png"),outro_background=Path("/tmp/unused.png"),outname="x",
+              clear_mode="delayed",sync_offset=0,highlight_bandwidth=4,draw_bandwidth=1,
+              background="#000000",border="#000000",font_size=18,stroke_width=1,stroke_type="octagon",
+              instrumentals=[],singers=[singer],lyrics=[lyric],intro_duration_seconds=0,first_syllable_buffer_seconds=0,
+              outro_text_line1="",outro_text_line2="")
+          c=KaraokeComposer(cfg,relative_dir=Path("."))
+          syl=[]
+          for li,line in enumerate(c.lyrics[0].lines):
+              for si,s in enumerate(line.syllables):
+                  syl.append({"li":li,"si":si,"s":s.start_offset,"e":s.end_offset,"silent":not bool(str(s.text).strip())})
+          payload={
+              "lines":[[{"text":"L"+str(i+1)}] for i in range(12)],
+              "syl":syl,"lpp":6,
+              "expected_draw":c.lyric_times[0].line_draw,
+              "expected_erase":c.lyric_times[0].line_erase,
+          }
+          Path("/tmp/nomad-js-compare.json").write_text(json.dumps(payload),encoding="utf-8")
+          PY
+          sudo node <<'NODE'
+          const fs=require("fs");
+          const html=fs.readFileSync("/tmp/djgabo-editor-review-nomad-v1/index.html","utf8");
+          const m=html.match(/function pvNomadLineDelayedSchedule\(lines,syl,lpp\)\{[\s\S]*?\n\}\n\nfunction pvPlan/);
+          if(!m) throw new Error("No pude extraer pvNomadLineDelayedSchedule");
+          const src=m[0].replace(/\n\nfunction pvPlan[\s\S]*$/,"");
+          global.PV={GAP:50};
+          eval(src);
+          const d=JSON.parse(fs.readFileSync("/tmp/nomad-js-compare.json","utf8"));
+          const got=pvNomadLineDelayedSchedule(d.lines,d.syl,d.lpp);
+          const norm=a=>a.map(v=>v==null?0:v);
+          if(JSON.stringify(norm(got.draw))!==JSON.stringify(d.expected_draw)){
+            throw new Error("line_draw JS != Nomad Python\n"+JSON.stringify(norm(got.draw))+"\n"+JSON.stringify(d.expected_draw));
+          }
+          if(JSON.stringify(norm(got.erase))!==JSON.stringify(d.expected_erase)){
+            throw new Error("line_erase JS != Nomad Python\n"+JSON.stringify(norm(got.erase))+"\n"+JSON.stringify(d.expected_erase));
+          }
+          console.log("PREVIEW_NOMAD_SCHEDULER_EQUALITY=PASS");
+          NODE
+
+          echo "=== BUILD REAL EL PERFUME SMOKE PROJECT ==="
+          sudo python3 - <<'PY' >/tmp/editor-review-smoke-paths
+          import json,sqlite3,wave
+          from pathlib import Path
+          db=next((p for p in [Path("/var/lib/djgabo-cdg/local.db"),Path("/var/lib/djgabo-cdg/data/local.db"),Path("/opt/djgabo-cdg/data/local.db")] if p.is_file()),None)
+          if db is None: raise SystemExit("local.db not found")
+          con=sqlite3.connect(f"file:{db}?mode=ro",uri=True);con.row_factory=sqlite3.Row
+          row=con.execute("SELECT id,artist,title,project_json,duration FROM jobs WHERE id='LET-0088'").fetchone()
+          if row is None: raise SystemExit("LET-0088 not found")
+          doc=json.loads(row["project_json"])
+          out=Path("/tmp/editor-review-real.timings.json");out.write_text(json.dumps(doc,ensure_ascii=False),encoding="utf-8")
+          duration=float((doc.get("song") or {}).get("duration") or row["duration"] or 260)
+          wav=Path("/tmp/editor-review-silent.wav");rate=8000;frames=int((duration+1)*rate)
+          with wave.open(str(wav),"wb") as wf:
+              wf.setnchannels(1);wf.setsampwidth(2);wf.setframerate(rate);block=b"\0\0"*rate
+              while frames:
+                  n=min(frames,rate);wf.writeframes(block[:n*2]);frames-=n
+          print(out);print(wav);print(f"{row['id']}|{row['artist']}|{row['title']}")
+          PY
+          TIMINGS="$(sed -n '1p' /tmp/editor-review-smoke-paths)"
+          AUDIO="$(sed -n '2p' /tmp/editor-review-smoke-paths)"
+          echo "SMOKE_JOB=$(sed -n '3p' /tmp/editor-review-smoke-paths)"
+
+          echo "=== VERIFY REAL CONFIG + INSTRUMENTAL UNIT ==="
+          sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" "$PROD/.venv/bin/python" - <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          stage=Path(os.environ["STAGE"])/"renderer"
+          sys.path.insert(0,str(stage));sys.path.insert(0,str(stage/"vendor"))
+          import normalize as N
+          doc=N.load(os.environ["TIMINGS"])
+          style=json.load(open(stage/"style.json",encoding="utf-8"))
+          font=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+          style["font"]=str(font);style["font_fallback"]=str(font)
+          Path("/tmp/editor-review-smoke-style.json").write_text(json.dumps(style),encoding="utf-8")
+          n=N.normalize(doc,style)
+          toml=N.to_toml(n,style,Path(os.environ["AUDIO"]),"editor-review-smoke",stage)
+          assert 'clear_mode = "delayed"' in toml
+          assert 'screen_clear_sync = []' in toml
+          assert 'explicit_timeline = false' in toml
+          assert 'inactive_fill = "#FFFFFF"' in toml
+          assert 'active_fill = "#F2A900"' in toml
+          cfg=Path("/tmp/editor-review-smoke.toml");cfg.write_text(toml,encoding="utf-8")
+          from cdgmaker.composer import KaraokeComposer
+          c=KaraokeComposer.from_file(cfg)
+          pairs=0
+          for lyric,times in zip(c.lyrics,c.lyric_times):
+              for i in range(len(lyric.lines)-1):
+                  a,b=lyric.lines[i],lyric.lines[i+1]
+                  vis=[s for s in b.syllables if str(s.text).strip()]
+                  if "INSTRUMENTAL" in str(a.text).upper() and vis and all(str(s.text).strip() in {"§","●"} for s in vis):
+                      pairs+=1
+                      end=max(s.end_offset for s in vis)
+                      assert times.line_erase[i]==end
+                      assert times.line_erase[i+1]==end
+                      assert times.line_draw[i]==times.line_draw[i+1]
+          assert pairs>=1,"No instrumental unit found in LET-0088"
+          print("DEFAULT_NO_ROLE_WHITE_TO_YELLOW=PASS")
+          print("INSTRUMENTAL_UNITS",pairs)
+          print("INSTRUMENTAL_UNIT_TIMING=PASS")
+          PY
+
+          echo "=== FULL REAL CDG SMOKE ==="
+          sudo timeout 300 "$PROD/.venv/bin/python" "$STAGE/renderer/render.py" "$TIMINGS" "$AUDIO" -s /tmp/editor-review-smoke-style.json -o "$SMOKE" >/tmp/editor-review-full-smoke.log 2>&1 || {
+            tail -160 /tmp/editor-review-full-smoke.log
+            echo "FULL_SMOKE=FAIL"
+            exit 1
+          }
+          tail -100 /tmp/editor-review-full-smoke.log
+          CDG="$(find "$SMOKE" -maxdepth 1 -type f -name '*.cdg' -size +1000c | head -1)"
+          test -n "$CDG"
+          SIZE="$(stat -c %s "$CDG")"
+          test $((SIZE%24)) -eq 0
+          echo "FULL_SMOKE=PASS"
+          echo "SMOKE_CDG_SIZE=$SIZE"
+          echo "SMOKE_PACKETS=$((SIZE/24))"
+
+          echo "=== BACKUP ==="
+          sudo mkdir -p "$BACKUP/renderer/vendor/cdgmaker" "$BACKUP/editor_v1"
+          sudo cp -a "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp -a "$RENDER/normalize.py" "$BACKUP/renderer/normalize.py"
+          sudo cp -a "$RENDER/vendor/cdgmaker/composer.py" "$BACKUP/renderer/vendor/cdgmaker/composer.py"
+          echo "BACKUP=$BACKUP"
+
+          echo "=== INSTALL ==="
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/index.html" "$EDITOR"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/renderer/normalize.py" "$RENDER/normalize.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/renderer/vendor/cdgmaker/composer.py" "$RENDER/vendor/cdgmaker/composer.py"
+          sudo python3 -m py_compile "$RENDER/normalize.py" "$RENDER/vendor/cdgmaker/composer.py"
+
+          echo "=== POST VERIFY ==="
+          PROTECTED_AFTER="$(sudo sha256sum \
+            "$PROD/server.py" "$PROD/panel.html" "$RENDER/render.py" "$RENDER/preview.py" "$RENDER/style.json" | sha256sum | awk '{print $1}')"
+          EDITOR_AFTER="$(sudo sha256sum "$EDITOR" | awk '{print $1}')"
+          NORMALIZE_AFTER="$(sudo sha256sum "$RENDER/normalize.py" | awk '{print $1}')"
+          COMPOSER_AFTER="$(sudo sha256sum "$RENDER/vendor/cdgmaker/composer.py" | awk '{print $1}')"
+          AFTER_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          EDITOR_HTTP="$(curl -fsS http://127.0.0.1:8765/editor-v1 | grep -c 'DJGABO_EDITOR_REVIEW_NOMAD_V1' || true)"
+
+          test "$PROTECTED_BEFORE" = "$PROTECTED_AFTER"
+          test "$EDITOR_BEFORE" != "$EDITOR_AFTER"
+          test "$NORMALIZE_BEFORE" != "$NORMALIZE_AFTER"
+          test "$COMPOSER_BEFORE" != "$COMPOSER_AFTER"
+          test "$AFTER_HTTP" = 200
+          test "$EDITOR_HTTP" -ge 1
+          test "$(sudo systemctl is-active "$SERVICE")" = active
+
+          echo "PROTECTED_FILES_UNCHANGED=YES"
+          echo "EDITOR_CHANGED=YES"
+          echo "NORMALIZE_CHANGED=YES"
+          echo "COMPOSER_CHANGED=YES"
+          echo "PREVIEW_SCHEDULER=NOMAD_LINE_DELAYED"
+          echo "REVIEW_RATES=1x,2x,3x,4x,5x"
+          echo "FAST_RATE_MUTATES_TIMINGS=NO"
+          echo "AI_BUTTONS_SEPARATED_FROM_ROLES=YES"
+          echo "HELP_TEXT_REMOVED=YES"
+          echo "TOP_CREATE_CDG_HIDDEN=YES"
+          echo "SAVE_PROJECT_BUTTON_HIDDEN=YES_AUTOSAVE_PRESERVED"
+          echo "LYRICS_TOGGLE_HIDDEN=YES_LYRICS_PRESERVED"
+          echo "PANTALLA_TOGGLE_PRESERVED=YES"
+          echo "INSTRUMENTAL_LABEL_AND_DOTS_JOINT_ERASE=YES"
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP_AFTER=$AFTER_HTTP"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save deployment diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-editor-review-nomad-v1-deploy.txt ]; then
+            git add diagnostics/cdg-editor-review-nomad-v1-deploy.txt
+            git commit -m "diag: record editor review Nomad v1 deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
