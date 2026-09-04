@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T08:34:59+00:00
+TIMESTAMP=2026-09-04T08:36:10+00:00
 SCOPE=FINAL_CDG_SCHEDULER_ONLY
 PREVIEW_UI_CHANGE=NO
 PANEL_UI_CHANGE=NO
@@ -9,5 +9,13 @@ PATCH=OK
 MARKER=DJGABO_NOMAD_LINE_DELAYED_PROD_V1
 PATH=/tmp/djgabo-renderer-nomad-line-delayed-v1/normalize.py
 STAGE_PATCH=PASS
-=== LOCATE REAL EL PERFUME TEST ASSETS ===
-LET-0088 timings JSON not found
+=== BUILD READ-ONLY REAL PROJECT SMOKE FROM PRODUCTION DB ===
+SMOKE_TIMINGS=/tmp/nomad-real-project.timings.json
+SMOKE_AUDIO=/tmp/nomad-real-project-silent.wav
+SMOKE_JOB=LET-0088|Hermanos Silva|El Perfume
+=== VERIFY GENERATED TOML USES NOMAD LINE_DELAYED ===
+Traceback (most recent call last):
+  File "<stdin>", line 6, in <module>
+  File "/tmp/djgabo-renderer-nomad-line-delayed-v1/normalize.py", line 27, in <module>
+    from PIL import ImageFont
+ModuleNotFoundError: No module named 'PIL'
