@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 var PPS=300, CDGW=300, CDGH=216, VX=6, VY=12, VW=288, VH=192;
-var M={mode:"karaoke",timeline:null,cdg:null,decoder:null,processed:0,busy:false,lastProject:"",clearMode:"delayed",previewScale:2,features:{opening:true,instrumental:true,lead_in:true,ending:true}};
+var M={mode:"karaoke",timeline:null,cdg:null,decoder:null,processed:0,busy:false,lastProject:"",clearMode:"delayed",previewScale:2,features:{opening:true,instrumental:true,lead_in:false,ending:true}};
 function el(id){return document.getElementById(id)}
 function token(){try{return String(PANEL_TOKEN||"")}catch(_){return ""}}
 function job(){try{return String(PANEL_JOB_ID||"")}catch(_){return ""}}
@@ -45,7 +45,7 @@ function inject(){
   '<div class="v2head"><span class="v2badge">CDG ENGINE V2 · LAB</span><span class="v2safe">PRODUCCIÓN INTACTA</span></div>'+
   '<div class="v2tabs"><button class="v2tab on" data-v2="karaoke">Karaoke V2</button><button class="v2tab" data-v2="pages">Páginas</button><button class="v2tab" data-v2="diag">Diagnóstico</button><button class="v2tab" data-v2="cdg">CDG V2</button></div>'+
   '<div class="v2body"><div class="v2options"><label class="v2opt">Filas Nomad<select id="v2clear"><option value="eager">EAGER · reemplaza antes</option><option value="delayed" selected>DELAYED · espera más</option><option value="page">PAGE · página completa</option></select></label><label class="v2opt">Resolución preview<select id="v2scale"><option value="1">1× · 300×216</option><option value="2" selected>2× · 600×432</option><option value="4">4× · 1200×864</option></select></label></div>'+
-  '<div class="v2layers"><div class="v2layersTitle"><span>CAPAS VISUALES · PRUEBA A/B</span><span class="v2ab"><button class="v2mini" id="v2alloff" type="button">TODO OFF</button><button class="v2mini" id="v2allon" type="button">TODO ON</button></span></div><div class="v2checks"><label class="v2check"><input id="v2opening" type="checkbox" checked> Título + Artista</label><label class="v2check"><input id="v2inst" type="checkbox" checked> Instrumental</label><label class="v2check"><input id="v2lead" type="checkbox" checked> Lead-in &gt;&gt;&gt;</label><label class="v2check"><input id="v2ending" type="checkbox" checked> Ending</label></div></div>'+
+  '<div class="v2layers"><div class="v2layersTitle"><span>CAPAS VISUALES · PRUEBA A/B</span><span class="v2ab"><button class="v2mini" id="v2alloff" type="button">TODO OFF</button><button class="v2mini" id="v2allon" type="button">TODO ON</button></span></div><div class="v2checks"><label class="v2check"><input id="v2opening" type="checkbox" checked> Título + Artista</label><label class="v2check"><input id="v2inst" type="checkbox" checked> Instrumental</label><label class="v2check"><input id="v2lead" type="checkbox"> Lead-in &gt;&gt;&gt; · experimental</label><label class="v2check"><input id="v2ending" type="checkbox" checked> Ending</label></div></div>'+
   '<div class="v2screen"><canvas id="v2canvas" width="600" height="432"></canvas></div><div id="v2panel"></div>'+
   '<div class="v2transport"><span id="v2now">0:00</span><input id="v2seek" type="range" min="0" max="1000" value="0"><span id="v2dur">0:00</span></div>'+
   '<div class="v2actions"><button class="v2btn" id="v2refresh">↻ Recalcular</button><button class="v2btn primary" id="v2render">⚡ Generar V2</button></div>'+
@@ -165,7 +165,7 @@ function paintPanel(){
 async function loadCdg(){
   var r=await fetch(api("/api/v2/jobs/"+encodeURIComponent(job())+"/cdg?token="+encodeURIComponent(token())),{cache:"no-store"});if(!r.ok)throw new Error("No pude abrir CDG V2 ("+r.status+")");M.cdg=new Uint8Array(await r.arrayBuffer());resetDecoder()
 }
-function download(){var a=document.createElement("a");a.href=api("/api/v2/jobs/"+encodeURIComponent(job())+"/cdg?token="+encodeURIComponent(token()));a.download=(job()||"karaoke")+"-V2.cdg";a.click()}
+function download(){var a=document.createElement("a"),sig=M.timeline&&M.timeline.render_metadata&&M.timeline.render_metadata.feature_signature||"AB";a.href=api("/api/v2/jobs/"+encodeURIComponent(job())+"/cdg?token="+encodeURIComponent(token()));a.download=(job()||"karaoke")+"-V2-"+sig+".cdg";a.click()}
 function resetDecoder(){M.decoder={frame:new Uint8Array(CDGW*CDGH),pal:Array.from({length:16},function(){return[0,0,0]}),border:0,trans:0,mem:0,ho:0,vo:0};M.processed=0}
 function packet(p){var d=M.decoder;if(!p||p.length!==24||(p[0]&63)!==9)return;var ins=p[1]&63,a=[];for(var i=0;i<16;i++)a[i]=p[4+i]&63;
   if(ins===1){d.mem=a[0]&15;d.frame.fill(d.mem)}else if(ins===2)d.border=a[0]&15;else if(ins===6||ins===38){var c0=a[0]&15,c1=a[1]&15,y0=(a[2]&31)*12,x0=(a[3]&63)*6;for(var y=0;y<12;y++)for(var q=0;q<6;q++){var xx=x0+q,yy=y0+y;if(xx<CDGW&&yy<CDGH){var v=(a[4+y]&(1<<(5-q)))?c1:c0,ii=yy*CDGW+xx;d.frame[ii]=ins===38?(d.frame[ii]^v):v}}}
