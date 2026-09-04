@@ -1,0 +1,15 @@
+TIMESTAMP=2026-09-04T09:44:53+00:00
+SERVICE_BEFORE=active
+HTTP_BEFORE=200
+Traceback (most recent call last):
+  File "/tmp/patch_cdg_review_rates_visible_v1.py", line 32, in <module>
+    main()
+  File "/tmp/patch_cdg_review_rates_visible_v1.py", line 27, in main
+    p.write_text(text,encoding="utf-8")
+  File "/usr/lib/python3.12/pathlib.py", line 1049, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/tmp/cdg-review-rates-visible-v1.html'
