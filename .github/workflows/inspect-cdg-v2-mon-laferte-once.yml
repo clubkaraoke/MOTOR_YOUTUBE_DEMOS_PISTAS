@@ -1,0 +1,225 @@
+name: Inspect CDG V2 Mon Laferte once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-v2-mon-laferte-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Read-only inspect Mon Laferte V2 data
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json, os, sqlite3, sys
+          from pathlib import Path
+          from datetime import datetime
+
+          DATA = Path("/var/lib/djgabo-cdg-v2")
+          APP = Path("/opt/djgabo-cdg-v2")
+          needle = "mon laferte"
+
+          print("MODE=READ_ONLY")
+          print("DATA_ROOT", DATA)
+          print("APP_ROOT", APP)
+          print("V2_SERVICE_ACTIVE", os.system("systemctl is-active --quiet djgabo-cdg-v2") == 0)
+
+          # 1) Resolve likely job IDs from clone DB without changing anything.
+          db = DATA / "local.db"
+          job_ids = []
+          if db.is_file():
+              try:
+                  con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+                  con.row_factory = sqlite3.Row
+                  cols = [r[1] for r in con.execute("PRAGMA table_info(jobs)")]
+                  print("JOBS_COLUMNS", cols)
+                  if cols:
+                      rows = con.execute("SELECT * FROM jobs").fetchall()
+                      for row in rows:
+                          d = dict(row)
+                          hay = " ".join(str(d.get(k,"")) for k in ("id","artist","artista","title","titulo","name","nombre")).lower()
+                          if needle in hay:
+                              safe = {k:d.get(k) for k in ("id","artist","artista","title","titulo","status","estado") if k in d}
+                              print("MATCHING_JOB", json.dumps(safe, ensure_ascii=False))
+                              jid = str(d.get("id") or "").strip()
+                              if jid: job_ids.append(jid)
+                  con.close()
+              except Exception as e:
+                  print("DB_INSPECT_ERROR", repr(e))
+          else:
+              print("DB_NOT_FOUND", db)
+
+          # 2) Find JSONs containing "Mon Laferte" under clone data/app.
+          candidates = []
+          for root in (DATA, APP):
+              if not root.exists():
+                  continue
+              for p in root.rglob("*.json"):
+                  try:
+                      if p.stat().st_size > 25_000_000:
+                          continue
+                      raw = p.read_text(encoding="utf-8", errors="ignore")
+                  except Exception:
+                      continue
+                  if needle in raw.lower():
+                      candidates.append((p, raw))
+
+          # Also include all JSONs for matched jobs, even if artist is not repeated inside.
+          for jid in job_ids:
+              for root in (DATA/"jobs"/jid, DATA/"v2_renders"/jid):
+                  if root.exists():
+                      for p in root.rglob("*.json"):
+                          if any(p == q for q,_ in candidates):
+                              continue
+                          try:
+                              raw = p.read_text(encoding="utf-8", errors="ignore")
+                          except Exception:
+                              continue
+                          candidates.append((p, raw))
+
+          print("CANDIDATE_COUNT", len(candidates))
+
+          def find_first(obj, keys):
+              if isinstance(obj, dict):
+                  for k in keys:
+                      if k in obj and obj[k] not in (None, "", [], {}):
+                          return obj[k]
+                  for v in obj.values():
+                      got = find_first(v, keys)
+                      if got not in (None, "", [], {}):
+                          return got
+              elif isinstance(obj, list):
+                  for v in obj[:50]:
+                      got = find_first(v, keys)
+                      if got not in (None, "", [], {}):
+                          return got
+              return None
+
+          def collect_words(obj):
+              if isinstance(obj, dict):
+                  w = obj.get("words")
+                  if isinstance(w, list) and w and isinstance(w[0], dict):
+                      if any(k in w[0] for k in ("start","start_time")):
+                          return w
+                  for v in obj.values():
+                      got = collect_words(v)
+                      if got is not None:
+                          return got
+              elif isinstance(obj, list):
+                  for v in obj[:100]:
+                      got = collect_words(v)
+                      if got is not None:
+                          return got
+              return None
+
+          def collect_pages(obj):
+              if isinstance(obj, dict):
+                  for k in ("pages","render_pages"):
+                      v=obj.get(k)
+                      if isinstance(v, list):
+                          return v
+                      if isinstance(v, dict) and isinstance(v.get("pages"), list):
+                          return v["pages"]
+                  for v in obj.values():
+                      got=collect_pages(v)
+                      if got is not None:
+                          return got
+              elif isinstance(obj, list):
+                  for v in obj[:100]:
+                      got=collect_pages(v)
+                      if got is not None:
+                          return got
+              return None
+
+          for idx,(p,raw) in enumerate(sorted(candidates, key=lambda x:str(x[0]))):
+              print("\n=== JSON", idx+1, "===")
+              st=p.stat()
+              print("PATH", p)
+              print("SIZE", st.st_size)
+              print("MTIME", datetime.fromtimestamp(st.st_mtime).isoformat())
+              try:
+                  d=json.loads(raw)
+              except Exception as e:
+                  print("JSON_PARSE_ERROR", repr(e))
+                  continue
+              if isinstance(d,dict):
+                  print("TOP_KEYS", list(d.keys())[:80])
+              artist=find_first(d, ("artist","artista"))
+              title=find_first(d, ("title","titulo"))
+              jid=find_first(d, ("job_id","idTrabajo","jobId"))
+              print("IDENTITY", json.dumps({"job_id":jid,"artist":artist,"title":title},ensure_ascii=False,default=str))
+
+              words=collect_words(d)
+              if words is not None:
+                  print("WORDS_COUNT", len(words))
+                  print("FIRST_20_WORDS")
+                  for w in words[:20]:
+                      out={
+                          "id": w.get("id"),
+                          "text": w.get("text") or w.get("word"),
+                          "start": w.get("start", w.get("start_time")),
+                          "end": w.get("end", w.get("end_time")),
+                          "spoken": w.get("spoken"),
+                          "role": w.get("role", w.get("vocal_role")),
+                      }
+                      print(json.dumps(out,ensure_ascii=False))
+
+              pages=collect_pages(d)
+              if pages is not None:
+                  print("PAGES_COUNT", len(pages))
+                  dist={}
+                  for pg in pages:
+                      if not isinstance(pg,dict): continue
+                      lines=pg.get("lines",[])
+                      n=len([x for x in lines if x and (not isinstance(x,dict) or x.get("text") or x.get("word_ids"))]) if isinstance(lines,list) else None
+                      if n is not None: dist[n]=dist.get(n,0)+1
+                  print("PAGE_LINE_DISTRIBUTION", json.dumps(dist,sort_keys=True))
+                  print("FIRST_10_PAGES")
+                  for pg in pages[:10]:
+                      if not isinstance(pg,dict): continue
+                      slim={k:pg.get(k) for k in ("page","page_id","kind","break_reason","clear_at","draw_begin_at","ready_at","first_sweep_start","show_at") if k in pg}
+                      lines=pg.get("lines")
+                      if isinstance(lines,list):
+                          slim["lines"]=[(x.get("text") if isinstance(x,dict) else str(x)) for x in lines]
+                      print(json.dumps(slim,ensure_ascii=False,default=str))
+
+              # Common config knobs and engine identity.
+              for keyset,label in [
+                  (("version","engine","mode"),"ENGINE"),
+                  (("max_lines","lines_per_page","max_width","read_ahead_seconds","suggested_break_seconds","forced_break_seconds","clear_mode"),"CONFIG"),
+              ]:
+                  vals={}
+                  for k in keyset:
+                      v=find_first(d,(k,))
+                      if v is not None: vals[k]=v
+                  if vals:
+                      print(label, json.dumps(vals,ensure_ascii=False,default=str))
+
+          print("\nDONE=READ_ONLY")
+          PY
