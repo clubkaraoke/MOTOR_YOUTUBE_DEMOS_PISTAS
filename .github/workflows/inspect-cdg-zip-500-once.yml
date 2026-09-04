@@ -1,0 +1,40 @@
+name: Inspect CDG ZIP 500 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-zip-500-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "=== SERVICE ==="
+          sudo systemctl is-active djgabo-cdg
+          echo "=== RECENT ERRORS ==="
+          sudo journalctl -u djgabo-cdg --since "20 minutes ago" --no-pager -n 250 | tail -250
+          echo "=== ROUTE SOURCE ==="
+          sudo grep -n -A120 -B30 'def cdg_download_zip' /opt/djgabo-cdg/cdg_preview_routes.py || true
+          echo "=== META SOURCE ==="
+          sudo grep -n -A90 -B20 'def _download_wav_bytes' /opt/djgabo-cdg/cdg_preview_routes.py || true
+          REMOTE
