@@ -68,7 +68,7 @@ jobs:
           mkdir -p diagnostics
           scp -P "$OVH_PORT" /tmp/cdg-engine-v2-bundle.tgz "$OVH_USER@$OVH_HOST:/tmp/cdg-engine-v2-bundle.tgz"
 
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-engine-v2-deploy.txt 2>&1 <<'REMOTE'
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 <<'REMOTE' | tee diagnostics/cdg-engine-v2-deploy.txt
           set -euo pipefail
           PROD=/opt/djgabo-cdg
           CLONE=/opt/djgabo-cdg-v2
@@ -272,7 +272,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add diagnostics/cdg-engine-v2-deploy.txt diagnostics/el-perfume-v2-equality.txt diagnostics/el-perfume-v2-equality.json 2>/dev/null || true
+          for f in diagnostics/cdg-engine-v2-deploy.txt diagnostics/el-perfume-v2-equality.txt diagnostics/el-perfume-v2-equality.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git commit -m "diag: record CDG Engine V2 El Perfume validation" || exit 0
           git pull --rebase origin main || true
           git push origin HEAD:main || true
