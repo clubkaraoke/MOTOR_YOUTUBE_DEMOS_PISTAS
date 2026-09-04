@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p diagnostics
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 | tee diagnostics/cdg-v2-stuck-scribe.txt <<'REMOTE'
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE' 2>&1 | tee diagnostics/cdg-v2-stuck-scribe.txt
           set -euo pipefail
           echo "NOW=$(date -Is)"
           echo "=== SERVICES ==="
