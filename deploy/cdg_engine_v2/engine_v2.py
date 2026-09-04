@@ -147,7 +147,10 @@ def _feature_flags(options):
         "opening":_opt_bool(options,"show_title_artist",True),
         "instrumental":_opt_bool(options,"show_instrumental",True),
         "ending":_opt_bool(options,"show_ending",True),
-        "lead_in":_opt_bool(options,"show_lead_in",True),
+        # Lead-in Nomad queda disponible para pruebas, pero OFF por defecto:
+        # es la única capa que en LET-0089 aumentó de forma apreciable la
+        # presión de paquetes sobre el barrido real.
+        "lead_in":_opt_bool(options,"show_lead_in",False),
     }
 
 def _clamp(v,a,b):
