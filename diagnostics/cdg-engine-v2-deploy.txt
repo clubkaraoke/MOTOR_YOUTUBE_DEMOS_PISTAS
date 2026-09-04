@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T07:50:56+00:00
+TIMESTAMP=2026-09-04T07:52:14+00:00
 PHASE=CDG_V2_EQUALITY_ONLY
 MP4_ENGINE=NOT_IMPLEMENTED
 PROD_HTTP_BEFORE=200
@@ -47,4 +47,16 @@ WORD 178 'FELICIDAAAD.' SRC 226.36 229.98 TL 226.36 229.98 CDG_COMPILE 226.36 22
 REPORT=/var/lib/djgabo-cdg-v2/v2_renders/LET-0088/equality_report_v2.json
 EQUALITY_STRUCTURAL=PASS
 === INSTALL /cdg-v2/ ROUTE ===
-Marcador V2 encontrado pero no su location inicial
+NGINX_ROUTE=UPDATED /etc/nginx/sites-available/panel.kitkaraoke.com
+NGINX_ROUTE=UPDATED /etc/nginx/sites-available/djgabo-cdg
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+=== PRODUCTION SAFETY ===
+PROD_CODE_HASH_AFTER=8ada4556151547f095d9e2cf1471a8ad6ac3eef8b0f1f1e657024f3358842884
+PRODUCTION_CODE_UNCHANGED=YES
+PROD_HTTP_AFTER=200
+V2_SERVICE=active
+V2_HTTP=200
+SCRIBE_GATEWAY=1
+DEPLOY=OK
+PUBLIC_CDG_V2_HTTP=200
