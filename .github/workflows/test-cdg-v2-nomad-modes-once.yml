@@ -1,0 +1,74 @@
+name: Test CDG V2 Nomad modes once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-cdg-v2-nomad-modes-once.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Test EAGER DELAYED PAGE plus phases
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'python3 -' <<'PY'
+          import json, shutil, sys
+          from pathlib import Path
+          root=Path("/opt/djgabo-cdg-v2")
+          sys.path.insert(0,str(root))
+          from engine_v2 import render_cdg
+          project={
+            "song":{"artist":"DJGABO","title":"NOMAD MODES TEST","duration":30.0},
+            "cdg_settings":{
+              "lines_per_page":4,"font_size":18,"stroke_width":1,"font_family":"impact",
+              "lyric_y_offset":0,
+              "outro_line1":"Ediciones Personalizadas.",
+              "outro_line2":"Whatsapp +51921675846",
+              "outro_size":18,
+              "outro_transition":"centertexttoplogobottomtext"
+            },
+            "segments":[
+              {"id":"s1","kind":"lyrics","words":[
+                {"id":"w1","text":"HOLA","start_time":8.0,"end_time":8.7},
+                {"id":"w2","text":"MUNDO","start_time":8.8,"end_time":9.5}
+              ]},
+              {"id":"s2","kind":"lyrics","words":[
+                {"id":"w3","text":"VUELVE","start_time":18.0,"end_time":18.6},
+                {"id":"w4","text":"LA VOZ","start_time":18.7,"end_time":19.4}
+              ]}
+            ]
+          }
+          for mode in ("eager","delayed","page"):
+            out=Path("/tmp")/("djgabo-v2-mode-"+mode)
+            shutil.rmtree(out,ignore_errors=True)
+            r=render_cdg(project,out,{"clear_mode":mode})
+            tl=r["timeline"]
+            assert tl["layout"]["clear_mode"]==mode, tl["layout"]
+            assert tl["policy"]["intro_delay_seconds"]==0
+            assert tl["instrumentals"], "missing instrumental"
+            assert tl["lead_ins"], "missing lead-in"
+            assert tl["opening"]["enabled"], tl["opening"]
+            assert tl["ending"]["enabled"], tl["ending"]
+            assert (out/"output_v2.cdg").stat().st_size>0
+            print("MODE",mode,"PASS","lines",tl["rendered_line_count"],"inst",len(tl["instrumentals"]),"lead",len(tl["lead_ins"]),"size",r["cdg_size"])
+          print("ALL_NOMAD_MODES=PASS")
+          PY
