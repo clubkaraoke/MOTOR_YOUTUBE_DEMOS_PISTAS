@@ -1,0 +1,48 @@
+name: Smoke V2 mobile responsive once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/smoke-v2-mobile-responsive-once.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Verify mobile asset and clone-only injection
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'SH'
+          set -euo pipefail
+          test -s /opt/djgabo-cdg-v2/vendor/cdg-v2-mobile.js
+          grep -q 'max-width:820px' /opt/djgabo-cdg-v2/vendor/cdg-v2-mobile.js
+          grep -q 'cdg-v2-mobile.js' /opt/djgabo-cdg-v2/panel.html
+          grep -q 'cdg-v2-mobile.js' /opt/djgabo-cdg-v2/editor_v1/index.html
+          ! grep -q 'cdg-v2-mobile.js' /opt/djgabo-cdg/panel.html
+          ! grep -q 'cdg-v2-mobile.js' /opt/djgabo-cdg/editor_v1/index.html
+          code="$(curl -sS -o /tmp/v2mobile.js -w '%{http_code}' http://127.0.0.1:8787/api/vendor/cdg-v2-mobile.js)"
+          test "$code" = 200
+          grep -q 'v2mEditorNav' /tmp/v2mobile.js
+          echo MOBILE_ASSET=PASS
+          echo CLONE_PANEL_INJECT=PASS
+          echo CLONE_EDITOR_INJECT=PASS
+          echo DESKTOP_SCOPE_MEDIA_QUERY=PASS
+          echo PRODUCTION_MOBILE_INJECT=NO
+          SH
