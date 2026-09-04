@@ -1,0 +1,288 @@
+name: Deploy CDG final five v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-final-five-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH and upload patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          scp -P "$OVH_PORT" deploy/cdg_final_five_v1/patch_production.py "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_final_five_v1.py"
+
+      - name: Stage from live production and patch
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          ST=/tmp/cdg-final-five-v1
+          sudo rm -rf "$ST"
+          sudo mkdir -p "$ST/editor_v1" "$ST/vendor" "$ST/renderer"
+          sudo cp "$P/editor_v1/index.html" "$ST/editor_v1/index.html"
+          sudo cp "$P/server.py" "$ST/server.py"
+          sudo cp "$P/cdg_preview_routes.py" "$ST/cdg_preview_routes.py"
+          sudo cp "$P/vendor/cdg-final-preview.js" "$ST/vendor/cdg-final-preview.js"
+          sudo cp -a "$P/renderer/." "$ST/renderer/"
+          sudo chown -R "$USER":"$USER" "$ST"
+
+          python3 /tmp/patch_cdg_final_five_v1.py             "$ST/editor_v1/index.html" "$ST/server.py" "$ST/renderer/normalize.py"             "$ST/cdg_preview_routes.py" "$ST/vendor/cdg-final-preview.js"
+
+          python3 -m py_compile "$ST/server.py" "$ST/renderer/normalize.py" "$ST/cdg_preview_routes.py"
+          echo "PY_SYNTAX=PASS"
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          t=Path("/tmp/cdg-final-five-v1/editor_v1/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',t,re.S|re.I)
+          out=Path("/tmp/cdg-final-five-js");out.mkdir(exist_ok=True)
+          for i,b in enumerate(blocks):(out/f"{i}.js").write_text(b,encoding="utf-8")
+          print("SCRIPT_BLOCKS="+str(len(blocks)))
+          PY
+          for f in /tmp/cdg-final-five-js/*.js; do node --check "$f"; done
+          node --check "$ST/vendor/cdg-final-preview.js"
+          echo "JS_SYNTAX=PASS"
+
+          env E="$ST/editor_v1/index.html" S="$ST/server.py" N="$ST/renderer/normalize.py" R="$ST/cdg_preview_routes.py" J="$ST/vendor/cdg-final-preview.js" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          E=Path(os.environ["E"]).read_text(encoding="utf-8")
+          S=Path(os.environ["S"]).read_text(encoding="utf-8")
+          N=Path(os.environ["N"]).read_text(encoding="utf-8")
+          R=Path(os.environ["R"]).read_text(encoding="utf-8")
+          J=Path(os.environ["J"]).read_text(encoding="utf-8")
+          checks={
+            "STICKY_AI_BOTTOM":"DJGABO_STICKY_AI_BOTTOM_V1" in E and "position:sticky;bottom:0" in E and E.find('id="lyricsInner"')<E.find('id="aiToolsBar"'),
+            "ONE_MASTER_SNAPSHOT":"DJGABO_JSON_SINGLE_SNAPSHOT_V1" in E and "const master=buildExport();" in E and "JSON.stringify(master)" in E,
+            "HABLADO_DETERMINISTIC":"DJGABO_HABLADO_DETERMINISTIC_V1" in E and 'allTarget?"none":role' not in E,
+            "PREVIEW_SPOKEN_FILTER":'.filter(w=>!w.spoken' in E,
+            "DOTS_ONLY":"DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" in E,
+            "SERVER_FINGERPRINT":"DJGABO_MASTER_FINGERPRINT_V1" in S and "cdg_source_sha256" in S and "timings_sha256" in S,
+            "MIRROR_GUARD":"DJGABO_PREVIEW_CDG_MIRROR_GUARD_V1" in S,
+            "OVERLAP_LANES":"DJGABO_OVERLAP_LANES_V1" in N and "build_overlap_lyric_lanes" in N,
+            "NOMAD_DELAYED":'"explicit_timeline = false"' in N and '"screen_clear_sync = []"' in N,
+            "STALE_META":"DJGABO_CDG_STALE_META_V1" in R and "cdg_current" in R,
+            "STALE_UI":"DJGABO_CDG_STALE_UI_V1" in J and "CDG DESACTUALIZADO" in J,
+          }
+          for k,v in checks.items():
+              print(k+"="+("PASS" if v else "FAIL"))
+              assert v,k
+          PY
+          REMOTE
+
+      - name: Stage Pumita overlap + full CDG smoke
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          ST=/tmp/cdg-final-five-v1
+          T=/tmp/cdg-final-five-smoke
+          sudo rm -rf "$T"; sudo mkdir -p "$T/out"; sudo chmod -R 0777 "$T"
+
+          sudo env ST="$ST" T="$T" P="$P" "$P/.venv/bin/python" - <<'PY'
+          import sys,json,os,wave,copy
+          from pathlib import Path
+          ST=Path(os.environ["ST"]);T=Path(os.environ["T"]);P=Path(os.environ["P"])
+          sys.path.insert(0,str(ST/"renderer"));sys.path.insert(0,str(ST/"renderer/vendor"))
+          import normalize as N
+          src=Path("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
+          if not src.is_file(): raise SystemExit("LET0095_MASTER_MISSING")
+          doc=N.load(src)
+          before={str(w.get("id")):(w.get("start_time"),w.get("end_time"),bool(w.get("spoken"))) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
+          font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          style["font"]=font;style["font_fallback"]=font
+          n=N.normalize(doc,style)
+          after={str(w.get("id")):(w.get("start_time"),w.get("end_time"),bool(w.get("spoken"))) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          print("PUMITA_START_END_UNCHANGED="+("YES" if before==after else "NO"))
+          assert before==after
+          print("PUMITA_LANE_COUNT="+str(len(n.lyric_lanes)))
+          assert len(n.lyric_lanes)>=2
+          for lane in n.lyric_lanes:
+              q=lane["sync"];assert all(q[i]>=q[i-1] for i in range(1,len(q)))
+          print("PUMITA_LANES_MONOTONIC=YES")
+          spids={str(w.get("id")) for s in doc.get("segments",[]) for w in s.get("words",[]) if w.get("spoken")}
+          rp=doc.get("render_pages") or {}
+          leaked=set()
+          for pg in rp.get("pages") or []:
+              for ln in pg.get("lines") or []:
+                  for wid in ln.get("word_ids") or []:
+                      if str(wid) in spids: leaked.add(str(wid))
+          print("PUMITA_SPOKEN_PAGE_LEAK="+str(len(leaked)))
+          assert not leaked
+          toml=N.to_toml(n,style,T/"silent.wav","pumita-smoke",ST/"renderer")
+          print("PUMITA_TOML_LYRIC_BLOCKS="+str(toml.count("[[lyrics]]")))
+          assert toml.count("[[lyrics]]")==len(n.lyric_lanes)
+          assert "explicit_timeline = false" in toml
+          (T/"normalized.toml").write_text(toml,encoding="utf-8")
+
+          duration=max(440,int(float((doc.get("song") or {}).get("duration") or 0))+2)
+          with wave.open(str(T/"silent.wav"),"wb") as wf:
+              wf.setnchannels(1);wf.setsampwidth(2);wf.setframerate(8000)
+              wf.writeframes(b"\0\0"*(8000*duration))
+          # render.py gets the same project; write a smoke style with Linux font.
+          (T/"style.json").write_text(json.dumps(style),encoding="utf-8")
+          (T/"project.json").write_text(json.dumps(doc,ensure_ascii=False),encoding="utf-8")
+          PY
+
+          sudo timeout 300 "$P/.venv/bin/python" "$ST/renderer/render.py" "$T/project.json" "$T/silent.wav" -s "$T/style.json" -o "$T/out" > "$T/render.log" 2>&1 || { tail -160 "$T/render.log"; exit 1; }
+          CDG="$(find "$T/out" -type f -name '*.cdg' | head -1)"
+          if [ -z "$CDG" ]; then
+            ZIP="$(find "$T/out" -type f -name '*.zip' | head -1)"
+            test -n "$ZIP"
+            python3 - "$ZIP" "$T/result.cdg" <<'PY'
+          import sys,zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              n=next(x for x in z.namelist() if x.lower().endswith(".cdg"))
+              open(sys.argv[2],"wb").write(z.read(n))
+          PY
+            CDG="$T/result.cdg"
+          fi
+          SIZE="$(stat -c %s "$CDG")"
+          test "$SIZE" -gt 24
+          test $((SIZE%24)) -eq 0
+          echo "PUMITA_FULL_CDG_RENDER=PASS"
+          echo "PUMITA_CDG_BYTES=$SIZE"
+          REMOTE
+
+      - name: Backup install and restart
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-final-five-v1.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          ST=/tmp/cdg-final-five-v1
+          TS="$(date +%Y%m%d-%H%M%S)"
+          B="$P/backups/final_five_v1_$TS"
+
+          COMPOSER_BEFORE="$(sudo sha256sum "$P/renderer/vendor/cdgmaker/composer.py"|awk '{print $1}')"
+          STYLE_BEFORE="$(sudo sha256sum "$P/renderer/style.json"|awk '{print $1}')"
+
+          sudo mkdir -p "$B/editor_v1" "$B/renderer" "$B/vendor"
+          sudo cp -a "$P/editor_v1/index.html" "$B/editor_v1/index.html"
+          sudo cp -a "$P/server.py" "$B/server.py"
+          sudo cp -a "$P/renderer/normalize.py" "$B/renderer/normalize.py"
+          sudo cp -a "$P/cdg_preview_routes.py" "$B/cdg_preview_routes.py"
+          sudo cp -a "$P/vendor/cdg-final-preview.js" "$B/vendor/cdg-final-preview.js"
+          echo "BACKUP=$B"
+
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$ST/editor_v1/index.html" "$P/editor_v1/index.html"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$ST/server.py" "$P/server.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$ST/renderer/normalize.py" "$P/renderer/normalize.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$ST/cdg_preview_routes.py" "$P/cdg_preview_routes.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$ST/vendor/cdg-final-preview.js" "$P/vendor/cdg-final-preview.js"
+
+          COMPOSER_AFTER="$(sudo sha256sum "$P/renderer/vendor/cdgmaker/composer.py"|awk '{print $1}')"
+          STYLE_AFTER="$(sudo sha256sum "$P/renderer/style.json"|awk '{print $1}')"
+          test "$COMPOSER_BEFORE" = "$COMPOSER_AFTER"
+          test "$STYLE_BEFORE" = "$STYLE_AFTER"
+
+          sudo systemctl restart djgabo-cdg
+          sleep 2
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+
+          sudo "$P/.venv/bin/python" - <<'PY'
+          import sqlite3
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db")
+          cols={x[1] for x in db.execute("pragma table_info(jobs)")}
+          assert "timings_sha256" in cols and "cdg_source_sha256" in cols
+          r=db.execute("select timings_sha256,cdg_source_sha256 from jobs where id='LET-0095'").fetchone()
+          print("DB_FINGERPRINT_COLUMNS=PASS")
+          print("LET0095_MASTER_HASH="+("SET" if r and r[0] else "MISSING"))
+          print("LET0095_CDG_SOURCE_HASH="+("SET" if r and r[1] else "OLD_OR_UNKNOWN"))
+          assert r and r[0]
+          PY
+
+          echo "STICKY_AI_BOTTOM=YES"
+          echo "JSON_SINGLE_MASTER=YES"
+          echo "CDG_STALE_GUARD=YES"
+          echo "OVERLAP_LANES=YES"
+          echo "PREVIEW_CDG_MIRROR_GUARD=YES"
+          echo "HABLADO_RULE_UNCHANGED=YES"
+          echo "START_END_SHIFT=NO"
+          echo "NOMAD_COMPOSER_UNCHANGED=YES"
+          echo "STYLE_UNCHANGED=YES"
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP=200"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Verify live Pumita normalizer after install
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          sudo env P="$P" "$P/.venv/bin/python" - <<'PY'
+          import sys,json,os
+          from pathlib import Path
+          P=Path(os.environ["P"]);sys.path.insert(0,str(P/"renderer"));sys.path.insert(0,str(P/"renderer/vendor"))
+          import normalize as N
+          doc=N.load("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
+          before={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
+          font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";style["font"]=font;style["font_fallback"]=font
+          n=N.normalize(doc,style)
+          after={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          assert before==after
+          assert n.lyric_lanes
+          print("LIVE_PUMITA_NO_TIMING_SHIFT=YES")
+          print("LIVE_PUMITA_OVERLAP_LANES="+str(len(n.lyric_lanes)))
+          PY
+          REMOTE
+
+      - name: Save safe diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-final-five-v1.txt ]; then
+            grep -E '^(BACKUP=|DB_|LET0095_|STICKY_|JSON_|CDG_|OVERLAP_|PREVIEW_|HABLADO_|START_|NOMAD_|STYLE_|SERVICE_|HTTP=|DEPLOY=)' diagnostics/cdg-final-five-v1.txt > diagnostics/cdg-final-five-v1.safe.txt || true
+            rm -f diagnostics/cdg-final-five-v1.txt
+            git add diagnostics/cdg-final-five-v1.safe.txt
+            git commit -m "diag: record CDG final five deployment" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
