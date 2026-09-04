@@ -81,8 +81,13 @@ async function apiJson(path,method,body,headers){
     body:body===undefined?undefined:JSON.stringify(body),
     cache:"no-store"
   });
+  const ct=String(r.headers.get("content-type")||"");
+  if(r.redirected||!ct.includes("application/json")){
+    throw new Error("La ruta LAB respondió fuera de la API. Recarga /cdg-v2/ e inicia sesión nuevamente.");
+  }
   let d={};try{d=await r.json()}catch(_){}
   if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));
+  if(!d||typeof d!=="object")throw new Error("Respuesta inválida del LAB.");
   return d;
 }
 async function uploadBlobChunks(uploadId,kind,file,chunkSize,state){
@@ -100,6 +105,10 @@ async function uploadBlobChunks(uploadId,kind,file,chunkSize,state){
       body:blob,
       cache:"no-store"
     });
+    const ct=String(r.headers.get("content-type")||"");
+    if(r.redirected||!ct.includes("application/json")){
+      throw new Error("La subida salió de la API LAB. Recarga e inicia sesión nuevamente.");
+    }
     let d={};try{d=await r.json()}catch(_){}
     if(!r.ok||d.ok===false){
       if(r.status===409&&Number.isFinite(Number(d.expected_offset))){
@@ -181,8 +190,10 @@ async function submitLab(e){
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({token:getToken(),use_existing_lyrics:!!lyrics})
     });
+    const sct=String(sr.headers.get("content-type")||"");
+    if(sr.redirected||!sct.includes("application/json"))throw new Error("La sesión LAB no llegó a ElevenLabs. Recarga e inicia sesión nuevamente.");
     let sd={};try{sd=await sr.json()}catch(_){}
-    if(!sr.ok||sd.ok===false)throw new Error(sd.error||"No se pudo iniciar ElevenLabs.");
+    if(!sr.ok||sd.ok===false||!sd.task_id)throw new Error(sd.error||"No se pudo iniciar ElevenLabs.");
     const result=await pollTask(sd.task_id);
     progress(100,"✓ Sincronización completada",(result.words||0)+" palabras · guardado sólo en LAB V2");
     notify("Trabajo "+jid+" creado en LAB V2 · ElevenLabs OK");
