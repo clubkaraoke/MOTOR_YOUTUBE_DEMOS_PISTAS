@@ -1,5 +1,5 @@
 AUDIT_MODE=READ_ONLY
-AUDIT_AT=2026-09-04T01:57:10+00:00
+AUDIT_AT=2026-09-04T01:58:21+00:00
 
 === GATEWAY EVENT LOG ===
 EVENT_FILE_EXISTS=True
@@ -11,6 +11,79 @@ COUNT elevenlabs_scribe_started=21
 TOTAL_EXTERNAL_ATTEMPTS=71
 SCRIBE_FULL_ATTEMPTS=21
 FORCED_ALIGNMENT_ATTEMPTS=50
+
+=== EXTERNAL RESULTS ===
+{"elapsed_s": 0.457, "event": "elevenlabs_scribe_error", "filename": "Tito Nieves - Ya Te Olvidé-vocals.mp3", "n": 1, "request_id": "scribe-1788381733114-0r9pv4", "ts": "2026-09-02T20:42:36.694+00:00"}
+{"elapsed_s": 7.429, "event": "elevenlabs_scribe_done", "filename": "Tito Nieves - Ya Te Olvidé-vocals.mp3", "n": 2, "request_id": "scribe-1788381956376-hrl7xr", "ts": "2026-09-02T20:46:26.926+00:00"}
+{"elapsed_s": 8.846, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 3, "request_id": null, "ts": "2026-09-03T00:34:55.733+00:00"}
+{"elapsed_s": 21.781, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 4, "request_id": null, "ts": "2026-09-03T00:54:39.117+00:00"}
+{"elapsed_s": 8.609, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 5, "request_id": null, "ts": "2026-09-03T01:48:05.568+00:00"}
+{"elapsed_s": 7.934, "event": "elevenlabs_scribe_done", "filename": "Grupo Amor Rebelde - Mix Cuánto Te Amo (Voz Principal).mp3", "n": 6, "request_id": "scribe-1788400459333-zcvl21", "ts": "2026-09-03T01:54:54.048+00:00"}
+{"elapsed_s": 10.366, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 7, "request_id": null, "ts": "2026-09-03T02:55:17.686+00:00"}
+{"elapsed_s": 7.2, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 8, "request_id": null, "ts": "2026-09-03T02:55:29.417+00:00"}
+{"elapsed_s": 8.513, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 9, "request_id": null, "ts": "2026-09-03T05:45:28.326+00:00"}
+{"elapsed_s": 7.02, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 10, "request_id": null, "ts": "2026-09-03T05:54:35.965+00:00"}
+{"elapsed_s": 7.808, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 11, "request_id": null, "ts": "2026-09-03T05:58:43.299+00:00"}
+{"elapsed_s": 0.711, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 12, "request_id": null, "ts": "2026-09-03T06:02:23.217+00:00"}
+{"elapsed_s": 0.773, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 13, "request_id": null, "ts": "2026-09-03T06:03:35.194+00:00"}
+{"elapsed_s": 9.823, "event": "elevenlabs_scribe_done", "filename": "Amor Rebelde - Mix Cuanto te amo (Voz).mp3", "n": 14, "request_id": null, "ts": "2026-09-03T06:13:54.481+00:00"}
+{"elapsed_s": 0.682, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 15, "request_id": null, "ts": "2026-09-03T06:24:27.711+00:00"}
+{"elapsed_s": 0.386, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_0_8_0.wav", "n": 16, "request_id": null, "ts": "2026-09-03T06:24:28.363+00:00"}
+{"elapsed_s": 0.33, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_16_0.wav", "n": 17, "request_id": null, "ts": "2026-09-03T06:24:28.793+00:00"}
+{"elapsed_s": 0.362, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_24_0.wav", "n": 18, "request_id": null, "ts": "2026-09-03T06:24:29.256+00:00"}
+{"elapsed_s": 0.375, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_32_0.wav", "n": 19, "request_id": null, "ts": "2026-09-03T06:24:29.727+00:00"}
+{"elapsed_s": 0.336, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_40_0.wav", "n": 20, "request_id": null, "ts": "2026-09-03T06:24:30.188+00:00"}
+{"elapsed_s": 0.652, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 21, "request_id": null, "ts": "2026-09-03T06:24:53.040+00:00"}
+{"elapsed_s": 0.408, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_0_8_0.wav", "n": 22, "request_id": null, "ts": "2026-09-03T06:24:53.763+00:00"}
+{"elapsed_s": 0.378, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_16_0.wav", "n": 23, "request_id": null, "ts": "2026-09-03T06:24:54.279+00:00"}
+{"elapsed_s": 0.334, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_24_0.wav", "n": 24, "request_id": null, "ts": "2026-09-03T06:24:54.721+00:00"}
+{"elapsed_s": 0.335, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_32_0.wav", "n": 25, "request_id": null, "ts": "2026-09-03T06:24:55.221+00:00"}
+{"elapsed_s": 0.331, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_40_0.wav", "n": 26, "request_id": null, "ts": "2026-09-03T06:24:55.648+00:00"}
+{"elapsed_s": 0.531, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 27, "request_id": null, "ts": "2026-09-03T06:25:14.029+00:00"}
+{"elapsed_s": 0.507, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_0_8_0.wav", "n": 28, "request_id": null, "ts": "2026-09-03T06:25:14.860+00:00"}
+{"elapsed_s": 0.26, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_16_0.wav", "n": 29, "request_id": null, "ts": "2026-09-03T06:25:15.230+00:00"}
+{"elapsed_s": 0.346, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_24_0.wav", "n": 30, "request_id": null, "ts": "2026-09-03T06:25:15.674+00:00"}
+{"elapsed_s": 0.329, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_32_0.wav", "n": 31, "request_id": null, "ts": "2026-09-03T06:25:16.101+00:00"}
+{"elapsed_s": 0.244, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_40_0.wav", "n": 32, "request_id": null, "ts": "2026-09-03T06:25:16.464+00:00"}
+{"elapsed_s": 0.554, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 33, "request_id": null, "ts": "2026-09-03T06:37:53.501+00:00"}
+{"elapsed_s": 0.269, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_0_8_0.wav", "n": 34, "request_id": null, "ts": "2026-09-03T06:37:54.039+00:00"}
+{"elapsed_s": 0.23, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_16_0.wav", "n": 35, "request_id": null, "ts": "2026-09-03T06:37:54.367+00:00"}
+{"elapsed_s": 0.348, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_24_0.wav", "n": 36, "request_id": null, "ts": "2026-09-03T06:37:54.869+00:00"}
+{"elapsed_s": 0.273, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_32_0.wav", "n": 37, "request_id": null, "ts": "2026-09-03T06:37:55.264+00:00"}
+{"elapsed_s": 0.479, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_40_0.wav", "n": 38, "request_id": null, "ts": "2026-09-03T06:37:55.850+00:00"}
+{"elapsed_s": 0.518, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 39, "request_id": null, "ts": "2026-09-03T06:55:48.093+00:00"}
+{"elapsed_s": 0.35, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_0_8_0.wav", "n": 40, "request_id": null, "ts": "2026-09-03T06:55:48.736+00:00"}
+{"elapsed_s": 0.259, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_16_0.wav", "n": 41, "request_id": null, "ts": "2026-09-03T06:55:49.103+00:00"}
+{"elapsed_s": 0.269, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_8_12_1.wav", "n": 42, "request_id": null, "ts": "2026-09-03T06:55:49.489+00:00"}
+{"elapsed_s": 0.293, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_12_16_1.wav", "n": 43, "request_id": null, "ts": "2026-09-03T06:55:49.879+00:00"}
+{"elapsed_s": 0.268, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_12_14_2.wav", "n": 44, "request_id": null, "ts": "2026-09-03T06:55:50.256+00:00"}
+{"elapsed_s": 0.273, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_14_16_2.wav", "n": 45, "request_id": null, "ts": "2026-09-03T06:55:50.644+00:00"}
+{"elapsed_s": 0.345, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_24_0.wav", "n": 46, "request_id": null, "ts": "2026-09-03T06:55:51.110+00:00"}
+{"elapsed_s": 0.29, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_16_20_1.wav", "n": 47, "request_id": null, "ts": "2026-09-03T06:55:51.496+00:00"}
+{"elapsed_s": 0.321, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_20_24_1.wav", "n": 48, "request_id": null, "ts": "2026-09-03T06:55:51.916+00:00"}
+{"elapsed_s": 0.454, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_32_0.wav", "n": 49, "request_id": null, "ts": "2026-09-03T06:55:52.473+00:00"}
+{"elapsed_s": 0.237, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_24_28_1.wav", "n": 50, "request_id": null, "ts": "2026-09-03T06:55:52.820+00:00"}
+{"elapsed_s": 0.503, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_28_32_1.wav", "n": 51, "request_id": null, "ts": "2026-09-03T06:55:53.440+00:00"}
+{"elapsed_s": 0.295, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_28_30_2.wav", "n": 52, "request_id": null, "ts": "2026-09-03T06:55:53.828+00:00"}
+{"elapsed_s": 0.212, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_30_32_2.wav", "n": 53, "request_id": null, "ts": "2026-09-03T06:55:54.171+00:00"}
+{"elapsed_s": 0.343, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_40_0.wav", "n": 54, "request_id": null, "ts": "2026-09-03T06:55:54.630+00:00"}
+{"elapsed_s": 0.321, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_36_1.wav", "n": 55, "request_id": null, "ts": "2026-09-03T06:55:55.087+00:00"}
+{"elapsed_s": 0.246, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_32_34_2.wav", "n": 56, "request_id": null, "ts": "2026-09-03T06:55:55.443+00:00"}
+{"elapsed_s": 0.2, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_34_36_2.wav", "n": 57, "request_id": null, "ts": "2026-09-03T06:55:55.732+00:00"}
+{"elapsed_s": 0.289, "event": "elevenlabs_forced_alignment_done", "filename": "repeat_36_40_1.wav", "n": 58, "request_id": null, "ts": "2026-09-03T06:55:56.116+00:00"}
+{"elapsed_s": 6.234, "event": "elevenlabs_scribe_done", "filename": "Laura Leon - Mujeres Engañadas (Voz).mp3", "n": 59, "request_id": null, "ts": "2026-09-03T07:20:07.498+00:00"}
+{"elapsed_s": 8.167, "event": "elevenlabs_scribe_done", "filename": "Armonia 10 - Tu sin mi (En vivo) KARAOKE (Coro) (Voz).mp3", "n": 60, "request_id": null, "ts": "2026-09-03T08:01:44.055+00:00"}
+{"elapsed_s": 7.203, "event": "elevenlabs_scribe_done", "filename": "Marisol - No me mientas KARAOKE (Voz).mp3", "n": 61, "request_id": null, "ts": "2026-09-03T11:52:10.486+00:00"}
+{"elapsed_s": 6.686, "event": "elevenlabs_scribe_done", "filename": "Grupo Amor Serrano - Asi es la vida (Voz).mp3", "n": 62, "request_id": null, "ts": "2026-09-03T11:58:25.903+00:00"}
+{"elapsed_s": 5.346, "event": "elevenlabs_scribe_done", "filename": "Los Claveles de la Cumbia - Es amor KARAOKE (Voz).mp3", "n": 63, "request_id": null, "ts": "2026-09-03T12:11:54.995+00:00"}
+{"elapsed_s": 16.139, "event": "elevenlabs_scribe_done", "filename": "Lápiz de Carmín - Tremendo Son Orquesta (Ciudad del Pescador 2018) (Voz Principal) (RoFormer Lead_Back C) - vocals - Bb major - 95bpm - 432hz.mp3", "n": 64, "request_id": null, "ts": "2026-09-03T12:24:22.275+00:00"}
+{"elapsed_s": 0.537, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 65, "request_id": null, "ts": "2026-09-03T17:11:44.909+00:00"}
+{"elapsed_s": 0.383, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 66, "request_id": null, "ts": "2026-09-03T17:12:07.215+00:00"}
+{"elapsed_s": 9.155, "event": "elevenlabs_scribe_done", "filename": "Las Estrellas de la Cumbia - Mix Lloraras (Voz).mp3", "n": 67, "request_id": null, "ts": "2026-09-03T17:24:12.988+00:00"}
+{"elapsed_s": 0.338, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 68, "request_id": null, "ts": "2026-09-03T17:33:36.871+00:00"}
+{"elapsed_s": 5.864, "event": "elevenlabs_scribe_done", "filename": "Es Amor _Voz Principal_.mp3", "n": 69, "request_id": null, "ts": "2026-09-03T19:38:40.873+00:00"}
+{"elapsed_s": 9.05, "event": "elevenlabs_scribe_done", "filename": "Los Rebeldes de la cumbia - Mix Si me ibas a dejas, Yo lo queria, Solamente un amor (Voz).mp3", "n": 70, "request_id": null, "ts": "2026-09-04T00:29:45.269+00:00"}
+{"elapsed_s": 0.258, "event": "elevenlabs_forced_alignment_done", "filename": "block.wav", "n": 71, "request_id": null, "ts": "2026-09-04T00:38:46.177+00:00"}
 
 === EVERY EXTERNAL ATTEMPT (NO LYRICS, NO API KEYS) ===
 {"event": "elevenlabs_scribe_started", "filename": "Tito Nieves - Ya Te Olvidé-vocals.mp3", "mode": "scribe_only", "model": "scribe_v2", "n": 1, "request_id": "scribe-1788381733114-0r9pv4", "ts": "2026-09-02T20:42:36.237+00:00", "words": null}
