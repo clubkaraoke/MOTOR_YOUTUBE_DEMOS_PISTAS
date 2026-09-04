@@ -110,6 +110,9 @@ class SettingsInstrumental:
     # Si se define, el ending empieza dentro del reloj del audio original.
     # No añade 8 s artificiales al archivo.
     outro_start_sync: int | None = None
+    # Permite pruebas A/B del LAB sin Ending. Al desactivarlo sólo se
+    # completa el reloj del audio con NO-OP; no se dibuja outro.
+    outro_enabled: bool = True
 
     outro_transition: str = "centertexttoplogobottomtext"
 '''
@@ -250,7 +253,12 @@ def patch_composer(path: Path) -> None:
             # audio. Si se provee outro_start_sync, respetamos ese reloj y no
             # añadimos una cola artificial de 8 segundos.
             explicit_outro = getattr(self.config, "outro_start_sync", None)
-            if explicit_outro is not None:
+            if not bool(getattr(self.config, "outro_enabled", True)):
+                end = max(int(self.audio.duration_seconds * CDG_FPS), self.writer.packets_queued)
+                if self.writer.packets_queued < end:
+                    self.writer.queue_packets([no_instruction()] * (end - self.writer.packets_queued))
+                self.logger.info("CDG V2: ending disabled; audio clock preserved to %d", end)
+            elif explicit_outro is not None:
                 end = max(int(self.audio.duration_seconds * CDG_FPS), self.writer.packets_queued)
                 outro_start = sync_to_cdg(int(explicit_outro))
                 if self.writer.packets_queued < outro_start:
