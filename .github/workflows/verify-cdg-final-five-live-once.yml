@@ -1,0 +1,148 @@
+name: Verify CDG final five live once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-cdg-final-five-live-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live final five
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          E="$P/editor_v1/index.html"
+          S="$P/server.py"
+          N="$P/renderer/normalize.py"
+          R="$P/cdg_preview_routes.py"
+          J="$P/vendor/cdg-final-preview.js"
+
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+
+          sudo env E="$E" S="$S" N="$N" R="$R" J="$J" "$P/.venv/bin/python" - <<'PY'
+          from pathlib import Path
+          import os,sqlite3,json,sys,wave,tempfile,subprocess
+          E=Path(os.environ["E"]).read_text(encoding="utf-8")
+          S=Path(os.environ["S"]).read_text(encoding="utf-8")
+          Ntxt=Path(os.environ["N"]).read_text(encoding="utf-8")
+          R=Path(os.environ["R"]).read_text(encoding="utf-8")
+          J=Path(os.environ["J"]).read_text(encoding="utf-8")
+          checks={
+            "STICKY_AI_BOTTOM":"DJGABO_STICKY_AI_BOTTOM_V1" in E and "position:sticky;bottom:0" in E and E.find('id="lyricsInner"')<E.find('id="aiToolsBar"'),
+            "JSON_SINGLE_MASTER":"DJGABO_JSON_SINGLE_SNAPSHOT_V1" in E and "const master=buildExport();" in E and "panelSaveProject(master,true)" in E,
+            "HABLADO_DETERMINISTIC":"DJGABO_HABLADO_DETERMINISTIC_V1" in E and 'allTarget?"none":role' not in E,
+            "HABLADO_PREVIEW_FILTER":'.filter(w=>!w.spoken' in E,
+            "DOTS_ONLY":"DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" in E,
+            "MASTER_FINGERPRINT":"DJGABO_MASTER_FINGERPRINT_V1" in S and "timings_sha256" in S and "cdg_source_sha256" in S,
+            "MIRROR_GUARD":"DJGABO_PREVIEW_CDG_MIRROR_GUARD_V1" in S,
+            "OVERLAP_LANES":"DJGABO_OVERLAP_LANES_V1" in Ntxt,
+            "NOMAD_LINE_DELAYED":'"explicit_timeline = false"' in Ntxt and '"screen_clear_sync = []"' in Ntxt,
+            "STALE_META":"DJGABO_CDG_STALE_META_V1" in R and "cdg_stale" in R,
+            "STALE_UI":"DJGABO_CDG_STALE_UI_V1" in J and "CDG DESACTUALIZADO" in J,
+          }
+          for k,v in checks.items():
+              print(k+"="+("PASS" if v else "FAIL"));assert v,k
+
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db");db.row_factory=sqlite3.Row
+          cols={x[1] for x in db.execute("pragma table_info(jobs)")}
+          assert {"timings_sha256","cdg_source_sha256"}.issubset(cols)
+          row=db.execute("select timings_sha256,cdg_source_sha256,render_status from jobs where id='LET-0095'").fetchone()
+          assert row and row["timings_sha256"]
+          print("DB_FINGERPRINTS=PASS")
+          print("LET0095_CDG_CURRENT="+("YES" if row["cdg_source_sha256"] and row["cdg_source_sha256"]==row["timings_sha256"] else "NO"))
+          print("LET0095_STALE_EXPECTED="+("NO" if row["cdg_source_sha256"] and row["cdg_source_sha256"]==row["timings_sha256"] else "YES"))
+
+          sys.path.insert(0,"/opt/djgabo-cdg/renderer")
+          sys.path.insert(0,"/opt/djgabo-cdg/renderer/vendor")
+          import normalize as N
+          doc=N.load("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
+          before_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          before_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[]) if w.get("end_time") is not None and w.get("start_time") is not None and float(w.get("end_time"))>float(w.get("start_time"))}
+          before_spoken={str(w.get("id")):bool(w.get("spoken")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          style=json.load(open("/opt/djgabo-cdg/renderer/style.json",encoding="utf-8"))
+          font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          style["font"]=font;style["font_fallback"]=font
+          style["lines_per_page"]=int((doc.get("render_pages") or {}).get("lines_per_page") or style.get("lines_per_page") or 6)
+          n=N.normalize(doc,style)
+          after_start={str(w.get("id")):w.get("start_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          after_end={str(w.get("id")):w.get("end_time") for s in doc.get("segments",[]) for w in s.get("words",[])}
+          after_spoken={str(w.get("id")):bool(w.get("spoken")) for s in doc.get("segments",[]) for w in s.get("words",[])}
+          assert before_start==after_start
+          assert all(after_end.get(k)==v for k,v in before_end.items())
+          assert before_spoken==after_spoken
+          assert len(n.lyric_lanes)==4
+          assert all(all(q[i]>=q[i-1] for i in range(1,len(q))) for q in [x["sync"] for x in n.lyric_lanes])
+          print("PUMITA_AUTHORITATIVE_TIMINGS_UNCHANGED=YES")
+          print("PUMITA_OVERLAP_LANES=4")
+
+          # Regresión normal: un proyecto simple sin solapes conserva un solo [[lyrics]].
+          simple={
+            "version":1,"song":{"artist":"T","title":"T","duration":15.0},"segments":[
+              {"id":"s1","kind":"lyric","text":"A B","words":[
+                {"id":"a","text":"A","start_time":5.0,"end_time":5.4,"locked":True,"spoken":False},
+                {"id":"b","text":"B","start_time":5.6,"end_time":6.0,"locked":True,"spoken":False}
+              ]}
+            ],"calibration_ms":0,
+            "cdg_settings":{"opening_cdg_enabled":False,"ending_cdg_enabled":False}
+          }
+          ss=dict(style);ss["lines_per_page"]=4
+          sn=N.normalize(simple,ss)
+          assert not sn.lyric_lanes
+          st=N.to_toml(sn,ss,Path("/tmp/x.wav"),"simple",Path("/opt/djgabo-cdg/renderer"))
+          assert st.count("[[lyrics]]")==1 and "explicit_timeline = false" in st
+          print("NORMAL_SINGLE_STREAM_UNCHANGED=YES")
+
+          # Contrato HABLADO largo: no sale texto hablado y sí salen 4 puntos.
+          spoken={
+            "version":1,"song":{"artist":"T","title":"T","duration":70.0},"segments":[
+              {"id":"h","kind":"lyric","text":"H","words":[
+                {"id":"h1","text":"PRESENTACION","start_time":3.0,"end_time":35.0,"locked":True,"spoken":True},
+                {"id":"h2","text":"HABLADA","start_time":35.0,"end_time":64.0,"locked":True,"spoken":True}
+              ]},
+              {"id":"c","kind":"lyric","text":"AHORA CANTO","words":[
+                {"id":"c1","text":"AHORA","start_time":65.0,"end_time":65.5,"locked":True,"spoken":False},
+                {"id":"c2","text":"CANTO","start_time":65.5,"end_time":66.2,"locked":True,"spoken":False}
+              ]}
+            ],"calibration_ms":0,
+            "cdg_settings":{"opening_cdg_enabled":False,"ending_cdg_enabled":False}
+          }
+          hs=dict(style);hs["lines_per_page"]=4
+          hn=N.normalize(spoken,hs)
+          assert "PRESENTACION" not in hn.text and "HABLADA" not in hn.text
+          assert "§ § § §" in hn.text
+          assert next(w["start_time"] for s in spoken["segments"] for w in s["words"] if w["id"]=="c1")==65.0
+          print("HABLADO_EXCLUDED_FROM_FINAL=YES")
+          print("HABLADO_DOTS_4=YES")
+          print("NEXT_SUNG_START_65=YES")
+          PY
+
+          COMPOSER_LIVE="$(sudo sha256sum "$P/renderer/vendor/cdgmaker/composer.py"|awk '{print $1}')"
+          COMPOSER_BACKUP="$(sudo sha256sum "$P/backups/final_five_v1_20260904-214725/renderer/../renderer/vendor/cdgmaker/composer.py" 2>/dev/null|awk '{print $1}' || true)"
+          # Backup package intentionally did not copy vendor/composer; compare against known predeploy hash from read-only audit.
+          test "$COMPOSER_LIVE" = "f132f83d4794cb9ed0737ac9570ae43c6012624acc24f3b78547da61ac0b6c82"
+          echo "NOMAD_COMPOSER_UNCHANGED=YES"
+
+          echo "VERIFY_LIVE=OK"
+          REMOTE
