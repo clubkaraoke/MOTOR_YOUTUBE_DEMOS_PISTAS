@@ -164,6 +164,12 @@ jobs:
           import normalize as N
           doc=N.load(os.environ["TIMINGS"])
           style=json.load(open(stage/"style.json",encoding="utf-8"))
+          smoke_font=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+          if not smoke_font.is_file():
+              raise SystemExit("smoke font not found: "+str(smoke_font))
+          style["font"]=str(smoke_font)
+          style["font_fallback"]=str(smoke_font)
+          Path("/tmp/nomad-smoke-style.json").write_text(json.dumps(style),encoding="utf-8")
           n=N.normalize(doc,style)
           toml=N.to_toml(n,style,Path(os.environ["AUDIO"]),"nomad-line-delayed-smoke",stage)
           assert 'clear_mode = "delayed"' in toml, "clear_mode no es delayed"
@@ -185,7 +191,7 @@ jobs:
 
           echo "=== FULL REAL CDG SMOKE IN /tmp ==="
           sudo mkdir -p "$SMOKE"
-          sudo timeout 240 "$PROD/.venv/bin/python" "$STAGE/render.py" "$TIMINGS" "$AUDIO" -o "$SMOKE" >/tmp/nomad-full-smoke.log 2>&1 || {
+          sudo timeout 240 "$PROD/.venv/bin/python" "$STAGE/render.py" "$TIMINGS" "$AUDIO" -s /tmp/nomad-smoke-style.json -o "$SMOKE" >/tmp/nomad-full-smoke.log 2>&1 || {
             cat /tmp/nomad-full-smoke.log
             echo "FULL_SMOKE=FAIL"
             exit 1
