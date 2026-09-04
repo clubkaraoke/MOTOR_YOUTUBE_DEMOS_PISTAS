@@ -27,9 +27,10 @@ replacement="""    except Exception as e:
 _backfill_master_fingerprints()
 
 def recover_interrupted_renders():"""
-if "_backfill_master_fingerprints()
+placed="""_backfill_master_fingerprints()
 
-def recover_interrupted_renders():" not in t:
+def recover_interrupted_renders():"""
+if placed not in t:
     if anchor not in t:
         raise RuntimeError("No encuentro ancla segura para backfill")
     t=t.replace(anchor,replacement,1)
