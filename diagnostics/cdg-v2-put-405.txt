@@ -1,0 +1,71 @@
+NOW=2026-09-04T07:36:46+00:00
+=== ROUTE SOURCE ===
+59:    @app.post("/api/v2/uploads/init")
+101:    @app.put("/api/v2/uploads/<upload_id>/<kind>")
+102:    def cdg_v2_upload_chunk(upload_id, kind):
+135:    @app.post("/api/v2/uploads/<upload_id>/finalize")
+206:    @app.delete("/api/v2/uploads/<upload_id>")
+216:    @app.post("/api/v2/jobs/create-local")
+319:    @app.post("/api/v2/jobs/<jid>/timeline")
+347:    @app.post("/api/v2/jobs/<jid>/render")
+=== ROUTE MAP ===
+[LOCAL 16.2 ONLINE] Históricos pendientes indexados: 41 · audios permanecen en Google Drive
+/api/v2/uploads/<upload_id> ['DELETE', 'OPTIONS']
+/api/v2/uploads/<upload_id>/<kind> ['OPTIONS', 'PUT']
+/api/v2/uploads/<upload_id>/finalize ['OPTIONS', 'POST']
+/api/v2/uploads/init ['OPTIONS', 'POST']
+=== NGINX BLOCK ===
+    # DJGABO_CDG_ENGINE_V2_CLONE
+    # Clon aislado: Nginx elimina /cdg-v2 y Flask escucha sólo en 127.0.0.1:8787.
+    location = /cdg-v2 { return 301 /cdg-v2/; }
+    location ^~ /cdg-v2/ {
+        client_max_body_size 800m;
+        auth_request /_portal_auth_admin;
+        error_page 401 403 = @admin_required;
+        rewrite ^/cdg-v2/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8787;
+        include /etc/nginx/proxy_params;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_connect_timeout 15s;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+}
+
+# configuration file /etc/nginx/proxy_params:
+proxy_set_header Host $http_host;
+=== OPTIONS LOCAL ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.8 Python/3.12.3
+Date: Fri, 04 Sep 2026 07:36:47 GMT
+Content-Type: text/html; charset=utf-8
+Allow: OPTIONS, PUT
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Referrer-Policy: same-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://content.dropboxapi.com https://uvronline.app https://*.uvronline.app; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'
+Cache-Control: private, no-store
+Content-Length: 0
+Connection: close
+
+=== OPTIONS PUBLIC ===
+HTTP/2 302 
+server: nginx/1.24.0 (Ubuntu)
+date: Fri, 04 Sep 2026 07:36:47 GMT
+content-type: text/html
+content-length: 154
+location: https://panel.kitkaraoke.com/?admin_required=1
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+referrer-policy: same-origin
+
+<html>
+<head><title>302 Found</title></head>
+<body>
+<center><h1>302 Found</h1></center>
+<hr><center>nginx/1.24.0 (Ubuntu)</center>
+</body>
+</html>
