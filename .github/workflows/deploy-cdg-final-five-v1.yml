@@ -318,3 +318,5 @@ jobs:
 # rerun with master render_pages lines_per_page in Pumita smoke
 
 # rerun: validate authoritative starts and explicit ends, allowing legacy missing-end completion
+
+# final rerun after live rescue + independent verification
