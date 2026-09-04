@@ -1,0 +1,106 @@
+name: Inspect LET0095 sync order once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0095-sync-order-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect sync order around failure
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          sudo env P="$P" "$P/.venv/bin/python" - <<'PY'
+          import os,sys,json
+          from pathlib import Path
+          P=Path(os.environ["P"]);sys.path.insert(0,str(P/"renderer"));sys.path.insert(0,str(P/"renderer/vendor"))
+          import normalize as N
+          doc=N.load("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
+          style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
+          # emulate project display settings relevant to geometry if present
+          cfg=doc.get("cdg_settings") or {}
+          for src,dst in [("lines_per_page","lines_per_page"),("font_size","font_size"),("stroke_width","stroke_width"),("lyric_y_offset","lyric_y_offset")]:
+              if src in cfg: style[dst]=cfg[src]
+          # Stable Linux font just for inspection; timings unaffected.
+          font_path=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+          style["font"]=str(font_path);style["font_fallback"]=str(font_path)
+          font=N.ImageFont.truetype(str(font_path),style["font_size"])
+          words=N.flatten(doc);words.sort(key=lambda w:w["start_time"]);N.apply_calibration(words,doc.get("calibration_ms",0));N.fill_ends(words,style["max_word_seconds"])
+          by_id={w["id"]:w for w in words}
+          for seg in doc["segments"]:
+              for w in seg.get("words",[]):
+                  if w.get("id") in by_id:
+                      q=by_id[w["id"]];w["start_time"],w["end_time"]=q["start_time"],q["end_time"]
+          spoken=[]
+          for seg in doc["segments"]:
+              for w in seg.get("words",[]):
+                  if w.get("spoken") and w.get("start_time") is not None:
+                      st=float(w["start_time"]);en=float(w.get("end_time") or st+style["max_word_seconds"]);spoken.append((st,max(st+.05,en)))
+          vg=[]
+          for g in ((doc.get("ai") or {}).get("voice_gaps") or []):
+              try:a,b=float(g.get("start")),float(g.get("end"))
+              except:continue
+              if b>a:vg.append((a,b))
+          visual,rp=N.resolve_render_pages(doc,style,font,bool(style.get("uppercase",True)))
+          visual=N.build_instrumentals(visual,style,spoken,vg)
+          visual=N.center_last_page(visual,style["lines_per_page"])
+          N.wipe_spans(visual)
+
+          events=[]
+          for li,line in enumerate(visual):
+              if not line: continue
+              if line[0].get("_inst"):
+                  for w in line:
+                      events.append((float(w["start_time"]),f"INST_START li={li} id={w.get('id')} dot={bool(w.get('_dotline'))}"))
+              else:
+                  for wi,w in enumerate(line):
+                      events.append((float(w["start_time"]),f"WORD_START li={li} id={w.get('id')} spoken={bool(w.get('spoken'))}"))
+                      end=w.get("end_time")
+                      nxt=None
+                      if wi+1<len(line):nxt=line[wi+1]["start_time"]
+                      else:
+                          for nl in visual[li+1:]:
+                              if nl:
+                                  nxt=nl[0]["start_time"];break
+                      if end is not None and end>w["start_time"] and (nxt is None or end<=nxt):
+                          events.append((float(end),f"WORD_ENDSYNC li={li} id={w.get('id')} next={nxt}"))
+          bad=[]
+          for i in range(1,len(events)):
+              if events[i][0] < events[i-1][0]-1e-9:
+                  bad.append((i,events[i-1],events[i]))
+          print("BAD_COUNT="+str(len(bad)))
+          for i,a,b in bad[:10]:
+              print(f"BAD_INDEX={i}")
+              print(f"PREV_TIME={a[0]:.5f} PREV_KIND={a[1]}")
+              print(f"NEXT_TIME={b[0]:.5f} NEXT_KIND={b[1]}")
+              lo=max(0,i-4);hi=min(len(events),i+5)
+              for j in range(lo,hi):
+                  print(f"CTX{j-i:+d}={events[j][0]:.5f}|{events[j][1]}")
+          # raw project words around target time, ids only
+          for seg in doc["segments"]:
+              for w in seg.get("words",[]):
+                  st=w.get("start_time")
+                  if st is not None and 295.5 <= float(st) <= 298.0:
+                      print(f"RAW=id={w.get('id')} start={float(st):.5f} end={float(w.get('end_time') or st):.5f} spoken={bool(w.get('spoken'))} role={w.get('vocal_role')}")
+          PY
+          REMOTE
