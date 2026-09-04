@@ -1,0 +1,44 @@
+name: Inspect Nomad compose loop once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-nomad-compose-loop-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect compose loop
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          sudo env F=/opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py python3 - <<'PY'
+          from pathlib import Path
+          import os,re
+          t=Path(os.environ["F"]).read_text(encoding="utf-8")
+          for name in ["compose","_compose","compose_lyrics","_compose_lyrics","_get_events","_events","event"]:
+              m=re.search(r'^    def '+re.escape(name)+r'\(',t,re.M)
+              if not m: m=re.search(r'^def '+re.escape(name)+r'\(',t,re.M)
+              if m:
+                  i=m.start();n=re.search(r'^    def |^def ',t[m.end():],re.M)
+                  j=m.end()+n.start() if n else min(len(t),i+18000)
+                  print("\n###",name)
+                  print(t[i:j])
+          PY
+          REMOTE
