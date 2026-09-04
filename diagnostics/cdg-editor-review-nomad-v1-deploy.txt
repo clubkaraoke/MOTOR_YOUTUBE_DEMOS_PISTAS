@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T09:26:41+00:00
+TIMESTAMP=2026-09-04T09:28:30+00:00
 SCOPE=EDITOR_PREVIEW_REVIEW_UI_PLUS_INSTRUMENTAL_UNIT
 FINAL_CDG_SCHEDULER=NOMAD_LINE_DELAYED
 START_END_MUTATION=NO
@@ -13,4 +13,15 @@ PREVIEW_SCHEDULER=PASS
 AI_TOOLBAR=PASS
 RATE_5X=PASS
 RENDER_PLAN=PASS
-sudo: node: command not found
+LIVE_EDITOR_SCHEDULER_STATIC_CHECK=PASS
+=== BUILD REAL EL PERFUME SMOKE PROJECT ===
+SMOKE_JOB=LET-0088|Hermanos Silva|El Perfume
+=== VERIFY REAL CONFIG + INSTRUMENTAL UNIT ===
+Traceback (most recent call last):
+  File "<stdin>", line 11, in <module>
+  File "/tmp/djgabo-editor-review-nomad-v1/renderer/normalize.py", line 916, in normalize
+    visual, render_pages = resolve_render_pages(doc, style, font, upper)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/djgabo-editor-review-nomad-v1/renderer/normalize.py", line 270, in resolve_render_pages
+    raise NormalizeError(
+normalize.NormalizeError: render_pages fue creado con 5 líneas/página pero el render pide 6.
