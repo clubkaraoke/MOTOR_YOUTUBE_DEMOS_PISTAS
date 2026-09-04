@@ -1,0 +1,80 @@
+name: Inspect Pumita project files once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-pumita-project-files-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Pumita project files
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          echo "=== PROJECT MATCHES ==="
+          MATCHES="$(sudo grep -Ril --include='proyecto.timings.json' --include='*.json' 'Mi escritorio' /var/lib/djgabo-cdg /opt/djgabo-cdg/data 2>/dev/null | head -20 || true)"
+          printf '%s\n' "$MATCHES"
+          FIRST="$(printf '%s\n' "$MATCHES" | grep 'proyecto.timings.json' | head -1 || true)"
+          if [ -n "$FIRST" ]; then
+            sudo env F="$FIRST" "$P/.venv/bin/python" - <<'PY'
+          import os,json,time,re
+          from pathlib import Path
+          f=Path(os.environ["F"]); d=json.loads(f.read_text(encoding="utf-8"))
+          jid=f.parent.name
+          words=[w for s in d.get("segments",[]) for w in s.get("words",[])]
+          sp=[w for w in words if w.get("spoken")]
+          sung=[w for w in words if not w.get("spoken") and w.get("start_time") is not None]
+          print("JOB_ID="+jid)
+          print("PROJECT_PATH="+str(f))
+          print("PROJECT_MTIME="+time.strftime("%Y-%m-%dT%H:%M:%S",time.localtime(f.stat().st_mtime)))
+          print("WORDS="+str(len(words)))
+          print("SPOKEN_COUNT="+str(len(sp)))
+          print("FIRST_SUNG_START="+str(min([float(w["start_time"]) for w in sung],default=None)))
+          print("SPOKEN_FIRST_START="+str(min([float(w["start_time"]) for w in sp if w.get("start_time") is not None],default=None)))
+          print("SPOKEN_LAST_END="+str(max([float(w.get("end_time") or w["start_time"]) for w in sp if w.get("start_time") is not None],default=None)))
+          rp=d.get("render_pages") or {}
+          spids={str(w.get("id")) for w in sp}
+          leak=set()
+          for pg in rp.get("pages") or []:
+              for ln in pg.get("lines") or []:
+                  for wid in ln.get("word_ids") or []:
+                      if str(wid) in spids: leak.add(str(wid))
+          print("RENDER_PAGES_SPOKEN_LEAK_COUNT="+str(len(leak)))
+          print("RENDER_PAGES_VERSION="+str(rp.get("version")))
+          # Search nearest pending CDG metadata roots by jid
+          roots=[Path("/var/lib/djgabo-cdg"),Path("/opt/djgabo-cdg/data")]
+          for root in roots:
+              meta=root/"pending"/"cdg"/(re.sub(r'[^A-Za-z0-9_.-]+','_',jid)+".json")
+              binp=root/"pending"/"cdg"/(re.sub(r'[^A-Za-z0-9_.-]+','_',jid)+".bin")
+              if meta.is_file():
+                  m=json.loads(meta.read_text(encoding="utf-8"))
+                  print("CDG_META_PATH="+str(meta))
+                  print("CDG_CACHE_UPDATED="+time.strftime("%Y-%m-%dT%H:%M:%S",time.localtime(float(m.get("updated") or meta.stat().st_mtime))))
+                  print("CDG_CACHE_SIZE="+str(m.get("size")))
+                  print("CDG_CACHE_NAME="+str(m.get("name")))
+                  print("CDG_BIN_EXISTS="+str(binp.is_file()))
+          PY
+          fi
+
+          echo "=== DB FILES ==="
+          sudo find /var/lib/djgabo-cdg /opt/djgabo-cdg -maxdepth 4 -type f \( -name 'local.db' -o -name '*.sqlite' -o -name '*.db' \) -printf '%p\n' 2>/dev/null | head -30 || true
+          REMOTE
