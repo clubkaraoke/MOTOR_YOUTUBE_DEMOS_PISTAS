@@ -150,16 +150,20 @@ jobs:
           PY
 
           echo "=== FULL CDG RENDER SMOKE ==="
-          sudo env T="$T" "$P/.venv/bin/python" - <<'PY'
-          import os,wave
+          sudo env T="$T" P="$P" "$P/.venv/bin/python" - <<'PY'
+          import os,wave,json
           from pathlib import Path
-          T=Path(os.environ["T"])
+          T=Path(os.environ["T"]);P=Path(os.environ["P"])
           with wave.open(str(T/"silent.wav"),"wb") as wf:
               wf.setnchannels(1);wf.setsampwidth(2);wf.setframerate(8000)
               wf.writeframes(b"\\0\\0"*(8000*70))
+          s=json.load(open(P/"renderer/style.json",encoding="utf-8"))
+          font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          s["font"]=font;s["font_fallback"]=font;s["lines_per_page"]=6
+          (T/"smoke-style.json").write_text(json.dumps(s),encoding="utf-8")
           PY
           sudo mkdir -p "$T/render"; sudo chmod 0777 "$T/render"
-          sudo timeout 240 "$P/.venv/bin/python" "$P/renderer/render.py" "$T/case.json" "$T/silent.wav" -s "$P/renderer/style.json" -o "$T/render" > "$T/render.log" 2>&1
+          sudo timeout 240 "$P/.venv/bin/python" "$P/renderer/render.py" "$T/case.json" "$T/silent.wav" -s "$T/smoke-style.json" -o "$T/render" > "$T/render.log" 2>&1
           CDG="$(find "$T/render" -maxdepth 1 -type f -name '*.cdg' | head -1)"
           test -n "$CDG"
           SIZE="$(stat -c %s "$CDG")"
