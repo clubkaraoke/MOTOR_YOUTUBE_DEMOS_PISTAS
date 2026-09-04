@@ -161,6 +161,7 @@ def patch_composer(path: Path) -> None:
             )
         else:
             self.intro_delay = 0
+            self.logger.info("First syllable after buffer period. No additional silence needed.")
 '''
     new_delay = '''        # DJGABO_CDG_ENGINE_V2_PATCH
         # Prohibido desplazar el JSON para acomodar el opening.
