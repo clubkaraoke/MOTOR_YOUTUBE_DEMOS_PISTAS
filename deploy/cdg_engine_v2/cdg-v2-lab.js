@@ -36,7 +36,7 @@ function progress(pct,stage,detail){
 function ensureLabCss(){
   if(document.getElementById("v2LabEssentialCss"))return;
   const st=document.createElement("style");st.id="v2LabEssentialCss";
-  st.textContent="#dropboxNuevaStatus{color:#63d6a3!important}.dropbox-dest-card{border-color:rgba(99,214,163,.45)!important}.v2-lab-hidden{display:none!important}";
+  st.textContent="#dropboxNuevaStatus{display:none!important}.dropbox-dest-card{border-color:rgba(99,214,163,.45)!important}.v2-lab-hidden{display:none!important}";
   document.head.appendChild(st);
 }
 function applyLabUI(){
