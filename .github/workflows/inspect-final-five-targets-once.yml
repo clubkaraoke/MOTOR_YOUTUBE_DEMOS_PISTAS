@@ -1,0 +1,62 @@
+name: Inspect final five targets once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-final-five-targets-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact targets
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          sudo env E="$P/editor_v1/index.html" S="$P/server.py" python3 - <<'PY'
+          from pathlib import Path
+          import os,re
+          E=Path(os.environ["E"]).read_text(encoding="utf-8")
+          S=Path(os.environ["S"]).read_text(encoding="utf-8")
+          def show(t,label,key,before=2500,after=8500):
+              i=t.find(key);print("\n###",label,"AT",i)
+              if i>=0:print(t[max(0,i-before):min(len(t),i+after)])
+          for label,key in [
+              ("RENDER BUTTON","Crear / actualizar CDG final"),
+              ("CDG LOADER","async function loadCdg"),
+              ("CDG LOAD ALT","async function pvLoadCdg"),
+              ("CDG STATUS TEXT","CDG final real cargado"),
+              ("CDG STATE","cdgFinal"),
+              ("IA BUTTON ID","iaBlock"),
+              ("DIAG BUTTON ID","diag"),
+              ("ROLE HTML","SIN ROL"),
+              ("LYRICS SCROLL","lyricsScroll"),
+              ("STICKY CSS","position:sticky"),
+          ]:show(E,label,key)
+          for label,key in [
+              ("RENDER WORKER","def _render_worker"),
+              ("RENDER ROUTE","render/start"),
+              ("RENDER ROUTE API","/api/jobs/<jid>/render"),
+              ("TIMINGS ROUTE","proyecto.timings.json"),
+              ("SAVE TIMINGS","schedule_timings_backup"),
+              ("RENDER STATUS","render_status"),
+          ]:show(S,label,key)
+          PY
+          REMOTE
