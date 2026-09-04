@@ -28,7 +28,7 @@ jobs:
           OVH_PORT: ${{ secrets.OVH_PORT }}
           OVH_USER: ${{ secrets.OVH_USER }}
         run: |
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'python3 -' <<'PY'
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
           from pathlib import Path
           import re
           s=Path("/opt/djgabo-cdg-v2/panel.html").read_text(encoding="utf-8")
