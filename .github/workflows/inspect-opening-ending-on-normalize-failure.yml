@@ -1,0 +1,56 @@
+name: Inspect Opening Ending on normalize failure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-opening-ending-on-normalize-failure.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Reproduce ON normalizer
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          TEST=/tmp/djgabo-opening-ending-smoke
+          STAGE=/tmp/djgabo-opening-ending-downloads-yellow-v1
+          PROD=/opt/djgabo-cdg
+          sudo env TEST="$TEST" STAGE="$STAGE" "$PROD/.venv/bin/python" - <<'PY'
+          import json,os,sys,traceback
+          from pathlib import Path
+          test=Path(os.environ["TEST"]);stage=Path(os.environ["STAGE"])/"renderer"
+          sys.path.insert(0,str(stage));sys.path.insert(0,str(stage/"vendor"))
+          try:
+              import normalize as N
+              style=json.load(open(test/"style.json",encoding="utf-8"))
+              doc=N.load(test/"on.json")
+              print("LOAD_OK")
+              n=N.normalize(doc,dict(style))
+              print("NORMALIZE_OK",n.outro_enabled)
+              toml=N.to_toml(n,dict(style),test/"silent.wav","smoke-on",stage)
+              print("TOML_OK",len(toml),'outro_enabled = true' in toml)
+              (test/"on-debug.toml").write_text(toml,encoding="utf-8")
+          except Exception:
+              traceback.print_exc()
+          PY
+          REMOTE
