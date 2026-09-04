@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T09:28:30+00:00
+TIMESTAMP=2026-09-04T09:29:57+00:00
 SCOPE=EDITOR_PREVIEW_REVIEW_UI_PLUS_INSTRUMENTAL_UNIT
 FINAL_CDG_SCHEDULER=NOMAD_LINE_DELAYED
 START_END_MUTATION=NO
@@ -17,11 +17,174 @@ LIVE_EDITOR_SCHEDULER_STATIC_CHECK=PASS
 === BUILD REAL EL PERFUME SMOKE PROJECT ===
 SMOKE_JOB=LET-0088|Hermanos Silva|El Perfume
 === VERIFY REAL CONFIG + INSTRUMENTAL UNIT ===
-Traceback (most recent call last):
-  File "<stdin>", line 11, in <module>
-  File "/tmp/djgabo-editor-review-nomad-v1/renderer/normalize.py", line 916, in normalize
-    visual, render_pages = resolve_render_pages(doc, style, font, upper)
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/tmp/djgabo-editor-review-nomad-v1/renderer/normalize.py", line 270, in resolve_render_pages
-    raise NormalizeError(
-normalize.NormalizeError: render_pages fue creado con 5 líneas/página pero el render pide 6.
+line 5 too wide
+max width is 280 pixel(s); actual width is 360 pixel(s)
+	EL PERFUME QUE USASTE AQUELLA 
+line 6 too wide
+max width is 280 pixel(s); actual width is 353 pixel(s)
+	ÚLTIMA NOCHE DE AMOR LO LLEVO 
+line 7 too wide
+max width is 280 pixel(s); actual width is 345 pixel(s)
+	IMPREGNADO AÚN EN MI CUERPO. 
+line 14 too wide
+max width is 280 pixel(s); actual width is 317 pixel(s)
+	EREES EL AMOOOR DE MI VIDA. 
+line 16 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+line 18 too wide
+max width is 280 pixel(s); actual width is 317 pixel(s)
+	EREES EL AMOOOR DE MI VIDA. 
+line 20 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+line 30 too wide
+max width is 280 pixel(s); actual width is 360 pixel(s)
+	EL PERFUME QUE USASTE AQUELLA 
+line 31 too wide
+max width is 280 pixel(s); actual width is 353 pixel(s)
+	ÚLTIMA NOCHE DE AMOR LO LLEVO 
+line 32 too wide
+max width is 280 pixel(s); actual width is 345 pixel(s)
+	IMPREGNADO AÚN EN MI CUERPO. 
+line 39 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+line 41 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+line 43 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+line 45 too wide
+max width is 280 pixel(s); actual width is 293 pixel(s)
+	AY, SOLO TÚ PODRÁS DARME 
+line 46 too wide
+max width is 280 pixel(s); actual width is 289 pixel(s)
+	AMOOOR Y MI FELICIDAAAD. 
+line 55 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+line 57 too wide
+max width is 280 pixel(s); actual width is 393 pixel(s)
+	AY, SOLO TÚ PODRÁS DARME AMOOOR 
+DEFAULT_NO_ROLE_WHITE_TO_YELLOW=PASS
+INSTRUMENTAL_UNITS 3
+INSTRUMENTAL_UNIT_TIMING=PASS
+=== FULL REAL CDG SMOKE ===
+DJGABO_PROGRESS:4:Leyendo estilo y proyecto…
+DJGABO_PROGRESS:14:Timings validados…
+INFO  379 sílabas · 60 líneas visuales · 0 instrumental(es)
+WARNING  palabra «QUE» (w0010): necesita 7 pasos de barrido y sólo caben 4; el CDG la barre en 60 ms
+WARNING  palabra «DE» (w0015): necesita 5 pasos de barrido y sólo caben 4; el CDG la barre en 60 ms
+WARNING  palabra «A» (w0038): necesita 3 pasos de barrido y sólo caben 1; el CDG la barre en 20 ms
+WARNING  palabra «QUE» (w0109): necesita 7 pasos de barrido y sólo caben 4; el CDG la barre en 60 ms
+WARNING  palabra «DE» (w0114): necesita 5 pasos de barrido y sólo caben 4; el CDG la barre en 59 ms
+INFO  render timeline: first_real_voice=9.28 · opening=6.0s · rule=AUTO_NORMAL_FITS · intro_delay=0
+DJGABO_PROGRESS:24:Preparando compositor CDG…
+WARNING  line 5 too wide
+max width is 280 pixel(s); actual width is 360 pixel(s)
+	EL PERFUME QUE USASTE AQUELLA 
+WARNING  line 6 too wide
+max width is 280 pixel(s); actual width is 353 pixel(s)
+	ÚLTIMA NOCHE DE AMOR LO LLEVO 
+WARNING  line 7 too wide
+max width is 280 pixel(s); actual width is 345 pixel(s)
+	IMPREGNADO AÚN EN MI CUERPO. 
+WARNING  line 14 too wide
+max width is 280 pixel(s); actual width is 317 pixel(s)
+	EREES EL AMOOOR DE MI VIDA. 
+WARNING  line 16 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+WARNING  line 18 too wide
+max width is 280 pixel(s); actual width is 317 pixel(s)
+	EREES EL AMOOOR DE MI VIDA. 
+WARNING  line 20 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+WARNING  line 30 too wide
+max width is 280 pixel(s); actual width is 360 pixel(s)
+	EL PERFUME QUE USASTE AQUELLA 
+WARNING  line 31 too wide
+max width is 280 pixel(s); actual width is 353 pixel(s)
+	ÚLTIMA NOCHE DE AMOR LO LLEVO 
+WARNING  line 32 too wide
+max width is 280 pixel(s); actual width is 345 pixel(s)
+	IMPREGNADO AÚN EN MI CUERPO. 
+WARNING  line 39 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+WARNING  line 41 too wide
+max width is 280 pixel(s); actual width is 356 pixel(s)
+	SOLO TÚ PODRÁS DARME AMOOOR 
+WARNING  line 43 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+WARNING  line 45 too wide
+max width is 280 pixel(s); actual width is 293 pixel(s)
+	AY, SOLO TÚ PODRÁS DARME 
+WARNING  line 46 too wide
+max width is 280 pixel(s); actual width is 289 pixel(s)
+	AMOOOR Y MI FELICIDAAAD. 
+WARNING  line 55 too wide
+max width is 280 pixel(s); actual width is 287 pixel(s)
+	EREES EL AMOR DE MI VIDA. 
+WARNING  line 57 too wide
+max width is 280 pixel(s); actual width is 393 pixel(s)
+	AY, SOLO TÚ PODRÁS DARME AMOOOR 
+INFO  config settings loaded
+INFO  instrumental visual unit: lines 1/2 draw=1115 erase=7905
+INFO  instrumental visual unit: lines 26/27 draw=29044 erase=36354
+INFO  instrumental visual unit: lines 51/52 draw=57430 erase=61668
+INFO  draw times set
+DJGABO_PROGRESS:32:Componiendo barrido CDG…
+INFO  song file loaded
+INFO  Opening composed for 6.000s; intro_delay forced to 0.
+WARNING  Not enough time to highlight lyric 0 line 5 syllable 4. Ideal duration is 0 column(s); actual duration is 7 column(s). Syllable text: EL PERFUME {QUE} USASTE AQUELLA 
+WARNING  Not enough time to highlight lyric 0 line 6 syllable 4. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: ÚLTIMA NOCHE {DE} AMOR LO LLEVO 
+WARNING  Not enough time to highlight lyric 0 line 8 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: TODAVÍA {TÚ} ERES EL 
+WARNING  Not enough time to highlight lyric 0 line 10 syllable 4. Ideal duration is 4 column(s); actual duration is 6 column(s). Syllable text: ESTE AMOR {HA} SEGUIDO 
+WARNING  Not enough time to highlight lyric 0 line 11 syllable 4. Ideal duration is -4 column(s); actual duration is 3 column(s). Syllable text: CRECIENDO DÍA {A} DÍA. 
+WARNING  Not enough time to highlight lyric 0 line 13 syllable 4. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: QUE NO {TE} OLVIDA. 
+WARNING  Not enough time to highlight lyric 0 line 30 syllable 4. Ideal duration is 0 column(s); actual duration is 7 column(s). Syllable text: EL PERFUME {QUE} USASTE AQUELLA 
+WARNING  Not enough time to highlight lyric 0 line 31 syllable 4. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: ÚLTIMA NOCHE {DE} AMOR LO LLEVO 
+WARNING  Not enough time to highlight lyric 0 line 34 syllable 4. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: AMOR DE {MI} VIDA. 
+WARNING  Not enough time to highlight lyric 0 line 35 syllable 4. Ideal duration is 4 column(s); actual duration is 6 column(s). Syllable text: ESTE AMOR {HA} SEGUIDO 
+WARNING  Not enough time to highlight lyric 0 line 36 syllable 4. Ideal duration is 0 column(s); actual duration is 3 column(s). Syllable text: CRECIENDO DÍA {A} DÍA. 
+WARNING  Not enough time to highlight lyric 0 line 38 syllable 4. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: QUE NO {TE} OLVIDA. 
+WARNING  Not enough time to highlight lyric 0 line 44 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: TE {LO} DICE MI CORAZÓN. 
+WARNING  Not enough time to highlight lyric 0 line 58 syllable 2. Ideal duration is 4 column(s); actual duration is 5 column(s). Syllable text: Y {MI} FELICIDAAAD. 
+INFO  karaoke file composed
+INFO  karaoke files written to /tmp/tmpvp7d2yn7/hermanos-silva--el-perfume.zip
+DJGABO_PROGRESS:86:CDG compuesto · empaquetando…
+DJGABO_PROGRESS:96:Verificando archivo CDG…
+INFO  → /tmp/djgabo-editor-review-nomad-smoke/hermanos-silva--el-perfume.cdg
+INFO  → /tmp/djgabo-editor-review-nomad-smoke/hermanos-silva--el-perfume.mp3
+INFO  → /tmp/djgabo-editor-review-nomad-smoke/hermanos-silva--el-perfume.zip
+WARNING  36 aviso(s). Revisa /tmp/djgabo-editor-review-nomad-smoke/hermanos-silva--el-perfume.avisos.json y corrige esas palabras en el editor.
+DJGABO_PROGRESS:100:CDG terminado
+FULL_SMOKE=PASS
+SMOKE_CDG_SIZE=1829832
+SMOKE_PACKETS=76243
+=== BACKUP ===
+BACKUP=/opt/djgabo-cdg/backups/editor_review_nomad_v1_20260904-092957
+=== INSTALL ===
+=== POST VERIFY ===
+PROTECTED_FILES_UNCHANGED=YES
+EDITOR_CHANGED=YES
+NORMALIZE_CHANGED=YES
+COMPOSER_CHANGED=YES
+PREVIEW_SCHEDULER=NOMAD_LINE_DELAYED
+REVIEW_RATES=1x,2x,3x,4x,5x
+FAST_RATE_MUTATES_TIMINGS=NO
+AI_BUTTONS_SEPARATED_FROM_ROLES=YES
+HELP_TEXT_REMOVED=YES
+TOP_CREATE_CDG_HIDDEN=YES
+SAVE_PROJECT_BUTTON_HIDDEN=YES_AUTOSAVE_PRESERVED
+LYRICS_TOGGLE_HIDDEN=YES_LYRICS_PRESERVED
+PANTALLA_TOGGLE_PRESERVED=YES
+INSTRUMENTAL_LABEL_AND_DOTS_JOINT_ERASE=YES
+SERVICE_ACTIVE=YES
+HTTP_AFTER=200
+DEPLOY=OK
