@@ -180,8 +180,14 @@ class LyricState:
     line_erase: int
     syllable_line: int
     syllable_index: int
+    # DJGABO_RENDER_QUEUE_FIX_V1
+    # Los borrados tienen cola propia y prioridad sobre dibujos futuros.
+    erase_queue: deque[CDGPacket]
     draw_queue: deque[CDGPacket]
     highlight_queue: deque[list[CDGPacket]]
+    # Número de grupos de highlight que deben usar también el ancho de banda
+    # reservado al dibujo para alcanzar el mínimo físico del CD+G.
+    highlight_burst: int = 0
 
 
 @define
@@ -812,8 +818,10 @@ class KaraokeComposer:
                         line_erase=0,
                         syllable_line=0,
                         syllable_index=0,
+                        erase_queue=deque(),
                         draw_queue=deque(),
                         highlight_queue=deque(),
+                        highlight_burst=0,
                     )
                 )
 
@@ -860,6 +868,7 @@ class KaraokeComposer:
                 state.line_draw < len(times.line_draw)
                 or state.line_erase < len(times.line_erase)
                 or state.syllable_line < len(lyric.lines)
+                or state.erase_queue
                 or state.draw_queue
                 or state.highlight_queue
                 for lyric, times, state in zip(
@@ -962,6 +971,8 @@ class KaraokeComposer:
                 self.logger.debug("explicit screen clear at %d", clear_time)
                 for st in lyric_states:
                     st.highlight_queue.clear()
+                    st.highlight_burst=0
+                    st.erase_queue.clear()
                     st.draw_queue.clear()
                 packets=[*memory_preset_repeat(self.BACKGROUND),*load_color_table(self.color_table)]
                 if self.config.border is not None:
@@ -1030,7 +1041,10 @@ class KaraokeComposer:
                 f"t={self.writer.packets_queued}: erasing lyric " f"{line_erase_info.lyric_index} line " f"{line_erase_info.line_index}"
             )
             if line_erase_info.text.strip():
-                state.draw_queue.extend(
+                # DJGABO_RENDER_QUEUE_FIX_V1
+                # Un line_erase vencido no puede quedar detrás de decenas de
+                # dibujos futuros. Se agenda en una cola prioritaria.
+                state.erase_queue.extend(
                     line_image_to_packets(
                         line_erase_info.image,
                         xy=(line_erase_info.x, line_erase_info.y),
@@ -1079,13 +1093,19 @@ class KaraokeComposer:
             assert syllable_info is not None
             if syllable_info.text.strip():
                 # Add the highlight packets to the highlight queue
-                state.highlight_queue.extend(
-                    self._compose_highlight(
-                        lyric=lyric,
-                        syllable=syllable_info,
-                        current_time=current_time,
-                    )
+                highlight_groups, urgent = self._compose_highlight(
+                    lyric=lyric,
+                    syllable=syllable_info,
+                    current_time=current_time,
                 )
+                state.highlight_queue.extend(highlight_groups)
+                if urgent:
+                    # DJGABO_FAST_HIGHLIGHT_BURST_V1
+                    # Durante una palabra físicamente demasiado corta,
+                    # el highlight toma temporalmente también el bandwidth de
+                    # dibujo. No agrega paquetes: sólo elimina la espera
+                    # artificial entre grupos para acercarse al mínimo físico.
+                    state.highlight_burst=max(state.highlight_burst,len(state.highlight_queue))
 
             # Advance to the next syllable
             state.syllable_index += 1
@@ -1143,11 +1163,15 @@ class KaraokeComposer:
             else:
                 self.logger.debug("this instrumental did not wait for the previous " "line to finish")
 
-            self.logger.debug("_compose_lyric: Purging all highlight/draw queues")
+            self.logger.debug("_compose_lyric: Purging all highlight/erase/draw queues")
             for st in lyric_states:
                 if instrumental.wait:
                     if st.highlight_queue:
                         self.logger.warning("_compose_lyric: Unexpected items in highlight queue when instrumental waited")
+                    if st.erase_queue:
+                        # Respeta primero borrados ya vencidos antes de entrar
+                        # al instrumental cuando éste está esperando.
+                        self.writer.queue_packets(st.erase_queue)
                     if st.draw_queue:
                         if st == state:
                             self.logger.debug("_compose_lyric: Queueing remaining draw packets for current state")
@@ -1155,8 +1179,10 @@ class KaraokeComposer:
                             self.logger.warning("_compose_lyric: Unexpected items in draw queue for non-current state")
                         self.writer.queue_packets(st.draw_queue)
 
-                # Purge highlight/draw queues
+                # Purge highlight/erase/draw queues
                 st.highlight_queue.clear()
+                st.highlight_burst=0
+                st.erase_queue.clear()
                 st.draw_queue.clear()
 
             # The instrumental should end when the next line is drawn by
@@ -1214,45 +1240,78 @@ class KaraokeComposer:
             return
 
         composer_state.just_cleared = False
-        # Create groups of packets for highlights and draws, with None
-        # as a placeholder value for non-highlight packets
+        # DJGABO_RENDER_QUEUE_FIX_V1 / DJGABO_FAST_HIGHLIGHT_BURST_V1
+        # Prioridades de ancho de banda:
+        #   1) highlight musical;
+        #   2) borrado ya vencido;
+        #   3) dibujo futuro (tiene read-ahead).
+        # Si un highlight fue declarado "urgent", toma temporalmente el slot
+        # de draw_bandwidth. El total de paquetes por ciclo NO aumenta.
+        burst=bool(state.highlight_burst>0 and state.highlight_queue)
+        highlight_slots=self.config.highlight_bandwidth + (self.config.draw_bandwidth if burst else 0)
+        draw_slots=0 if burst else self.config.draw_bandwidth
+
         highlight_groups: list[list[CDGPacket | None]] = []
-        for _ in range(self.config.highlight_bandwidth):
-            group = []
+        popped_groups=0
+        for _ in range(highlight_slots):
+            group=[]
             if state.highlight_queue:
-                group = state.highlight_queue.popleft()
-            highlight_groups.append(list(pad(group, self.max_tile_height)))
-        # NOTE This means the draw groups will only contain None.
-        draw_groups: list[list[CDGPacket | None]] = [[None] * self.max_tile_height] * self.config.draw_bandwidth
+                group=state.highlight_queue.popleft()
+                popped_groups+=1
+            highlight_groups.append(list(pad(group,self.max_tile_height)))
+
+        if burst:
+            state.highlight_burst=max(0,state.highlight_burst-popped_groups)
+        if not state.highlight_queue:
+            state.highlight_burst=0
+
+        draw_groups: list[list[CDGPacket | None]] = [
+            [None] * self.max_tile_height for _ in range(draw_slots)
+        ]
 
         self.lyric_packet_indices.update(
             range(
                 self.writer.packets_queued,
-                self.writer.packets_queued + len(list(it.chain(*highlight_groups, *draw_groups))),
+                self.writer.packets_queued + len(list(it.chain(*highlight_groups,*draw_groups))),
             )
         )
 
-        # Intersperse the highlight and draw groups and queue the
-        # packets
-        for group in intersperse(highlight_groups, draw_groups):
+        for group in intersperse(highlight_groups,draw_groups):
             for item in group:
                 if item is not None:
                     self.writer.queue_packet(item)
                     continue
 
-                # If a group item is None, try getting packets from the
-                # draw queue
+                # 1) Borrado vencido del estado actual.
+                if state.erase_queue:
+                    self.writer.queue_packet(state.erase_queue.popleft())
+                    continue
+
+                # 2) Borrado vencido de cualquier otro set de letra.
+                other_erase=next((st for st in lyric_states if st.erase_queue),None)
+                if other_erase is not None:
+                    self.writer.queue_packet(other_erase.erase_queue.popleft())
+                    continue
+
+                # 3) Dibujo futuro del estado actual.
                 if state.draw_queue:
                     self.writer.queue_packet(state.draw_queue.popleft())
                     continue
-                self.writer.queue_packet(next(iter(st.draw_queue.popleft() for st in lyric_states if st.draw_queue), no_instruction()))
+
+                # 4) Dibujo futuro de cualquier otro set.
+                other_draw=next((st for st in lyric_states if st.draw_queue),None)
+                if other_draw is not None:
+                    self.writer.queue_packet(other_draw.draw_queue.popleft())
+                    continue
+
+                self.writer.queue_packet(no_instruction())
 
     def _compose_highlight(
         self,
         lyric: LyricInfo,
         syllable: SyllableInfo,
         current_time: int,
-    ) -> list[list[CDGPacket]]:
+    ) -> tuple[list[list[CDGPacket]], bool]:
         assert syllable is not None
         line_info = lyric.lines[syllable.line_index]
         x = line_info.x
@@ -1277,9 +1336,15 @@ class KaraokeComposer:
         # along it (not including the one before the left edge or the
         # one after the right edge)
         highlight_progress = [tile_index * CDG_TILE_WIDTH for tile_index in range(left_tile + 1, right_tile + 1)]
+        # DJGABO_FAST_HIGHLIGHT_BURST_V1
+        # "urgent" significa que ni siquiera caben cómodamente los límites
+        # geométricos obligatorios de tiles dentro de la ventana musical.
+        # No movemos START/END y no inventamos más pasos; el scheduler sólo
+        # presta temporalmente draw_bandwidth al barrido.
+        urgent = columns - 1 < len(highlight_progress)
         # If there aren't too many tile boundaries for the number of
         # column updates
-        if columns - 1 >= len(highlight_progress):
+        if not urgent:
             # Add enough highlight points for all the column updates...
             highlight_progress += sorted(
                 # ...which are evenly distributed within the range...
@@ -1327,9 +1392,11 @@ class KaraokeComposer:
         # Create the highlight packets
         xor_map = {0: 2, 1: 8, 2: 10, 3: 12, 4: 0}
         highlight_xor = xor_map.get(syllable.mode, 2)
-        return [
-            line_mask_to_packets(syllable.mask, (x, y), edges, highlight=highlight_xor) for edges in it.pairwise([left_edge] + highlight_progress + [right_edge])
+        groups=[
+            line_mask_to_packets(syllable.mask,(x,y),edges,highlight=highlight_xor)
+            for edges in it.pairwise([left_edge]+highlight_progress+[right_edge])
         ]
+        return groups,urgent
 
     # !SECTION
     # endregion

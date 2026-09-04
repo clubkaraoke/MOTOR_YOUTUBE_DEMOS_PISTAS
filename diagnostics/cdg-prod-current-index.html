@@ -1682,57 +1682,121 @@ const f  = t => cs(t) * 3;                   // fotogramas CDG (300/s)
    Así ninguna página de letra puede contener texto de antes y después del
    instrumental: el Preview y el CDG comparten exactamente el mismo bloque. */
 function pvWrap(){
-  const lpp=PV.cfg.linesPerPage;
-  const blocks=[];let block=[];
-  const flushBlock=()=>{if(block.length){blocks.push(block);block=[];}};
-
-  for(const seg of S.doc.segments){
-    if(seg.kind==="break"){flushBlock();continue;}
-    const renderWords=(seg.words||[]).filter(w=>!w.spoken);
-    if(!renderWords.length)continue;
-    if(renderWords.some(w=>w.start_time===null)){flushBlock();break;}
-    let cur=[];
-    for(const w of renderWords){
-      const probe=cur.concat([w]),txt=probe.map(x=>pvText(x.text)).join(" ");
-      if(cur.length&&advWidth(txt)>PV.WRAP){block.push(cur);cur=[w];}else cur=probe;
-    }
-    if(cur.length)block.push(cur);
-  }
-  flushBlock();
-
+  /* DJGABO_PHRASE_AWARE_LAYOUT_V1
+     Regla visual:
+     - linesPerPage es CAPACIDAD máxima, no obligación de llenar.
+     - cada segmento de letra es una frase musical/semántica;
+     - se envuelve por ancho, pero se intenta mantener la frase junta;
+     - si una frase completa ya no cabe en la pantalla actual, empieza arriba
+       en la siguiente pantalla;
+     - sólo una frase que por sí sola excede N líneas se parte en varias pantallas;
+     - un BREAK explícito o un INSTRUMENTAL fuerza frontera de pantalla;
+     - las pantallas incompletas empiezan ARRIBA, nunca centradas verticalmente.
+  */
+  const lpp=Math.max(2,Math.min(8,Number(PV.cfg.linesPerPage||6)));
   const instStarts=new Set(
     _diagInstrumentalDecisions()
       .filter(x=>x.renderer_inserted&&x.next&&x.next.id)
       .map(x=>x.next.id)
   );
-  const splitBlocks=[];
-  for(const b of blocks){
-    let bb=[];
-    for(const line of b){
-      let ll=[];
-      for(const w of line){
-        if(instStarts.has(w.id) && (ll.length||bb.length)){
-          if(ll.length){bb.push(ll);ll=[];}
-          if(bb.length){splitBlocks.push(bb);bb=[];}
-        }
-        ll.push(w);
+
+  const groups=[];
+  let hardBefore=false;
+  let phraseSerial=0;
+
+  const wrapSlice=(words,phraseKey,forceBefore)=>{
+    if(!words.length)return;
+    const lines=[];
+    let cur=[];
+    const pushCur=()=>{
+      if(!cur.length)return;
+      cur._phraseKey=phraseKey;
+      lines.push(cur);
+      cur=[];
+    };
+    for(const w of words){
+      const probe=cur.concat([w]);
+      const txt=probe.map(x=>pvText(x.text)).join(" ");
+      if(cur.length&&advWidth(txt)>PV.WRAP){
+        pushCur();
+        cur=[w];
+      }else{
+        cur=probe;
       }
-      if(ll.length)bb.push(ll);
     }
-    if(bb.length)splitBlocks.push(bb);
+    pushCur();
+    if(lines.length){
+      groups.push({lines,hardBefore:!!forceBefore,phraseKey});
+    }
+  };
+
+  for(const seg of S.doc.segments){
+    if(seg.kind==="break"){
+      hardBefore=true;
+      continue;
+    }
+    const renderWords=(seg.words||[]).filter(w=>!w.spoken);
+    if(!renderWords.length)continue;
+    if(renderWords.some(w=>w.start_time===null)){
+      hardBefore=true;
+      continue;
+    }
+
+    let slice=[];
+    let sliceHard=hardBefore;
+    const flushSlice=()=>{
+      if(!slice.length)return;
+      const key=(seg.id||("seg"+phraseSerial))+":"+phraseSerial++;
+      wrapSlice(slice,key,sliceHard);
+      slice=[];
+      sliceHard=false;
+    };
+
+    for(const w of renderWords){
+      if(instStarts.has(w.id)){
+        if(slice.length)flushSlice();
+        sliceHard=true;
+      }
+      slice.push(w);
+    }
+    flushSlice();
+    hardBefore=false;
   }
 
-  const out=[];const padPage=()=>{while(out.length%lpp)out.push([]);};
-  for(const b of splitBlocks){
-    if(out.length)padPage();
-    for(let i=0;i<b.length;i+=lpp){
-      if(i>0)padPage();
-      const chunk=b.slice(i,i+lpp),top=Math.floor((lpp-chunk.length)/2),bottom=lpp-chunk.length-top;
-      for(let j=0;j<top;j++)out.push([]);
-      out.push(...chunk);
-      for(let j=0;j<bottom;j++)out.push([]);
+  const out=[];
+  let page=[];
+
+  const flushPage=()=>{
+    if(!page.length)return;
+    out.push(...page);
+    while(out.length%lpp)out.push([]);
+    page=[];
+  };
+
+  for(const g of groups){
+    if(g.hardBefore)flushPage();
+    const lines=g.lines||[];
+    if(!lines.length)continue;
+
+    if(lines.length>lpp){
+      flushPage();
+      for(let i=0;i<lines.length;i+=lpp){
+        const chunk=lines.slice(i,i+lpp);
+        out.push(...chunk);
+        if(i+lpp<lines.length){
+          while(out.length%lpp)out.push([]);
+        }
+      }
+      continue;
     }
+
+    if(page.length && page.length+lines.length>lpp){
+      flushPage();
+    }
+    page.push(...lines);
   }
+  flushPage();
+
   while(out.length&&!out[out.length-1].length)out.pop();
   return out;
 }
@@ -1853,6 +1917,8 @@ function buildRenderPlanDecision(){
       visual_index:li,
       slot:(li%lpp)+1,
       word_ids:ids,
+      phrase_id:line._phraseKey||null,
+      page_index:Math.floor(li/lpp)+1,
       text:line.map(w=>pvText(w.text)).join(" "),
       sweep_start:+st.toFixed(3),
       sweep_end:+en.toFixed(3),
@@ -1965,7 +2031,10 @@ function buildRenderPlanDecision(){
       lines_are_capacity_not_page_rule:true,
       preview_and_renderer_share_plan:true,
       full_clear_only_when_safe:true,
-      renderer_may_preroll_packets_before_display_at:true
+      renderer_may_preroll_packets_before_display_at:true,
+      phrase_aware_layout:true,
+      phrase_keep_together_when_possible:true,
+      partial_pages_start_at_top:true
     },
     clear_events:clearEvents,
     instrumental_intervals:instIntervals,
@@ -5045,5 +5114,6 @@ resize(); loop();
 <!-- DJGABO_INSTRUMENTAL_PAGE_BOUNDARY_V2 -->
 <!-- DJGABO_REPEAT_MICROTIMING_DIAG_V1 -->
 <!-- DJGABO_SMART_OVERWRITE_RENDER_PLAN_V1 -->
+<!-- DJGABO_PHRASE_AWARE_LAYOUT_V1 -->
 </body>
 </html>
