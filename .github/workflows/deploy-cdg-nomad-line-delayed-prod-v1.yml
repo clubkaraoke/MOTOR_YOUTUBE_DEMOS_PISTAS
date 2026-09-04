@@ -1,0 +1,228 @@
+name: Deploy CDG Nomad LINE_DELAYED to production once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-nomad-line-delayed-prod-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight patch source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_nomad_line_delayed_prod_v1/patch_production.py
+          grep -Fq DJGABO_NOMAD_LINE_DELAYED_PROD_V1 deploy/cdg_nomad_line_delayed_prod_v1/patch_production.py
+          echo "SOURCE_PREFLIGHT=PASS"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Stage, smoke, backup, and install scheduler only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_nomad_line_delayed_prod_v1/patch_production.py \
+            "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_nomad_line_delayed_prod_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 <<'REMOTE' | tee diagnostics/cdg-nomad-line-delayed-prod-v1.txt
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          RENDER="$PROD/renderer"
+          SERVICE=djgabo-cdg
+          STAGE=/tmp/djgabo-renderer-nomad-line-delayed-v1
+          SMOKE=/tmp/djgabo-nomad-line-delayed-smoke
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/nomad_line_delayed_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SCOPE=FINAL_CDG_SCHEDULER_ONLY"
+          echo "PREVIEW_UI_CHANGE=NO"
+          echo "PANEL_UI_CHANGE=NO"
+
+          test "$(sudo systemctl is-active "$SERVICE")" = active
+          BEFORE_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$BEFORE_HTTP" = 200
+
+          PROTECTED_BEFORE="$(sudo sha256sum \
+            "$PROD/server.py" \
+            "$PROD/panel.html" \
+            "$PROD/editor_v1/index.html" \
+            "$RENDER/preview.py" \
+            "$RENDER/render.py" \
+            "$RENDER/style.json" \
+            "$RENDER/vendor/cdgmaker/composer.py" \
+            "$RENDER/vendor/cdgmaker/config.py" | sha256sum | awk '{print $1}')"
+          NORMALIZE_BEFORE="$(sudo sha256sum "$RENDER/normalize.py" | awk '{print $1}')"
+          echo "PROTECTED_HASH_BEFORE=$PROTECTED_BEFORE"
+          echo "NORMALIZE_HASH_BEFORE=$NORMALIZE_BEFORE"
+
+          echo "=== STAGE CURRENT RENDERER ==="
+          sudo rm -rf "$STAGE" "$SMOKE"
+          sudo cp -a "$RENDER" "$STAGE"
+          sudo python3 /tmp/patch_cdg_nomad_line_delayed_prod_v1.py "$STAGE/normalize.py"
+          sudo python3 -m py_compile "$STAGE/normalize.py" "$STAGE/render.py" "$STAGE/vendor/cdgmaker/composer.py" "$STAGE/vendor/cdgmaker/config.py"
+          sudo grep -Fq 'DJGABO_NOMAD_LINE_DELAYED_PROD_V1' "$STAGE/normalize.py"
+          sudo grep -Fq '"explicit_timeline = false"' "$STAGE/normalize.py"
+          sudo grep -Fq '"screen_clear_sync = []"' "$STAGE/normalize.py"
+          echo "STAGE_PATCH=PASS"
+
+          echo "=== LOCATE REAL EL PERFUME TEST ASSETS ==="
+          sudo python3 - <<'PY' >/tmp/nomad-smoke-paths
+          import json
+          from pathlib import Path
+          root=Path("/var/lib/djgabo-cdg/jobs/LET-0088")
+          if not root.exists():
+              raise SystemExit("LET-0088 job directory not found")
+          timing=None
+          for p in sorted(root.rglob("*.timings.json")):
+              timing=p; break
+          if timing is None:
+              for p in sorted(root.rglob("*.json")):
+                  try:
+                      d=json.load(open(p,encoding="utf-8"))
+                  except Exception:
+                      continue
+                  if d.get("version")==1 and isinstance(d.get("segments"),list) and d.get("segments"):
+                      timing=p; break
+          if timing is None:
+              raise SystemExit("LET-0088 timings JSON not found")
+          audio_candidates=[]
+          for ext in ("*.mp3","*.wav","*.m4a"):
+              audio_candidates += list(root.rglob(ext))
+          audio_candidates=[p for p in audio_candidates if p.is_file() and p.stat().st_size>1000]
+          if not audio_candidates:
+              raise SystemExit("LET-0088 local audio not found")
+          audio=max(audio_candidates,key=lambda p:p.stat().st_size)
+          print(str(timing))
+          print(str(audio))
+          PY
+          TIMINGS="$(sed -n '1p' /tmp/nomad-smoke-paths)"
+          AUDIO="$(sed -n '2p' /tmp/nomad-smoke-paths)"
+          echo "SMOKE_TIMINGS=$TIMINGS"
+          echo "SMOKE_AUDIO=$AUDIO"
+
+          echo "=== VERIFY GENERATED TOML USES NOMAD LINE_DELAYED ==="
+          sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" python3 - <<'PY'
+          import json, os, sys, tempfile
+          from pathlib import Path
+          stage=Path(os.environ["STAGE"])
+          sys.path.insert(0,str(stage))
+          sys.path.insert(0,str(stage/"vendor"))
+          import normalize as N
+          doc=N.load(os.environ["TIMINGS"])
+          style=json.load(open(stage/"style.json",encoding="utf-8"))
+          n=N.normalize(doc,style)
+          toml=N.to_toml(n,style,Path(os.environ["AUDIO"]),"nomad-line-delayed-smoke",stage)
+          assert 'clear_mode = "delayed"' in toml, "clear_mode no es delayed"
+          assert 'screen_clear_sync = []' in toml, "legacy screen_clear_sync sigue activo"
+          assert 'explicit_timeline = false' in toml, "explicit SMART_OVERWRITE sigue activo"
+          cfg=Path("/tmp/nomad-line-delayed-config.toml")
+          cfg.write_text(toml,encoding="utf-8")
+          from cdgmaker.composer import KaraokeComposer
+          c=KaraokeComposer.from_file(cfg)
+          assert c.config.lyrics[0].explicit_timeline is False
+          lt=c.lyric_times[0]
+          assert lt.line_draw, "Nomad no calculó line_draw"
+          assert lt.line_erase, "Nomad no calculó line_erase"
+          print("NOMAD_LINE_DELAYED_CONFIG=PASS")
+          print("LINES",len(c.lyrics[0].lines))
+          print("FIRST_DRAW_FRAMES",lt.line_draw[:12])
+          print("FIRST_ERASE_FRAMES",lt.line_erase[:12])
+          PY
+
+          echo "=== FULL REAL CDG SMOKE IN /tmp ==="
+          sudo mkdir -p "$SMOKE"
+          sudo timeout 240 "$PROD/.venv/bin/python" "$STAGE/render.py" "$TIMINGS" "$AUDIO" -o "$SMOKE" >/tmp/nomad-full-smoke.log 2>&1 || {
+            cat /tmp/nomad-full-smoke.log
+            echo "FULL_SMOKE=FAIL"
+            exit 1
+          }
+          tail -80 /tmp/nomad-full-smoke.log
+          CDG="$(find "$SMOKE" -maxdepth 1 -type f -name '*.cdg' -size +1000c | head -1)"
+          test -n "$CDG"
+          CDG_SIZE="$(stat -c %s "$CDG")"
+          test $((CDG_SIZE % 24)) -eq 0
+          echo "FULL_SMOKE=PASS"
+          echo "SMOKE_CDG=$CDG"
+          echo "SMOKE_CDG_SIZE=$CDG_SIZE"
+          echo "SMOKE_PACKETS=$((CDG_SIZE/24))"
+
+          echo "=== BACKUP ==="
+          sudo mkdir -p "$BACKUP"
+          sudo cp -a "$RENDER/normalize.py" "$BACKUP/normalize.py"
+          sudo cp -a "$RENDER/render.py" "$BACKUP/render.py"
+          sudo cp -a "$RENDER/preview.py" "$BACKUP/preview.py"
+          sudo cp -a "$RENDER/style.json" "$BACKUP/style.json"
+          sudo cp -a "$RENDER/vendor/cdgmaker/composer.py" "$BACKUP/composer.py"
+          sudo cp -a "$RENDER/vendor/cdgmaker/config.py" "$BACKUP/config.py"
+          echo "BACKUP=$BACKUP"
+
+          echo "=== INSTALL ONLY normalize.py ==="
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/normalize.py" "$RENDER/normalize.py"
+          sudo python3 -m py_compile "$RENDER/normalize.py"
+          sudo grep -Fq 'DJGABO_NOMAD_LINE_DELAYED_PROD_V1' "$RENDER/normalize.py"
+          echo "INSTALL=PASS"
+
+          echo "=== SAFETY VERIFY ==="
+          PROTECTED_AFTER="$(sudo sha256sum \
+            "$PROD/server.py" \
+            "$PROD/panel.html" \
+            "$PROD/editor_v1/index.html" \
+            "$RENDER/preview.py" \
+            "$RENDER/render.py" \
+            "$RENDER/style.json" \
+            "$RENDER/vendor/cdgmaker/composer.py" \
+            "$RENDER/vendor/cdgmaker/config.py" | sha256sum | awk '{print $1}')"
+          NORMALIZE_AFTER="$(sudo sha256sum "$RENDER/normalize.py" | awk '{print $1}')"
+          AFTER_HTTP="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+
+          test "$PROTECTED_BEFORE" = "$PROTECTED_AFTER"
+          test "$NORMALIZE_BEFORE" != "$NORMALIZE_AFTER"
+          test "$AFTER_HTTP" = 200
+          test "$(sudo systemctl is-active "$SERVICE")" = active
+
+          echo "PROTECTED_HASH_AFTER=$PROTECTED_AFTER"
+          echo "NORMALIZE_HASH_AFTER=$NORMALIZE_AFTER"
+          echo "PROTECTED_FILES_UNCHANGED=YES"
+          echo "PREVIEW_UNCHANGED=YES"
+          echo "PANEL_UNCHANGED=YES"
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP_AFTER=$AFTER_HTTP"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save deployment diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/cdg-nomad-line-delayed-prod-v1.txt ]; then
+            git add diagnostics/cdg-nomad-line-delayed-prod-v1.txt
+            git commit -m "diag: record Nomad LINE_DELAYED production deploy" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
