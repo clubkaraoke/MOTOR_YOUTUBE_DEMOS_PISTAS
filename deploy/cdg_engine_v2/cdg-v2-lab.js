@@ -45,9 +45,12 @@ function applyLabUI(){
   }
   if(pick)pick.style.display="none";
   const label=[...modal.querySelectorAll("label")].find(x=>/Destino Dropbox actual/i.test(x.textContent||""));
-  if(label)label.innerHTML='Destino de esta prueba <span style="color:#63d6a3;font-size:10px">· SOLO OVH LAB · nada se publica</span>';
+  if(label){
+    const html='Destino de esta prueba <span style="color:#63d6a3;font-size:10px">· SOLO OVH LAB · nada se publica</span>';
+    if(label.innerHTML!==html)label.innerHTML=html;
+  }
   const btn=byId("btnEnviarNueva");
-  if(btn&&!submitting)btn.textContent="✨ Crear y sincronizar con IA · LAB V2";
+  if(btn&&!submitting&&btn.textContent!=="✨ Crear y sincronizar con IA · LAB V2")btn.textContent="✨ Crear y sincronizar con IA · LAB V2";
 }
 async function ensureQrReader(){
   if(typeof window.jsQR==="function")return true;
@@ -153,8 +156,8 @@ function init(){
     }
   });
   document.addEventListener("click",submitLab,true);
-  const modal=byId("modalNueva");
-  if(modal)new MutationObserver(()=>applyLabUI()).observe(modal,{attributes:true,childList:true,subtree:true,characterData:true});
+  const openBtn=byId("btnNuevaCancion");
+  if(openBtn)openBtn.addEventListener("click",()=>setTimeout(applyLabUI,0));
   setTimeout(applyLabUI,500);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
