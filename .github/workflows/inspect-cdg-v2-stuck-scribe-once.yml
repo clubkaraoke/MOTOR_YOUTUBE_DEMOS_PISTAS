@@ -1,0 +1,91 @@
+name: Inspect CDG V2 stuck Scribe once
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-v2-stuck-scribe-once.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect V2 task state
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' 2>&1 | tee diagnostics/cdg-v2-stuck-scribe.txt <<'REMOTE'
+          set -euo pipefail
+          echo "NOW=$(date -Is)"
+          echo "=== SERVICES ==="
+          sudo systemctl is-active djgabo-cdg-v2 || true
+          sudo systemctl is-active djgabo-cdg || true
+          sudo ss -ltnp | grep -E ':8787|:8765|:8097' || true
+
+          echo "=== LATEST V2 JOBS ==="
+          sudo python3 - <<'PY'
+          import sqlite3, json
+          db="/var/lib/djgabo-cdg-v2/local.db"
+          c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+          rows=c.execute("SELECT id,artist,title,status,origin,created,updated,voice_filename,instrumental_filename,project_json FROM jobs ORDER BY rowid DESC LIMIT 8").fetchall()
+          for r in rows:
+              d=dict(r)
+              pj=d.pop("project_json",None)
+              print(json.dumps(d,ensure_ascii=False))
+              if pj:
+                  try:
+                      j=json.loads(pj)
+                      print("  project_words=",sum(len(s.get("words") or []) for s in (j.get("segments") or []) if isinstance(s,dict)))
+                  except Exception as e: print("  project_json_error",e)
+          c.close()
+          PY
+
+          echo "=== AI TASKS TABLES ==="
+          sudo python3 - <<'PY'
+          import sqlite3, json
+          db="/var/lib/djgabo-cdg-v2/local.db"
+          c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+          tabs=[r[0] for r in c.execute("select name from sqlite_master where type='table' order by name")]
+          print("tables",tabs)
+          for t in tabs:
+              if "task" in t.lower() or "ai" in t.lower():
+                  print("TABLE",t)
+                  try:
+                      rows=c.execute(f'SELECT * FROM "{t}" ORDER BY rowid DESC LIMIT 10').fetchall()
+                      for r in rows: print(json.dumps(dict(r),ensure_ascii=False,default=str)[:6000])
+                  except Exception as e: print("ERR",e)
+          c.close()
+          PY
+
+          echo "=== V2 JOURNAL LAST 250 ==="
+          sudo journalctl -u djgabo-cdg-v2 -n 250 --no-pager || true
+
+          echo "=== SCRIBE RELATED PROCESSES ==="
+          ps auxww | grep -E 'scribe|8097|eleven|python' | grep -v grep | tail -80 || true
+          REMOTE
+      - name: Commit diagnostic
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-v2-stuck-scribe.txt
+          git commit -m "diag: inspect stuck V2 Scribe task" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
