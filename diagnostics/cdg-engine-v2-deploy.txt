@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T09:31:45+00:00
+TIMESTAMP=2026-09-04T09:33:11+00:00
 PHASE=CDG_V2_EQUALITY_ONLY
 MP4_ENGINE=NOT_IMPLEMENTED
 PROD_HTTP_BEFORE=200
@@ -12,7 +12,7 @@ PROD_DATA_RESOLVED=/var/lib/djgabo-cdg
 PROD_DB_RESOLVED=/var/lib/djgabo-cdg/local.db
 === COPY LOGIN SECRETS ONLY, NO DROPBOX/DRIVE SECRETS ===
 === SYSTEMD ISOLATED ===
-V2_HEALTH={"engine":"DJGABO_CDG_ENGINE_V2_0_2","external_backups":false,"isolated":true,"local_lab_upload":true,"ok":true,"publish_to_dropbox":false}
+V2_HEALTH={"engine":"DJGABO_CDG_ENGINE_V2_0_3","external_backups":false,"isolated":true,"local_lab_upload":true,"ok":true,"publish_to_dropbox":false}
 === ENGINE SMOKE ===
 {"ok": true, "size": 79608, "lines": 2}
 SMOKE=PASS
