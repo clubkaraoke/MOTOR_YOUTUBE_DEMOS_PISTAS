@@ -1,0 +1,210 @@
+name: Deploy CDG countdown dots only v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-countdown-dots-only-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Stage validate smoke backup install
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/cdg_countdown_dots_only_v1/patch_production.py             "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_countdown_dots_only_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-countdown-dots-only-v1.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          EDITOR="$PROD/editor_v1/index.html"
+          RENDER="$PROD/renderer"
+          STAGE=/tmp/djgabo-countdown-dots-only-v1
+          SMOKE=/tmp/djgabo-countdown-dots-only-smoke
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$PROD/backups/countdown_dots_only_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "CHANGE=REMOVE_VISUAL_INSTRUMENTAL_LABEL_KEEP_DOTS_ONLY"
+          echo "START_END_MUTATION=NO"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+
+          PROTECTED_BEFORE="$(sudo sha256sum "$PROD/server.py" "$PROD/panel.html" "$RENDER/render.py" "$RENDER/preview.py" "$RENDER/style.json" | sha256sum | awk '{print $1}')"
+
+          sudo rm -rf "$STAGE" "$SMOKE"
+          sudo mkdir -p "$STAGE/renderer" "$SMOKE"
+          sudo cp "$EDITOR" "$STAGE/index.html"
+          sudo cp -a "$RENDER/." "$STAGE/renderer/"
+          sudo chmod 0666 "$STAGE/index.html" "$STAGE/renderer/normalize.py" "$STAGE/renderer/vendor/cdgmaker/composer.py"
+
+          sudo python3 /tmp/patch_cdg_countdown_dots_only_v1.py             "$STAGE/index.html"             "$STAGE/renderer/normalize.py"             "$STAGE/renderer/vendor/cdgmaker/composer.py"
+
+          sudo python3 -m py_compile "$STAGE/renderer/normalize.py" "$STAGE/renderer/vendor/cdgmaker/composer.py"
+
+          echo "=== STATIC EDITOR CHECK ==="
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          h=Path("/tmp/djgabo-countdown-dots-only-v1/index.html").read_text(encoding="utf-8")
+          assert "DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" in h
+          assert 'instrumental: {dot:"●", dots:4,' in h
+          assert 'label:"INSTRUMENTAL"' not in h
+          assert 'strokeText("INSTRUMENTAL"' not in h
+          assert "function pvDrawCountdown(state)" in h
+          assert "pvDrawCountdown(instState)" in h
+          assert 'renderer_visual:"DOTS_ONLY"' in h
+          assert "renderer_label_at_seconds" not in h
+          assert "DJGABO_COUNTDOWN_DOTS_ONLY_SCHEDULER_V1" in h
+          print("EDITOR_DOTS_ONLY=PASS")
+          PY
+
+          echo "=== REAL EL PERFUME NORMALIZER/COMPOSER CHECK ==="
+          sudo python3 - <<'PY' >/tmp/dots-only-smoke-paths
+          import json,sqlite3,wave
+          from pathlib import Path
+          db=next((p for p in [Path("/var/lib/djgabo-cdg/local.db"),Path("/var/lib/djgabo-cdg/data/local.db"),Path("/opt/djgabo-cdg/data/local.db")] if p.is_file()),None)
+          if db is None: raise SystemExit("local.db not found")
+          con=sqlite3.connect(f"file:{db}?mode=ro",uri=True);con.row_factory=sqlite3.Row
+          row=con.execute("SELECT id,artist,title,project_json,duration FROM jobs WHERE id='LET-0088'").fetchone()
+          if row is None: raise SystemExit("LET-0088 not found")
+          doc=json.loads(row["project_json"])
+          out=Path("/tmp/dots-only-real.timings.json");out.write_text(json.dumps(doc,ensure_ascii=False),encoding="utf-8")
+          duration=float((doc.get("song") or {}).get("duration") or row["duration"] or 260)
+          wav=Path("/tmp/dots-only-silent.wav");rate=8000;frames=int((duration+1)*rate)
+          with wave.open(str(wav),"wb") as wf:
+              wf.setnchannels(1);wf.setsampwidth(2);wf.setframerate(rate);block=b"\0\0"*rate
+              while frames:
+                  n=min(frames,rate);wf.writeframes(block[:n*2]);frames-=n
+          print(out);print(wav);print(f"{row['id']}|{row['artist']}|{row['title']}")
+          PY
+          TIMINGS="$(sed -n '1p' /tmp/dots-only-smoke-paths)"
+          AUDIO="$(sed -n '2p' /tmp/dots-only-smoke-paths)"
+          echo "SMOKE_JOB=$(sed -n '3p' /tmp/dots-only-smoke-paths)"
+
+          sudo env STAGE="$STAGE" TIMINGS="$TIMINGS" AUDIO="$AUDIO" "$PROD/.venv/bin/python" - <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          stage=Path(os.environ["STAGE"])/"renderer"
+          sys.path.insert(0,str(stage));sys.path.insert(0,str(stage/"vendor"))
+          import normalize as N
+          doc=N.load(os.environ["TIMINGS"])
+          style=json.load(open(stage/"style.json",encoding="utf-8"))
+          declared=((doc.get("render_pages") or {}).get("lines_per_page")
+                    or (doc.get("cdg_settings") or {}).get("lines_per_page")
+                    or style.get("lines_per_page") or 6)
+          style["lines_per_page"]=int(declared)
+          font=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+          style["font"]=str(font);style["font_fallback"]=str(font)
+          style_path=Path("/tmp/dots-only-smoke-style.json")
+          style_path.write_text(json.dumps(style),encoding="utf-8")
+          n=N.normalize(doc,style)
+          assert "INSTRUMENTAL" not in n.text.upper(), n.text
+          dot_rows=[line for line in n.text.splitlines() if "§" in line]
+          assert len(dot_rows)>=1
+          assert all("3|" in line for line in dot_rows)
+          assert all(line.count("§")==4 for line in dot_rows)
+          print("NORMALIZED_INSTRUMENTAL_LABEL_ABSENT=PASS")
+          print("DOT_ROWS",len(dot_rows))
+          print("DOTS_PER_ROW=4")
+          toml=N.to_toml(n,style,Path(os.environ["AUDIO"]),"dots-only-smoke",stage)
+          assert 'clear_mode = "delayed"' in toml
+          assert 'explicit_timeline = false' in toml
+          cfg=Path("/tmp/dots-only-smoke.toml");cfg.write_text(toml,encoding="utf-8")
+          from cdgmaker.composer import KaraokeComposer
+          c=KaraokeComposer.from_file(cfg)
+          assert all("INSTRUMENTAL" not in str(line.text).upper() for lyric in c.lyrics for line in lyric.lines)
+          pairs=0
+          for lyric,times in zip(c.lyrics,c.lyric_times):
+              for i,line in enumerate(lyric.lines):
+                  vis=[s for s in line.syllables if str(s.text).strip()]
+                  if vis and all(str(s.text).strip() in {"§","●"} for s in vis):
+                      pairs+=1
+                      end=max(s.end_offset for s in vis)
+                      assert times.line_erase[i]==end,(i,times.line_erase[i],end)
+          assert pairs>=1
+          print("COMPOSER_DOTS_ONLY_ROWS",pairs)
+          print("DOT_ROW_ERASE_AT_LAST_DOT_END=PASS")
+          PY
+
+          echo "=== FULL CDG SMOKE ==="
+          sudo timeout 300 "$PROD/.venv/bin/python" "$STAGE/renderer/render.py" "$TIMINGS" "$AUDIO"             -s /tmp/dots-only-smoke-style.json -o "$SMOKE" >/tmp/dots-only-full-smoke.log 2>&1 || {
+              tail -160 /tmp/dots-only-full-smoke.log
+              echo "FULL_SMOKE=FAIL"
+              exit 1
+            }
+          tail -100 /tmp/dots-only-full-smoke.log
+          CDG="$(find "$SMOKE" -maxdepth 1 -type f -name '*.cdg' -size +1000c | head -1)"
+          test -n "$CDG"
+          SIZE="$(stat -c %s "$CDG")"
+          test $((SIZE%24)) -eq 0
+          echo "FULL_SMOKE=PASS"
+          echo "SMOKE_CDG_SIZE=$SIZE"
+          echo "SMOKE_PACKETS=$((SIZE/24))"
+
+          echo "=== BACKUP ==="
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/renderer/vendor/cdgmaker"
+          sudo cp -a "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp -a "$RENDER/normalize.py" "$BACKUP/renderer/normalize.py"
+          sudo cp -a "$RENDER/vendor/cdgmaker/composer.py" "$BACKUP/renderer/vendor/cdgmaker/composer.py"
+          echo "BACKUP=$BACKUP"
+
+          echo "=== INSTALL ==="
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/index.html" "$EDITOR"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/renderer/normalize.py" "$RENDER/normalize.py"
+          sudo install -o djgabo-cdg -g djgabo-cdg -m 0644 "$STAGE/renderer/vendor/cdgmaker/composer.py" "$RENDER/vendor/cdgmaker/composer.py"
+          sudo python3 -m py_compile "$RENDER/normalize.py" "$RENDER/vendor/cdgmaker/composer.py"
+
+          PROTECTED_AFTER="$(sudo sha256sum "$PROD/server.py" "$PROD/panel.html" "$RENDER/render.py" "$RENDER/preview.py" "$RENDER/style.json" | sha256sum | awk '{print $1}')"
+          test "$PROTECTED_BEFORE" = "$PROTECTED_AFTER"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          test "$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)" = 200
+          sudo grep -q "DJGABO_COUNTDOWN_DOTS_ONLY_PREVIEW_V1" "$EDITOR"
+          sudo grep -q "DJGABO_COUNTDOWN_DOTS_ONLY_NORMALIZER_V1" "$RENDER/normalize.py"
+          sudo grep -q "DJGABO_COUNTDOWN_DOTS_ONLY_COMPOSER_V1" "$RENDER/vendor/cdgmaker/composer.py"
+
+          echo "PROTECTED_FILES_UNCHANGED=YES"
+          echo "PREVIEW_VISUAL=DOTS_ONLY"
+          echo "FINAL_CDG_VISUAL=DOTS_ONLY"
+          echo "INSTRUMENTAL_LABEL_CONFIG_REMOVED=YES"
+          echo "COUNTDOWN_DETECTION_PRESERVED=YES"
+          echo "START_END_MUTATION=NO"
+          echo "SERVICE_ACTIVE=YES"
+          echo "HTTP_AFTER=200"
+          echo "DEPLOY=OK"
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-countdown-dots-only-v1.txt
+          git commit -m "diag: record dots-only countdown deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
