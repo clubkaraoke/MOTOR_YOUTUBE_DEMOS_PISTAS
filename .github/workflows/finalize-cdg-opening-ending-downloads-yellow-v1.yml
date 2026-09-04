@@ -105,7 +105,7 @@ jobs:
               assert 'active_fill = "#FFFF00"' in toml
               assert 'inactive_fill = "#FFFFFF"' in toml
               assert ('outro_enabled = true' in toml)==(mode=="on")
-              assert 'intro_duration_seconds = 0.0' in toml
+              assert float(n.render_timeline["opening"]["duration_seconds"])==0.0
           print("NORMALIZER_SMOKE=PASS")
           PY
 
