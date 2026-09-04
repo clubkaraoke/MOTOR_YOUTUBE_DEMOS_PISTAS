@@ -125,15 +125,37 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
                       "role":str(w.get("vocal_role") or "none")} for w in ws],
         }
         lines.append(item); lastslot[slot]=item
+    cdg_layout={"visible_width":280,"screen_width":300,"screen_height":216,"lines_per_screen":lpp,
+                "font_size":fs,"font_path_server":str(fp),"line_tile_height":lth,
+                "row":max(1,(18-lpp*lth)//2),"stroke_width":int(options.get("stroke_width") or s.get("stroke_width") or 1)}
+    master_words=[{
+        "id":w["id"],"text":str(w.get("text") or "").strip(),
+        "start":round(float(w["start_time"]),3),"end":round(float(w["end_time"]),3),
+        "role":str(w.get("vocal_role") or "none"),"spoken":bool(w.get("spoken",False))
+    } for w in words]
+    master_segments=[]
+    for seg in project.get("segments") or []:
+        if not isinstance(seg,dict): continue
+        master_segments.append({
+            "id":str(seg.get("id") or ""),"kind":str(seg.get("kind") or "lyrics"),
+            "text":str(seg.get("text") or ""),
+            "word_ids":[str(w.get("id") or "") for w in (seg.get("words") or []) if isinstance(w,dict)]
+        })
     return {
+        "schema":"djgabo.timeline.v2","schema_version":2,
         "engine":ENGINE_VERSION,"upstream":"nomadkaraoke/karaoke-gen","upstream_commit":UPSTREAM_COMMIT,
         "policy":{"elevenlabs_word_start_end_are_immutable":True,"preview_and_cdg_share_this_timeline":True,
-                  "intro_delay_seconds":0,"hidden_offsets":False,"phase":"KARAOKE_CORE_FIRST"},
+                  "future_mp4_must_share_this_timeline":True,"intro_delay_seconds":0,"hidden_offsets":False,
+                  "phase":"KARAOKE_CORE_FIRST","mp4_engine_status":"NOT_IMPLEMENTED"},
+        "audio":{"duration":round(float(duration),3),"source_file":str((project.get("song") or {}).get("audio_file") or "")},
         "song":project.get("song") or {},"duration":round(float(duration),3),
-        "layout":{"visible_width":280,"screen_width":300,"screen_height":216,"lines_per_screen":lpp,
-                  "font_size":fs,"font_path_server":str(fp),"line_tile_height":lth,
-                  "row":max(1,(18-lpp*lth)//2),"stroke_width":int(options.get("stroke_width") or s.get("stroke_width") or 1)},
-        "lines":lines,"warnings":warnings,"source_word_count":len(words),"rendered_line_count":len(lines),
+        "words":master_words,"segments":master_segments,
+        "render_metadata":{"source":"ELEVENLABS_START_END","time_unit":"seconds","word_times_mutable":False},
+        "layouts":{"cdg":{"layout":cdg_layout,"lines":lines},"mp4":None},
+        # Compatibilidad temporal de Fase 1: el Preview/CDG ya construido sigue leyendo
+        # estas dos claves. Son alias del layout CDG, no una segunda fuente temporal.
+        "layout":cdg_layout,"lines":lines,
+        "warnings":warnings,"source_word_count":len(words),"rendered_line_count":len(lines),
     }
 
 def silent_wav(path:Path, seconds:float, rate:int=44100):
