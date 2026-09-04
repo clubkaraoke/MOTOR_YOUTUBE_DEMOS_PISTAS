@@ -1,0 +1,141 @@
+name: Inspect CDG editor improvements v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-editor-improvements-v1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect live production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-editor-improvements-live.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          EDITOR="$PROD/editor_v1/index.html"
+          NORMALIZE="$PROD/renderer/normalize.py"
+          COMPOSER="$PROD/renderer/vendor/cdgmaker/composer.py"
+          STYLE="$PROD/renderer/style.json"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_PANEL=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          echo "HTTP_EDITOR=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+
+          sudo env EDITOR="$EDITOR" NORMALIZE="$NORMALIZE" COMPOSER="$COMPOSER" STYLE="$STYLE" python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+
+          html=Path(os.environ["EDITOR"]).read_text(encoding="utf-8")
+          norm=Path(os.environ["NORMALIZE"]).read_text(encoding="utf-8")
+          comp=Path(os.environ["COMPOSER"]).read_text(encoding="utf-8")
+          style=json.loads(Path(os.environ["STYLE"]).read_text(encoding="utf-8"))
+
+          def out(name, ok, detail=""):
+              print(f"{name}={'PASS' if ok else 'FAIL'}" + (f" | {detail}" if detail else ""))
+
+          # 1 Preview scheduler
+          out("PREVIEW_MARKER", "DJGABO_NOMAD_LINE_DELAYED_PREVIEW_V1" in html)
+          out("PREVIEW_MODE_NOMAD_LINE_DELAYED", 'mode:"NOMAD_LINE_DELAYED"' in html)
+          out("PREVIEW_SCHEDULER_FUNCTION", "function pvNomadLineDelayedSchedule(lines,syl,lpp)" in html)
+          out("PREVIEW_OLD_SMART_OVERWRITE_PLAN_NOT_ACTIVE", 'mode:"SMART_OVERWRITE"' not in html)
+
+          # 2 Default role colors, live style + generated singer 1 mapping
+          out("NO_ROLE_BASE_WHITE", str(style.get("text_color","")).upper()=="#FFFFFF", str(style.get("text_color")))
+          default_high=str(style.get("highlight_default",style.get("highlight_color",""))).upper()
+          out("NO_ROLE_SWEEP_YELLOW", default_high=="#F2A900", default_high)
+
+          # 3 Review speed buttons and timing isolation
+          rates=re.findall(r'<button class="rate[^"]*" data-rate="([^"]+)"',html)
+          out("REVIEW_RATES_1_2_3_4_5", rates==["1","2","3","4","5"], ",".join(rates))
+          m=re.search(r'function setRate\(r, force=false\)\{([\s\S]*?)\n\}',html)
+          setrate=m.group(1) if m else ""
+          out("REVIEW_RATE_WRITES_ONLY_PLAYBACKRATE", "S.audio.playbackRate" in setrate and "start_time" not in setrate and "end_time" not in setrate)
+          out("REVIEW_RATE_REQUIRES_COMPLETE", "reviewRateEnabled()" in setrate and "isSongCompleteForReview()" in html)
+
+          # 4 Instrumental: draw/erase coupling exists, but sweep is still separate.
+          out("INSTRUMENTAL_JOINT_DRAW_ERASE_PATCH", "DJGABO_INSTRUMENTAL_UNIT_V1" in comp and "joint_draw" in comp and "joint_end" in comp)
+          out("INSTRUMENTAL_DOT_END_PATCH", "DJGABO_INSTRUMENTAL_DOT_END_V1" in norm)
+          label_nosweep=('modes.append(4 if w.get("_label") else 0)' in norm and 'if line[0].get("_label")' in norm)
+          separate_dotline=('elif line[0].get("_dotline")' in norm)
+          out("INSTRUMENTAL_LABEL_AND_DOTS_SAME_SWEEP", not (label_nosweep and separate_dotline),
+              "label y dotline siguen como syllables/modos separados" if (label_nosweep and separate_dotline) else "")
+
+          # 5 IA tools separated from role chips
+          ai=re.search(r'<div id="aiToolsBar">([\s\S]*?)</div>\s*<div id="vocalRoles"',html)
+          roles=re.search(r'<div id="vocalRoles"[^>]*>([\s\S]*?)</div>',html)
+          ai_txt=ai.group(1) if ai else ""
+          roles_txt=roles.group(1) if roles else ""
+          out("IA_TOOLS_SEPARATED", "btnAiBlock" in ai_txt and "btnAiFull" in ai_txt and "btnAiBlock" not in roles_txt and "btnAiFull" not in roles_txt)
+          out("ROLE_CHIPS_PRESENT", all(x in roles_txt for x in ["btnRoleNone","btnMale","btnFemale","btnDuet","btnSpoken2"]))
+
+          # 6 Help text hidden
+          out("EDIT_HINT_HIDDEN", "#editHint{display:none!important}" in html)
+
+          # 7 Duplicate top create CDG hidden, main phase 3 preserved
+          out("TOP_CREATE_CDG_HIDDEN", "#btnLyrics,#btnSave,#btnCdg{display:none!important}" in html)
+          out("MAIN_CREATE_EXPORT_PRESERVED", 'id="phase3Step"' in html and 'CREAR CDG' in html)
+
+          # 8 Save button hidden but autosave code preserved
+          out("SAVE_PROJECT_BUTTON_HIDDEN", 'id="btnSave"' in html and "#btnLyrics,#btnSave,#btnCdg{display:none!important}" in html)
+          out("AUTOSAVE_PRESERVED", "function scheduleSave" in html and "scheduleSave();" in html and "guardarProyecto" in html)
+
+          # 9 Lyrics toggle hidden, editor remains
+          out("LYRICS_BUTTON_HIDDEN", 'id="btnLyrics"' in html and "#btnLyrics,#btnSave,#btnCdg{display:none!important}" in html)
+          drawer=re.search(r'<div id="lyricsDrawer"([^>]*)>',html)
+          drawer_attrs=drawer.group(1) if drawer else ""
+          out("LYRICS_DRAWER_PRESENT_AND_NOT_INIT_HIDDEN", drawer is not None and "hidden" not in drawer_attrs)
+
+          # 10 Screen button preserved + mobile toggle
+          out("PANTALLA_BUTTON_PRESENT", 'id="btnPreview">Pantalla</button>' in html)
+          out("PANTALLA_MOBILE_TOGGLE", 'mobileView === "screen" ? "lyrics" : "screen"' in html)
+
+          # 11 Final renderer still delayed, not explicit SMART_OVERWRITE
+          out("FINAL_STYLE_CLEAR_MODE_DELAYED", str(style.get("clear_mode","")).lower()=="delayed", str(style.get("clear_mode")))
+          out("FINAL_TOML_EXPLICIT_TIMELINE_FALSE", '"explicit_timeline = false"' in norm)
+          out("FINAL_TOML_SCREEN_CLEAR_EMPTY", '"screen_clear_sync = []"' in norm)
+          out("FINAL_COMPOSER_HAS_LINE_DELAYED", "_set_draw_times_line_delayed" in comp)
+          out("FINAL_INTRO_DELAY_ZERO_PATCH", "DJGABO_NO_INTRO_DELAY_V1" in comp and "self.intro_delay = 0" in comp)
+
+          # Make explicit overall conclusion count
+          print("VERIFY_COMPLETE=YES")
+          PY
+          REMOTE
+
+      - name: Save diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-editor-improvements-live.txt
+          git commit -m "diag: verify live CDG editor improvements" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
