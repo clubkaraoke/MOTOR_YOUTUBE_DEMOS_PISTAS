@@ -1,4 +1,4 @@
-TIMESTAMP=2026-09-04T08:36:10+00:00
+TIMESTAMP=2026-09-04T08:37:07+00:00
 SCOPE=FINAL_CDG_SCHEDULER_ONLY
 PREVIEW_UI_CHANGE=NO
 PANEL_UI_CHANGE=NO
@@ -15,7 +15,10 @@ SMOKE_AUDIO=/tmp/nomad-real-project-silent.wav
 SMOKE_JOB=LET-0088|Hermanos Silva|El Perfume
 === VERIFY GENERATED TOML USES NOMAD LINE_DELAYED ===
 Traceback (most recent call last):
-  File "<stdin>", line 6, in <module>
-  File "/tmp/djgabo-renderer-nomad-line-delayed-v1/normalize.py", line 27, in <module>
-    from PIL import ImageFont
-ModuleNotFoundError: No module named 'PIL'
+  File "<stdin>", line 9, in <module>
+  File "/tmp/djgabo-renderer-nomad-line-delayed-v1/normalize.py", line 879, in normalize
+    font_path = resolve_font_path(style)
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/djgabo-renderer-nomad-line-delayed-v1/normalize.py", line 157, in resolve_font_path
+    raise NormalizeError("No encuentro Impact ni una fuente alternativa del sistema.")
+normalize.NormalizeError: No encuentro Impact ni una fuente alternativa del sistema.
