@@ -1,0 +1,49 @@
+name: Inspect Nomad multilyrics capability once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-nomad-multilyrics-capability-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect composer/config structures
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg/renderer/vendor/cdgmaker
+          sudo env P="$P" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          P=Path(os.environ["P"])
+          for fn in ["config.py","composer.py"]:
+              t=(P/fn).read_text(encoding="utf-8")
+              print("===",fn,"===")
+              for key in ["lyrics","Lyrics","sync","line_draw","line_erase","row","clear_mode","explicit_timeline"]:
+                  print("\nKEY",key)
+                  p=0
+                  for _ in range(8):
+                      i=t.find(key,p)
+                      if i<0:break
+                      print(t[max(0,i-1000):min(len(t),i+3500)])
+                      p=i+len(key)
+          PY
+          REMOTE
