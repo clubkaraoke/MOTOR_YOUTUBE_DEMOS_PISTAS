@@ -43,6 +43,10 @@ def register_cdg_v2_routes(app, g):
     def cdg_v2_lab_asset():
         return send_file(root / "vendor" / "cdg-v2-lab.js", mimetype="application/javascript", conditional=True)
 
+    @app.get("/api/vendor/cdg-v2-mobile.js")
+    def cdg_v2_mobile_asset():
+        return send_file(root / "vendor" / "cdg-v2-mobile.js", mimetype="application/javascript", conditional=True)
+
     def _upload_root():
         p = data / "v2_uploads"
         p.mkdir(parents=True, exist_ok=True)
