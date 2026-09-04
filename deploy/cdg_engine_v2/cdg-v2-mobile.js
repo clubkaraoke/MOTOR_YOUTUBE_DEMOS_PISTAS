@@ -38,9 +38,25 @@ function injectCss(){
     flex:0 0 auto!important;min-height:42px!important;padding:0 12px!important;border-radius:9px!important;
     font-size:12px!important
   }
-  body:not(.v2m-editor-page) .content{
+  body:not(.v2m-editor-page) .content:not(.v1-editor-mode){
     padding:16px 12px calc(84px + env(safe-area-inset-bottom))!important;
     overflow-y:auto!important;height:auto!important;min-height:calc(100dvh - 58px)!important
+  }
+  body:not(.v2m-editor-page).v1-editor-open .topbar{display:none!important}
+  body:not(.v2m-editor-page).v1-editor-open .tabs-bottom{display:none!important}
+  body:not(.v2m-editor-page).v1-editor-open .content.v1-editor-mode{
+    position:fixed!important;inset:0!important;z-index:70!important;
+    width:100vw!important;height:100dvh!important;min-height:100dvh!important;
+    padding:0!important;margin:0!important;overflow:hidden!important;background:#12141A!important
+  }
+  body:not(.v2m-editor-page).v1-editor-open #view-editor,
+  body:not(.v2m-editor-page).v1-editor-open #editorBody{
+    display:block!important;width:100%!important;height:100%!important;min-height:0!important;
+    padding:0!important;margin:0!important;overflow:hidden!important
+  }
+  body:not(.v2m-editor-page).v1-editor-open .v1-editor-frame{
+    display:block!important;position:absolute!important;inset:0!important;
+    width:100%!important;height:100dvh!important;min-height:100dvh!important;border:0!important
   }
   body:not(.v2m-editor-page) .tabs-bottom{
     display:flex!important;position:fixed!important;left:10px!important;right:10px!important;
@@ -109,9 +125,18 @@ function injectCss(){
     display:none!important;width:100%!important;min-width:0!important;max-width:none!important;
     height:100%!important;flex:none!important;border:0!important
   }
-  body.v2m-editor-page[data-v2m-pane="wave"] #leftPane{display:flex!important}
-  body.v2m-editor-page[data-v2m-pane="lyrics"] #centerPane{display:flex!important}
-  body.v2m-editor-page[data-v2m-pane="preview"] #preview{display:flex!important}
+  body.v2m-editor-page[data-v2m-pane="editor"] #workspace{
+    display:grid!important;grid-template-rows:132px minmax(0,1fr)!important
+  }
+  body.v2m-editor-page[data-v2m-pane="editor"] #leftPane{
+    display:flex!important;grid-row:1!important;height:132px!important;min-height:132px!important;
+    border-bottom:1px solid var(--line)!important
+  }
+  body.v2m-editor-page[data-v2m-pane="editor"] #centerPane{
+    display:flex!important;grid-row:2!important;height:auto!important;min-height:0!important
+  }
+  body.v2m-editor-page[data-v2m-pane="preview"] #preview,
+  body.v2m-editor-page[data-v2m-pane="cdg"] #preview{display:flex!important}
   body.v2m-editor-page .split{display:none!important}
   body.v2m-editor-page #leftPane{padding:0!important}
   body.v2m-editor-page #waveWrap{min-height:0!important}
@@ -172,6 +197,13 @@ function injectCss(){
   body.v2m-editor-page #v2box .v2check{min-height:34px!important}
   body.v2m-editor-page #v2box .v2screen{width:min(100%,520px)!important;margin:0 auto!important}
   body.v2m-editor-page #v2box .v2actions{position:sticky!important;bottom:0!important;background:#10141b!important;padding:7px 0!important;z-index:4!important}
+
+  #v2mHeaderMore{
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    width:40px!important;height:40px!important;flex:0 0 40px!important;
+    border:1px solid #343b49!important;border-radius:10px!important;
+    background:#202530!important;color:#f1efea!important;font-size:20px!important
+  }
 
   /* Mobile editor bottom navigation */
   #v2mEditorNav{
@@ -240,15 +272,28 @@ function proxyAction(list,src,label){
 function initEditor(){
   if(!q("#workspace")||!q("#leftPane")||!q("#centerPane")||!q("#preview"))return false;
   document.body.classList.add("v2m-editor-page");
-  if(!document.body.dataset.v2mPane)document.body.dataset.v2mPane=sessionStorage.getItem("v2mPane")||"lyrics";
+  if(!document.body.dataset.v2mPane)document.body.dataset.v2mPane=sessionStorage.getItem("v2mPane")||"editor";
   if(q("#v2mEditorNav"))return true;
+
+  const drawer=createDrawer("v2mEditorDrawer","Opciones del editor");
+  const list=q(".v2m-drawer-list",drawer);
+  const hiddenActions=qa("header .hbtn").filter(x=>!x.classList.contains("go"));
+  hiddenActions.forEach(src=>proxyAction(list,src,src.textContent.trim()));
+  const settings=q("#btnSettings");if(settings&&!hiddenActions.includes(settings))proxyAction(list,settings,"Configuración");
+  const recalc=q("#v2refresh");if(recalc)proxyAction(list,recalc,"Recalcular Timeline V2");
+
+  const head=q("header");
+  if(head&&!q("#v2mHeaderMore")){
+    const more=el("button","v2m-only","⋮");more.id="v2mHeaderMore";more.type="button";more.title="Más opciones";
+    more.onclick=()=>drawer.classList.add("open");head.append(more);
+  }
 
   const nav=el("nav","v2m-only");nav.id="v2mEditorNav";nav.setAttribute("aria-label","Navegación móvil del editor");
   const items=[
-    ["wave","〽","Onda"],
-    ["lyrics","✎","Letra"],
+    ["home","⌂","Inicio"],
+    ["editor","✎","Editor"],
     ["preview","▣","Preview"],
-    ["more","•••","Más"]
+    ["cdg","◉","CDG V2"]
   ];
   const buttons={};
   items.forEach(([key,ico,label])=>{
@@ -257,21 +302,29 @@ function initEditor(){
   });
   document.body.append(nav);
 
-  const drawer=createDrawer("v2mEditorDrawer","Opciones del editor");
-  const list=q(".v2m-drawer-list",drawer);
-  const hiddenActions=qa("header .hbtn").filter(x=>!x.classList.contains("go"));
-  hiddenActions.forEach(src=>proxyAction(list,src,src.textContent.trim()));
-  const settings=q("#btnSettings");if(settings&&!hiddenActions.includes(settings))proxyAction(list,settings,"Ajustes");
-  const recalc=q("#v2refresh");if(recalc)proxyAction(list,recalc,"Recalcular Timeline V2");
-
+  function goHome(){
+    try{
+      if(window.parent&&window.parent!==window&&typeof window.parent.mostrarVista==="function"){
+        window.parent.mostrarVista("dashboard");return;
+      }
+    }catch(_){}
+    try{window.parent.location.href="/cdg-v2/"}catch(_){location.href="/cdg-v2/"}
+  }
   function select(key){
-    if(key==="more"){drawer.classList.add("open");return}
+    if(key==="home"){goHome();return}
     document.body.dataset.v2mPane=key;sessionStorage.setItem("v2mPane",key);
     Object.entries(buttons).forEach(([k,b])=>b.classList.toggle("on",k===key));
+    if(key==="cdg"){
+      setTimeout(()=>{const t=q('.v2tab[data-v2="cdg"]');if(t)t.click()},40);
+    }else if(key==="preview"){
+      setTimeout(()=>{const t=q('.v2tab[data-v2="karaoke"]');if(t)t.click()},40);
+    }
     window.dispatchEvent(new Event("resize"));
+    setTimeout(()=>window.dispatchEvent(new Event("resize")),120);
   }
   Object.entries(buttons).forEach(([k,b])=>b.onclick=()=>select(k));
-  select(document.body.dataset.v2mPane||"lyrics");
+  const first=["editor","preview","cdg"].includes(document.body.dataset.v2mPane)?document.body.dataset.v2mPane:"editor";
+  select(first);
   return true;
 }
 
