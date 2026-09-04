@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 const PREFIX="/cdg-v2";
-let submitting=false;
+let submitting=false,lastProgress=0;
 
 function byId(id){return document.getElementById(id)}
 function safeCall(name,args){
@@ -29,7 +29,8 @@ function notify(msg,kind){
   console.log("[V2 LAB]",msg);
 }
 function progress(pct,stage,detail){
-  try{if(typeof setIaProgress==="function"){setIaProgress(pct,stage,detail);return}}catch(_){}
+  lastProgress=Math.max(0,Math.min(100,Number(pct)||0));
+  try{if(typeof setIaProgress==="function"){setIaProgress(lastProgress,stage,detail);return}}catch(_){}
   const box=byId("uploadProgress"),st=byId("iaProgressStage"),pe=byId("iaProgressPct"),fi=byId("iaProgressFill"),de=byId("iaProgressDetail");
   if(box)box.style.display="block";if(st)st.textContent=stage||"";if(pe)pe.textContent=Math.round(pct||0)+"%";if(fi)fi.style.width=Math.max(0,Math.min(100,pct||0))+"%";if(de)de.textContent=detail||"";
 }
@@ -90,7 +91,7 @@ async function uploadBlobChunks(uploadId,kind,file,chunkSize,state){
     const end=Math.min(file.size,offset+chunkSize);
     const blob=file.slice(offset,end);
     const r=await fetch(PREFIX+"/api/v2/uploads/"+encodeURIComponent(uploadId)+"/"+kind,{
-      method:"PUT",
+      method:"POST",
       headers:{
         "Content-Type":"application/octet-stream",
         "X-Session-Token":getToken(),
@@ -133,8 +134,9 @@ async function createChunkedLab(artist,title,lyrics,voice,inst,voiceDuration){
     return await apiJson("/api/v2/uploads/"+encodeURIComponent(init.upload_id)+"/finalize","POST",{token:getToken()});
   }catch(e){
     try{
-      await fetch(PREFIX+"/api/v2/uploads/"+encodeURIComponent(init.upload_id),{
-        method:"DELETE",headers:{"X-Session-Token":getToken()},cache:"no-store"
+      await fetch(PREFIX+"/api/v2/uploads/"+encodeURIComponent(init.upload_id)+"/cancel",{
+        method:"POST",headers:{"Content-Type":"application/json","X-Session-Token":getToken()},
+        body:JSON.stringify({token:getToken()}),cache:"no-store"
       });
     }catch(_){}
     throw e;
@@ -191,7 +193,7 @@ async function submitLab(e){
     },350);
   }catch(err){
     const msg=err&&err.message?err.message:String(err);
-    progress(100,"ERROR",jid?("El trabajo "+jid+" quedó guardado en LAB. "+msg):msg);
+    progress(lastProgress,"ERROR",jid?("El trabajo "+jid+" quedó guardado en LAB. "+msg):msg);
     notify(jid?("Trabajo "+jid+" guardado en LAB · IA pendiente: "+msg):msg,"error");
   }finally{
     clearInterval(timer);if(timeEl)timeEl.textContent=((performance.now()-started)/1000).toFixed(1)+" s";
