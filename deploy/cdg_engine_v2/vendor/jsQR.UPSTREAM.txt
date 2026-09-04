@@ -1,0 +1,5 @@
+Project: cozmo/jsQR
+Version: 1.4.0
+Pinned commit: 8e6a036beafa7053dd44b1b76ac578d22b1b3311
+File: dist/jsQR.js
+License: Apache-2.0
