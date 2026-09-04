@@ -51,6 +51,7 @@ jobs:
           echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
           echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
 
+          sudo rm -f "$STAGE"
           sudo cp "$EDITOR" "$STAGE"
           sudo chmod 0666 "$STAGE"
           sudo python3 /tmp/patch_cdg_review_rates_visible_v1.py "$STAGE"
