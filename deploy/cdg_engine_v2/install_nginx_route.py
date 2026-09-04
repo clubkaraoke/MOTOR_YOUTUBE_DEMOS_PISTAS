@@ -6,15 +6,11 @@ p=Path(sys.argv[1] if len(sys.argv)>1 else "/etc/nginx/sites-available/panel.kit
 if not p.is_file(): raise SystemExit("No existe: "+str(p))
 s=p.read_text(encoding="utf-8")
 marker="# DJGABO_CDG_ENGINE_V2_CLONE"
-if marker in s:
-    print("NGINX_ROUTE=ALREADY_PRESENT "+str(p)); raise SystemExit(0)
 block=r'''    # DJGABO_CDG_ENGINE_V2_CLONE
     # Clon aislado: Nginx elimina /cdg-v2 y Flask escucha sólo en 127.0.0.1:8787.
     location = /cdg-v2 { return 301 /cdg-v2/; }
     location ^~ /cdg-v2/ {
         client_max_body_size 800m;
-        auth_request /_portal_auth_admin;
-        error_page 401 403 = @admin_required;
         rewrite ^/cdg-v2/(.*)$ /$1 break;
         proxy_pass http://127.0.0.1:8787;
         include /etc/nginx/proxy_params;
@@ -26,6 +22,26 @@ block=r'''    # DJGABO_CDG_ENGINE_V2_CLONE
     }
 
 '''
+if marker in s:
+    # Actualiza el bloque existente sin tocar ninguna otra location de producción.
+    start=s.index(marker)
+    loc_start=s.rfind("    location = /cdg-v2",0,start)
+    if loc_start < 0:
+        raise SystemExit("Marcador V2 encontrado pero no su location inicial")
+    tail=s.find("\n    }",start)
+    if tail < 0:
+        raise SystemExit("No pude cerrar bloque V2 existente")
+    # block contiene dos locations; encontrar el cierre del segundo.
+    second=s.find("location ^~ /cdg-v2/",loc_start)
+    tail=s.find("\n    }",second)
+    if second < 0 or tail < 0:
+        raise SystemExit("Bloque V2 existente incompleto")
+    end=tail+len("\n    }\n")
+    s=s[:loc_start]+block+s[end:]
+    p.write_text(s,encoding="utf-8")
+    print("NGINX_ROUTE=UPDATED "+str(p))
+    raise SystemExit(0)
+
 starts=[];pos=0
 while True:
     i=s.find("server {",pos)
