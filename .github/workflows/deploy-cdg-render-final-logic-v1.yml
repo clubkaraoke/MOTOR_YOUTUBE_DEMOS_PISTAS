@@ -1,0 +1,191 @@
+name: Deploy CDG final render logic V1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-cdg-render-final-logic-v1.yml"
+      - "deploy/cdg_render_final_logic_v1/**"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate patch script
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/cdg_render_final_logic_v1/patch_production.py
+
+      - name: Preflight against latest production snapshots
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cdg-final-render-preflight
+          mkdir -p /tmp/cdg-final-render-preflight/editor_v1 /tmp/cdg-final-render-preflight/cdgmaker
+
+          cp diagnostics/cdg-prod-current-index.html \
+             /tmp/cdg-final-render-preflight/editor_v1/index.html
+          cp diagnostics/cdg-prod-current-composer.py \
+             /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+
+          python3 deploy/cdg_render_final_logic_v1/patch_production.py \
+            --root /tmp/cdg-final-render-preflight \
+            --composer /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+
+          python3 -m py_compile \
+            /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+
+          grep -Fq 'DJGABO_PHRASE_AWARE_LAYOUT_V1' \
+            /tmp/cdg-final-render-preflight/editor_v1/index.html
+          grep -Fq 'phrase_keep_together_when_possible:true' \
+            /tmp/cdg-final-render-preflight/editor_v1/index.html
+          grep -Fq 'partial_pages_start_at_top:true' \
+            /tmp/cdg-final-render-preflight/editor_v1/index.html
+          grep -Fq 'DJGABO_RENDER_QUEUE_FIX_V1' \
+            /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+          grep -Fq 'DJGABO_FAST_HIGHLIGHT_BURST_V1' \
+            /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+          grep -Fq 'erase_queue: deque[CDGPacket]' \
+            /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+          grep -Fq 'highlight_burst' \
+            /tmp/cdg-final-render-preflight/cdgmaker/composer.py
+
+          python3 - <<'PY'
+          import re, pathlib
+          p=pathlib.Path('/tmp/cdg-final-render-preflight/editor_v1/index.html')
+          s=p.read_text(encoding='utf-8')
+          blocks=re.findall(r'<script[^>]*>(.*?)</script>',s,re.S|re.I)
+          target=next((b for b in blocks if 'DJGABO_PHRASE_AWARE_LAYOUT_V1' in b),None)
+          if target is None:
+              raise SystemExit('No encontré JS phrase-aware')
+          pathlib.Path('/tmp/cdg-final-render-preflight/editor.js').write_text(target,encoding='utf-8')
+          print('SCRIPT_BLOCKS='+str(len(blocks)))
+          PY
+          node --check /tmp/cdg-final-render-preflight/editor.js
+
+          echo "PREFLIGHT=PASS"
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: \${{ secrets.OVH_HOST }}
+          OVH_PORT: \${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: \${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Patch production safely
+        env:
+          OVH_HOST: \${{ secrets.OVH_HOST }}
+          OVH_PORT: \${{ secrets.OVH_PORT }}
+          OVH_USER: \${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+
+          scp -P "$OVH_PORT" \
+            deploy/cdg_render_final_logic_v1/patch_production.py \
+            "$OVH_USER@$OVH_HOST:/tmp/patch_cdg_render_final_logic_v1.py"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' \
+            > diagnostics/cdg-render-final-logic-v1-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+
+          ROOT=/opt/djgabo-cdg
+          EDITOR="$ROOT/editor_v1/index.html"
+          COMPOSER="$ROOT/renderer/vendor/cdgmaker/composer.py"
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          BACKUP="$ROOT/backups/render_final_logic_v1_$STAMP"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "SERVICE_BEFORE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_BEFORE=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+
+          sudo test -f "$EDITOR"
+          sudo test -f "$COMPOSER"
+
+          sudo mkdir -p "$BACKUP/editor_v1" "$BACKUP/cdgmaker"
+          sudo cp "$EDITOR" "$BACKUP/editor_v1/index.html"
+          sudo cp "$COMPOSER" "$BACKUP/cdgmaker/composer.py"
+          echo "BACKUP=$BACKUP"
+
+          STAGE=/tmp/djgabo-render-final-stage
+          sudo rm -rf "$STAGE"
+          sudo mkdir -p "$STAGE/editor_v1" "$STAGE/cdgmaker"
+          sudo cp "$EDITOR" "$STAGE/editor_v1/index.html"
+          sudo cp "$COMPOSER" "$STAGE/cdgmaker/composer.py"
+
+          sudo python3 /tmp/patch_cdg_render_final_logic_v1.py \
+            --root "$STAGE" \
+            --composer "$STAGE/cdgmaker/composer.py"
+
+          sudo python3 -m py_compile "$STAGE/cdgmaker/composer.py"
+          sudo grep -Fq 'DJGABO_PHRASE_AWARE_LAYOUT_V1' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'phrase_keep_together_when_possible:true' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'partial_pages_start_at_top:true' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_RENDER_QUEUE_FIX_V1' "$STAGE/cdgmaker/composer.py"
+          sudo grep -Fq 'DJGABO_FAST_HIGHLIGHT_BURST_V1' "$STAGE/cdgmaker/composer.py"
+          sudo grep -Fq 'erase_queue: deque[CDGPacket]' "$STAGE/cdgmaker/composer.py"
+          sudo grep -Fq 'highlight_burst' "$STAGE/cdgmaker/composer.py"
+          echo "STAGE=PASS"
+
+          sudo python3 /tmp/patch_cdg_render_final_logic_v1.py \
+            --root "$ROOT" \
+            --composer "$COMPOSER"
+
+          sudo python3 -m py_compile "$COMPOSER"
+
+          sudo systemctl restart djgabo-cdg
+          sleep 2
+
+          echo "SERVICE_AFTER=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP_AFTER=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+
+          EDITOR_HTTP="$(curl -sS -o /tmp/editor-final-render.html -w '%{http_code}' \
+            'http://127.0.0.1:8765/editor-v1?embed=1')"
+          echo "EDITOR_HTTP=$EDITOR_HTTP"
+          test "$EDITOR_HTTP" = 200
+          grep -Fq 'DJGABO_PHRASE_AWARE_LAYOUT_V1' /tmp/editor-final-render.html
+
+          LATEST_PROJECT="$(
+            sudo find /var/lib/djgabo-cdg -type f -name 'proyecto.timings.json' \
+              -printf '%T@ %p\n' 2>/dev/null \
+              | sort -nr | head -1 | cut -d' ' -f2-
+          )"
+          echo "LATEST_PROJECT=\${LATEST_PROJECT:-NONE}"
+
+          echo "DEPLOY=OK"
+          REMOTE
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'sudo cat /opt/djgabo-cdg/editor_v1/index.html' \
+            > diagnostics/cdg-prod-current-index.html
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" \
+            'sudo cat /opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py' \
+            > diagnostics/cdg-prod-current-composer.py
+
+      - name: Save deploy report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            diagnostics/cdg-render-final-logic-v1-deploy.txt \
+            diagnostics/cdg-prod-current-index.html \
+            diagnostics/cdg-prod-current-composer.py 2>/dev/null || true
+
+          git commit -m "diag: record final CDG render logic deploy" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
