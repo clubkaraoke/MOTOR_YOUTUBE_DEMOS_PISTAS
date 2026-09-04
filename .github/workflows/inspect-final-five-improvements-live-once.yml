@@ -1,0 +1,112 @@
+name: Inspect final five improvements live once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-final-five-improvements-live-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect live editor/server/normalizer
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          E="$P/editor_v1/index.html"
+          S="$P/server.py"
+          N="$P/renderer/normalize.py"
+
+          echo "=== HASHES ==="
+          sudo sha256sum "$E" "$S" "$N" "$P/renderer/vendor/cdgmaker/composer.py" "$P/renderer/style.json"
+
+          echo "=== EDITOR SNIPPETS ==="
+          sudo env E="$E" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["E"]).read_text(encoding="utf-8")
+          spans=[
+            ("function pvWrap","function buildRenderPagesDecision"),
+            ("function buildRenderPagesDecision","function buildRenderPlanDecision"),
+            ("function buildExport","function saveProject"),
+            ("function applyRoleToIndices","function applyArmedRoleToCurrentSelection"),
+            ("function pvInstrumentalState","function _diagLineNoForWord"),
+            ("function cdgVisibilitySettings","function setCdgVisibilitySetting"),
+            ("async function loadCdgFinal","function "),
+            ("function renderCdgTab","function "),
+            ("IA TODA LA LETRA","DIAGNÓSTICO"),
+            ("id=\"roleBar","</"),
+          ]
+          for a,b in spans:
+              i=t.find(a)
+              print("\n---",a,i,"---")
+              if i<0: continue
+              j=t.find(b,i+max(1,len(a)))
+              if j<0 or j-i>22000: j=min(len(t),i+18000)
+              print(t[i:j])
+          for key in ["cdg final real cargado","Crear / actualizar CDG final","IA BLOQUE","IA TODA LA LETRA","DIAGNÓSTICO","position:sticky","sticky"]:
+              print("\nFIND",key)
+              p=0
+              for _ in range(12):
+                  i=t.lower().find(key.lower(),p)
+                  if i<0: break
+                  print("AT",i)
+                  print(t[max(0,i-900):min(len(t),i+1800)])
+                  p=i+len(key)
+          PY
+
+          echo "=== SERVER SNIPPETS ==="
+          sudo env S="$S" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["S"]).read_text(encoding="utf-8")
+          for a,b in [
+            ("def _render_worker","@app."),
+            ("@app.post('/api/jobs/<jid>/render","@app."),
+            ("@app.get('/api/jobs/<jid>/render","@app."),
+            ("@app.post('/api/jobs/<jid>/timings","@app."),
+            ("def publish_job_to_dropbox","def "),
+            ("def _cdg_cache_put","def _cdg_cache_pop"),
+          ]:
+              i=t.find(a); print("\n---",a,i,"---")
+              if i>=0:
+                  j=t.find(b,i+len(a))
+                  if j<0 or j-i>24000:j=min(len(t),i+22000)
+                  print(t[i:j])
+          PY
+
+          echo "=== NORMALIZER SNIPPETS ==="
+          sudo env N="$N" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["N"]).read_text(encoding="utf-8")
+          for a,b in [
+            ("def resolve_render_pages","def "),
+            ("def build_instrumentals","def check_packet_budget"),
+            ("def normalize","return Normalized("),
+            ("# texto y sync","rows_used ="),
+          ]:
+              i=t.find(a); print("\n---",a,i,"---")
+              if i>=0:
+                  j=t.find(b,i+len(a))
+                  if j<0 or j-i>22000:j=min(len(t),i+20000)
+                  print(t[i:j])
+          PY
+          REMOTE
