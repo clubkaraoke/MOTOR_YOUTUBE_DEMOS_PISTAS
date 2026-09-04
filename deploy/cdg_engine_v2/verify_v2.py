@@ -90,15 +90,25 @@ def decode_samples(cdg:Path,compiled:list[dict],indices:list[int]):
         w=compiled[i]; st=int(w["cdg_start_frame"]); en=int(w["cdg_end_frame"]); ss=v["samples"]
         pre=[c for f,c in ss if f<st]
         baseline=max(pre) if pre else 0
-        post=[c for f,c in ss if f>=en]
-        peak=max(post or [c for _,c in ss] or [0])
-        growth=max(0,peak-baseline)
-        start_thr=baseline+max(1,math.ceil(growth*.05)) if growth else None
-        end_thr=baseline+max(1,math.ceil(growth*.98)) if growth else None
-        obs_start=next((f for f,c in ss if f>=st-6 and start_thr is not None and c>=start_thr),None)
-        obs_end=next((f for f,c in ss if f>=st and end_thr is not None and c>=end_thr),None)
+        peak=max([c for _,c in ss] or [0])
+        # Medimos paquetes reales, no un porcentaje de pixeles. El onset es el
+        # primer incremento de color activo y el completion es el ULTIMO
+        # incremento dentro de la ventana. Esto evita declarar una palabra
+        # "terminada" antes de tiempo sólo porque ya alcanzó 98% de su tinta.
+        changes=[]
+        prev=None
+        for f,c in ss:
+            if prev is not None and c>prev:
+                changes.append((f,c-prev))
+            prev=c
+        onset_candidates=[f for f,d in changes if f>=st-6]
+        completion_candidates=[f for f,d in changes if f>=st-6 and f<=en+90]
+        obs_start=onset_candidates[0] if onset_candidates else None
+        obs_end=completion_candidates[-1] if completion_candidates else None
         result[i]={
             "baseline_active_pixels":baseline,"peak_active_pixels":peak,
+            "active_pixel_growth":max(0,peak-baseline),
+            "positive_packet_changes":len(changes),
             "decoded_start_frame":obs_start,"decoded_end_frame":obs_end,
             "decoded_start":round(obs_start/PPS,6) if obs_start is not None else None,
             "decoded_end":round(obs_end/PPS,6) if obs_end is not None else None,
