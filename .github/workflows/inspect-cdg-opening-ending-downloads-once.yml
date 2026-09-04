@@ -1,0 +1,151 @@
+name: Inspect CDG opening ending downloads once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-opening-ending-downloads-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect live production only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          EDITOR="$PROD/editor_v1/index.html"
+          SERVER="$PROD/server.py"
+          NORMALIZE="$PROD/renderer/normalize.py"
+          STYLE="$PROD/renderer/style.json"
+
+          echo "=== LIVE HEALTH ==="
+          echo "SERVICE=$(sudo systemctl is-active djgabo-cdg)"
+          echo "HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          echo "EDITOR_SHA=$(sudo sha256sum "$EDITOR" | awk '{print $1}')"
+          echo "SERVER_SHA=$(sudo sha256sum "$SERVER" | awk '{print $1}')"
+          echo "NORMALIZE_SHA=$(sudo sha256sum "$NORMALIZE" | awk '{print $1}')"
+          echo
+
+          echo "=== EDITOR TARGETED CONTEXT ==="
+          sudo env EDITOR="$EDITOR" python3 - <<'PY'
+          from pathlib import Path
+          p=Path(__import__("os").environ["EDITOR"])
+          t=p.read_text(encoding="utf-8")
+          needles=[
+            'const PV =',
+            'function pvOpeningDecision',
+            'function pvEndingDecision',
+            'function pvDrawIntro',
+            'function pvDrawOutro',
+            'function buildRenderTimelineDecision',
+            'function buildDiagnosticJsonPayload',
+            'function guardarProyecto',
+            'function scheduleSave',
+            'async function createFinalCdg',
+            'Crear / actualizar CDG final',
+            'cdgFinal',
+            'instrumental',
+            'phase3Step',
+            'highlight_default',
+            '#F2A900',
+            '#FFFF00',
+          ]
+          for n in needles:
+              i=t.find(n)
+              if i<0: continue
+              print(f"\n--- {n} @ {i} ---")
+              print(t[max(0,i-1600):min(len(t),i+5200)])
+          PY
+
+          echo
+          echo "=== SERVER TARGETED CONTEXT ==="
+          sudo env SERVER="$SERVER" python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["SERVER"]).read_text(encoding="utf-8")
+          needles=[
+            '@app.',
+            'editor-v1',
+            'project_json',
+            'save',
+            'render',
+            'final',
+            'cdg',
+            'wav',
+            'instrumental',
+            'FileResponse',
+            'StreamingResponse',
+            'send_file',
+            'zipfile',
+            'jobs/',
+            'v2_renders',
+          ]
+          seen=set()
+          for n in needles:
+              start=0
+              count=0
+              while count<4:
+                  i=t.find(n,start)
+                  if i<0: break
+                  key=(n,i//1000)
+                  if key not in seen:
+                      seen.add(key)
+                      print(f"\n--- {n} @ {i} ---")
+                      print(t[max(0,i-1800):min(len(t),i+6200)])
+                  start=i+len(n);count+=1
+          PY
+
+          echo
+          echo "=== LIVE STYLE COLORS ==="
+          sudo env STYLE="$STYLE" python3 - <<'PY'
+          import json,os
+          s=json.load(open(os.environ["STYLE"],encoding="utf-8"))
+          for k in sorted(s):
+              if "color" in k or "highlight" in k or k in {"clear_mode","lines_per_page"}:
+                  print(k,repr(s[k]))
+          PY
+
+          echo
+          echo "=== LET-0088 SAFE FILE MAP ==="
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          roots=[Path("/var/lib/djgabo-cdg/jobs/LET-0088"),Path("/var/lib/djgabo-cdg")]
+          exts={".wav",".mp3",".cdg",".zip",".json"}
+          for root in roots:
+              if not root.exists(): continue
+              print("ROOT",root)
+              n=0
+              for p in root.rglob("*"):
+                  if p.is_file() and (p.suffix.lower() in exts or "LET-0088" in p.name):
+                      try: size=p.stat().st_size
+                      except: size=-1
+                      print(str(p),size)
+                      n+=1
+                      if n>=80: break
+          PY
+          REMOTE
