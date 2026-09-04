@@ -1,0 +1,61 @@
+name: Inspect LET-0091 WAV source once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0091-wav-source-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect OVH sources
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          P=/opt/djgabo-cdg
+          echo "=== LET-0091 FILES ==="
+          find /var/lib/djgabo-cdg -type f \( -iname '*LET-0091*' -o -path '*/LET-0091/*' \) -printf '%p %s\n' 2>/dev/null | sort || true
+
+          echo "=== JOB SAFE FIELDS ==="
+          sudo "$P/.venv/bin/python" - <<'PY'
+          import sqlite3,json
+          from pathlib import Path
+          db=next((p for p in [Path("/var/lib/djgabo-cdg/local.db"),Path("/var/lib/djgabo-cdg/data/local.db"),Path("/opt/djgabo-cdg/data/local.db")] if p.is_file()),None)
+          con=sqlite3.connect(f"file:{db}?mode=ro",uri=True); con.row_factory=sqlite3.Row
+          r=con.execute("select * from jobs where id='LET-0091'").fetchone()
+          if not r: raise SystemExit("job not found")
+          allow={"id","artist","title","status","instrumental_filename","instrumental_dropbox_path","instrumental_dropbox_id","cdg_local_filename","cdg_dropbox_path","render_status","render_progress","duration"}
+          for k in r.keys():
+              if k in allow:
+                  v=r[k]
+                  if isinstance(v,str) and ("dropbox" in k) and len(v)>160:v=v[:160]+"..."
+                  print(k,repr(v))
+          pj=r["project_json"] if "project_json" in r.keys() else None
+          if pj:
+              d=json.loads(pj)
+              print("project_keys",sorted(d.keys()))
+              print("project_cdg_settings",d.get("cdg_settings"))
+          PY
+
+          echo "=== SERVER CACHE HELPERS ==="
+          sudo grep -n -A90 -B20 'def _wav_cache' "$P/server.py" || true
+          sudo grep -n -A90 -B20 'wav_cache' "$P/server.py" | head -220 || true
+          sudo grep -n -A120 -B30 'instrumental_filename' "$P/server.py" | head -260 || true
+          REMOTE
