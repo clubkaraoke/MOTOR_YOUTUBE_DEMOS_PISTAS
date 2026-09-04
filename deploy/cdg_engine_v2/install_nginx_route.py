@@ -13,6 +13,8 @@ block=r'''    # DJGABO_CDG_ENGINE_V2_CLONE
     location = /cdg-v2 { return 301 /cdg-v2/; }
     location ^~ /cdg-v2/ {
         client_max_body_size 800m;
+        auth_request /_portal_auth_admin;
+        error_page 401 403 = @admin_required;
         rewrite ^/cdg-v2/(.*)$ /$1 break;
         proxy_pass http://127.0.0.1:8787;
         include /etc/nginx/proxy_params;
