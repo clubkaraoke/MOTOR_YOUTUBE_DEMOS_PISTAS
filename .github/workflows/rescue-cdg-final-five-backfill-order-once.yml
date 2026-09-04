@@ -52,3 +52,5 @@ jobs:
           PY
           echo "RESCUE=OK"
           REMOTE
+
+# rerun after rescue script newline fix
