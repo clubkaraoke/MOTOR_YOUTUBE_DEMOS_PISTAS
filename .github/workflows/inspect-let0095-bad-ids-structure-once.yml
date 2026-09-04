@@ -1,0 +1,51 @@
+name: Inspect LET0095 bad ids structure once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0095-bad-ids-structure-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect structure only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          sudo /opt/djgabo-cdg/.venv/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          f=Path("/var/lib/djgabo-cdg/jobs/LET-0095/proyecto.timings.json")
+          d=json.loads(f.read_text(encoding="utf-8"))
+          bad={"w0381","w0566","w0403","w0568","w0406","w0567","w0382","w0405","w0407"}
+          for si,s in enumerate(d.get("segments",[])):
+              ids=[str(w.get("id")) for w in s.get("words",[])]
+              if bad.intersection(ids):
+                  print(f"SEG_INDEX={si} SEG_ID={s.get('id')} KIND={s.get('kind')} WORD_COUNT={len(ids)}")
+                  for wi,w in enumerate(s.get("words",[])):
+                      if str(w.get("id")) in bad or any(str(x.get("id")) in bad for x in s.get("words",[])):
+                          print(f"  W{wi} id={w.get('id')} st={w.get('start_time')} en={w.get('end_time')} spoken={bool(w.get('spoken'))}")
+          rp=d.get("render_pages") or {}
+          for pg in rp.get("pages") or []:
+              for ln in pg.get("lines") or []:
+                  ids=[str(x) for x in ln.get("word_ids") or []]
+                  if bad.intersection(ids):
+                      print(f"PAGE={pg.get('page')} SLOT={ln.get('slot')} IDS={','.join(ids)}")
+          PY
+          REMOTE
