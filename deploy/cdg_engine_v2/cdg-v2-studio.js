@@ -8,7 +8,16 @@ function job(){try{return String(PANEL_JOB_ID||"")}catch(_){return ""}}
 function api(path){return "/cdg-v2"+path}
 function ftime(t){t=Number(t)||0;var m=Math.floor(t/60),s=t-m*60;return m+":"+(s<10?"0":"")+s.toFixed(3)}
 function roleColor(r){r=String(r||"").toLowerCase();if(r==="hombre"||r==="male")return "#55b8ff";if(r==="mujer"||r==="female")return "#ff6fb6";if(r==="duo"||r==="duet")return "#63dfa2";return "#f2b705"}
-function project(){if(typeof buildExport!=="function")throw new Error("No encuentro buildExport del editor.");return buildExport()}
+function editorReady(){
+  try{return !!(typeof S!=="undefined"&&S&&S.doc&&Array.isArray(S.doc.segments)&&S.doc.song)}catch(_){return false}
+}
+function project(){
+  if(!editorReady())throw new Error("El editor todavía está terminando de cargar el proyecto.");
+  if(typeof buildExport!=="function")throw new Error("No encuentro buildExport del editor.");
+  var p=buildExport();
+  if(!p||!Array.isArray(p.segments))throw new Error("El proyecto del editor todavía no está listo.");
+  return p
+}
 function opts(){var x={};try{x.lines_per_screen=Number(S.cfg.linesPerPage||6);x.font_size=Number(S.cfg.fontSize||18);x.stroke_width=Number(S.cfg.strokeWidth||1)}catch(_){}return x}
 async function request(path,body){
   var o={method:body?"POST":"GET",headers:{"Content-Type":"application/json"},cache:"no-store"};
@@ -46,10 +55,22 @@ function inject(){
   el("v2seek").oninput=function(e){try{var d=Number(S.audio.duration||S.duration||0);if(d)S.audio.currentTime=d*Number(e.target.value)/1000}catch(_){}paint()};
   var old=el("btnCdg");if(old){old.textContent="⚡ Generar V2";old.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();render()},true)}
   document.addEventListener("click",function(e){var t=e.target&&e.target.closest?e.target.closest('[data-phase="3"]'):null;if(t){e.preventDefault();e.stopImmediatePropagation();render()}},true);
-  refresh(false);requestAnimationFrame(loop)
+  autoRefreshWhenReady();requestAnimationFrame(loop)
+}
+async function autoRefreshWhenReady(){
+  for(var i=0;i<240;i++){
+    if(editorReady()){
+      await refresh(false);
+      return;
+    }
+    status("Esperando que termine de cargar audio + proyecto…","warn");
+    await new Promise(function(r){setTimeout(r,250)});
+  }
+  status("El editor tardó demasiado en preparar el proyecto. Pulsa Recalcular.","bad");
 }
 async function refresh(force){
   if(M.busy)return;var jid=job();if(!jid){status("Abre un trabajo guardado del panel.","warn");return}
+  if(!editorReady()){status("El proyecto aún se está cargando. Espera un momento y vuelve a Recalcular.","warn");return}
   M.busy=true;status("Construyendo timeline desde el JSON actual…","warn");
   try{var p=project();var d=await request("/api/v2/jobs/"+encodeURIComponent(jid)+"/timeline",{project:p,options:opts()});M.timeline=d.timeline;M.cdg=null;resetDecoder();status("Timeline V2 lista · START/END de ElevenLabs conservados.","ok");paintPanel();paint()}
   catch(e){status(e.message||String(e),"bad")}finally{M.busy=false}
