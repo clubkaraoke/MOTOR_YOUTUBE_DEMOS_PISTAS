@@ -1,0 +1,64 @@
+name: Inspect Opening Ending smoke failure once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-opening-ending-smoke-failure-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Read synthetic smoke failure
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          TEST=/tmp/djgabo-opening-ending-smoke
+          STAGE=/tmp/djgabo-opening-ending-downloads-yellow-v1
+          PROD=/opt/djgabo-cdg
+          echo "FILES"
+          find "$TEST" -maxdepth 2 -type f -printf '%p %s\n' 2>/dev/null | sort || true
+          for f in "$TEST/off.log" "$TEST/on.log"; do
+            if [ -f "$f" ]; then echo "=== $f ==="; tail -120 "$f"; fi
+          done
+          echo "=== NORMALIZER REPRO ==="
+          sudo env TEST="$TEST" STAGE="$STAGE" "$PROD/.venv/bin/python" - <<'PY'
+          import json,os,sys,traceback
+          from pathlib import Path
+          test=Path(os.environ["TEST"]);stage=Path(os.environ["STAGE"])/"renderer"
+          sys.path.insert(0,str(stage));sys.path.insert(0,str(stage/"vendor"))
+          try:
+              import normalize as N
+              style=json.load(open(test/"style.json",encoding="utf-8"))
+              doc=N.load(test/"off.json")
+              n=N.normalize(doc,dict(style))
+              print("NORMALIZE_OK",n.outro_enabled)
+              toml=N.to_toml(n,dict(style),test/"silent.wav","smoke-off",stage)
+              print("TOML_HAS_ENDING_FALSE", 'outro_enabled = false' in toml)
+              from cdgmaker.composer import KaraokeComposer
+              c=KaraokeComposer.from_file(test/"off.toml" if (test/"off.toml").exists() else test/"missing.toml")
+              print("COMPOSER_OK",c.config.outro_enabled)
+          except Exception:
+              traceback.print_exc()
+          PY
+          REMOTE
