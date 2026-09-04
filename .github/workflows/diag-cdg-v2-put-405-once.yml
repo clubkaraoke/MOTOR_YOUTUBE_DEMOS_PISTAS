@@ -1,0 +1,62 @@
+name: Diagnose CDG V2 PUT 405 once
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diag-cdg-v2-put-405-once.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Diagnose live route map and HTTP methods
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE' 2>&1 | tee diagnostics/cdg-v2-put-405.txt
+          set -euo pipefail
+          echo "NOW=$(date -Is)"
+          echo "=== ROUTE SOURCE ==="
+          sudo grep -nE 'uploads/<upload_id>|def cdg_v2_upload_chunk|@app\.(put|post|delete)' /opt/djgabo-cdg-v2/cdg_v2_routes.py || true
+          echo "=== ROUTE MAP ==="
+          sudo -u djgabo-cdg /opt/djgabo-cdg-v2/.venv/bin/python - <<'PY'
+          import sys
+          sys.path.insert(0,"/opt/djgabo-cdg-v2")
+          import server
+          for r in sorted(server.app.url_map.iter_rules(), key=lambda x:str(x)):
+              if "/api/v2/uploads" in str(r):
+                  print(str(r), sorted(r.methods))
+          PY
+          echo "=== NGINX BLOCK ==="
+          sudo nginx -T 2>/dev/null | sed -n '/DJGABO_CDG_ENGINE_V2_CLONE/,+20p' || true
+          echo "=== OPTIONS LOCAL ==="
+          curl -sS -i -X OPTIONS http://127.0.0.1:8787/api/v2/uploads/test/voice | sed -n '1,20p' || true
+          echo "=== OPTIONS PUBLIC ==="
+          curl -sS -i -X OPTIONS https://panel.kitkaraoke.com/cdg-v2/api/v2/uploads/test/voice | sed -n '1,25p' || true
+          REMOTE
+      - name: Save
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-v2-put-405.txt
+          git commit -m "diag: capture CDG V2 PUT 405" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
