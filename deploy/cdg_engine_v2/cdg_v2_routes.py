@@ -98,7 +98,7 @@ def register_cdg_v2_routes(app, g):
             app.logger.exception("V2 upload init")
             return jsonify(ok=False, error="No pude iniciar la subida LAB: " + str(e)), 500
 
-    @app.put("/api/v2/uploads/<upload_id>/<kind>")
+    @app.route("/api/v2/uploads/<upload_id>/<kind>", methods=["POST","PUT"])
     def cdg_v2_upload_chunk(upload_id, kind):
         try:
             g["session"](str(request.headers.get("X-Session-Token") or ""), "ADMIN")
@@ -203,7 +203,7 @@ def register_cdg_v2_routes(app, g):
             app.logger.exception("V2 upload finalize %s", upload_id)
             return jsonify(ok=False, error="No pude finalizar la subida LAB: " + str(e)), 500
 
-    @app.delete("/api/v2/uploads/<upload_id>")
+    @app.post("/api/v2/uploads/<upload_id>/cancel")
     def cdg_v2_upload_cancel(upload_id):
         try:
             g["session"](str(request.headers.get("X-Session-Token") or ""), "ADMIN")
