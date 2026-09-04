@@ -175,6 +175,12 @@ jobs:
           import normalize as N
           doc=N.load(os.environ["TIMINGS"])
           style=json.load(open(stage/"style.json",encoding="utf-8"))
+          # Igual que server.py: el render recibe lines_per_page desde
+          # render_options del proyecto/editor. El Perfume está actualmente en 5.
+          declared=((doc.get("render_pages") or {}).get("lines_per_page")
+                    or (doc.get("cdg_settings") or {}).get("lines_per_page")
+                    or style.get("lines_per_page") or 6)
+          style["lines_per_page"]=int(declared)
           font=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
           style["font"]=str(font);style["font_fallback"]=str(font)
           Path("/tmp/editor-review-smoke-style.json").write_text(json.dumps(style),encoding="utf-8")
