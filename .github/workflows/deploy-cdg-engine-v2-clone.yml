@@ -1,0 +1,278 @@
+name: Deploy isolated DJGABO CDG Engine V2 clone
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/cdg_engine_v2/**"
+      - ".github/workflows/deploy-cdg-engine-v2-clone.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate V2 source and pin Nomad
+        run: |
+          set -euo pipefail
+          python3 -m py_compile             deploy/cdg_engine_v2/engine_v2.py             deploy/cdg_engine_v2/cdg_v2_routes.py             deploy/cdg_engine_v2/patch_clone.py             deploy/cdg_engine_v2/patch_nomad.py             deploy/cdg_engine_v2/verify_v2.py             deploy/cdg_engine_v2/install_nginx_route.py
+          node --check deploy/cdg_engine_v2/cdg-v2-studio.js
+          grep -Fq 'mp4_engine_status":"NOT_IMPLEMENTED' deploy/cdg_engine_v2/engine_v2.py
+          grep -Fq 'No MP4 implementation is permitted' deploy/cdg_engine_v2/ARCHITECTURE.md
+
+          rm -rf /tmp/nomad-v2 /tmp/nomad-cdgmaker
+          git init -q /tmp/nomad-v2
+          git -C /tmp/nomad-v2 remote add origin https://github.com/nomadkaraoke/karaoke-gen.git
+          git -C /tmp/nomad-v2 fetch -q --depth 1 origin bedbcdc3bdba3aa475c5d8fb08c32fe799b3bf88
+          git -C /tmp/nomad-v2 checkout -q FETCH_HEAD
+          mkdir -p /tmp/nomad-cdgmaker
+          cp -a /tmp/nomad-v2/karaoke_gen/lyrics_transcriber/output/cdgmaker/. /tmp/nomad-cdgmaker/
+          python3 deploy/cdg_engine_v2/patch_nomad.py /tmp/nomad-cdgmaker
+          grep -Fq DJGABO_CDG_ENGINE_V2_PATCH /tmp/nomad-cdgmaker/composer.py
+          echo "SOURCE_PREFLIGHT=PASS"
+
+      - name: Package isolated clone payload
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cdg-engine-v2-bundle
+          mkdir -p /tmp/cdg-engine-v2-bundle/deploy /tmp/cdg-engine-v2-bundle/nomad_cdgmaker
+          cp -a deploy/cdg_engine_v2/. /tmp/cdg-engine-v2-bundle/deploy/
+          cp -a /tmp/nomad-cdgmaker/. /tmp/cdg-engine-v2-bundle/nomad_cdgmaker/
+          tar -C /tmp/cdg-engine-v2-bundle -czf /tmp/cdg-engine-v2-bundle.tgz .
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy clone, smoke, and validate El Perfume
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" /tmp/cdg-engine-v2-bundle.tgz "$OVH_USER@$OVH_HOST:/tmp/cdg-engine-v2-bundle.tgz"
+
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' > diagnostics/cdg-engine-v2-deploy.txt 2>&1 <<'REMOTE'
+          set -euo pipefail
+          PROD=/opt/djgabo-cdg
+          CLONE=/opt/djgabo-cdg-v2
+          DATA=/var/lib/djgabo-cdg-v2
+          SERVICE=djgabo-cdg-v2
+          PORT=8787
+          BUNDLE=/tmp/cdg-engine-v2-bundle
+          STAGE=/tmp/djgabo-cdg-v2-stage
+          NGINX=/etc/nginx/sites-available/panel.kitkaraoke.com
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+
+          echo "TIMESTAMP=$(date -Is)"
+          echo "PHASE=CDG_V2_EQUALITY_ONLY"
+          echo "MP4_ENGINE=NOT_IMPLEMENTED"
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          PROD_HTTP_BEFORE="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$PROD_HTTP_BEFORE" = 200
+          PROD_HASH_BEFORE="$(sudo sha256sum             "$PROD/server.py" "$PROD/panel.html" "$PROD/editor_v1/index.html"             "$PROD/renderer/render.py" "$PROD/renderer/normalize.py" | sha256sum | awk '{print $1}')"
+          echo "PROD_HTTP_BEFORE=$PROD_HTTP_BEFORE"
+          echo "PROD_CODE_HASH_BEFORE=$PROD_HASH_BEFORE"
+
+          sudo rm -rf "$BUNDLE" "$STAGE"
+          sudo mkdir -p "$BUNDLE" "$STAGE"
+          sudo tar -xzf /tmp/cdg-engine-v2-bundle.tgz -C "$BUNDLE"
+
+          echo "=== CLONE CURRENT PRODUCTION CODE ==="
+          sudo rsync -a --delete             --exclude='.venv' --exclude='data' --exclude='output' --exclude='backups'             "$PROD/" "$STAGE/"
+          sudo mkdir -p "$STAGE/vendor/nomad_cdgmaker"
+          sudo cp -a "$BUNDLE/nomad_cdgmaker/." "$STAGE/vendor/nomad_cdgmaker/"
+          sudo python3 "$BUNDLE/deploy/patch_clone.py" "$STAGE" "$BUNDLE/deploy"
+          sudo grep -Fq 'DJGABO_CDG_ENGINE_V2_CLONE_PATCH' "$STAGE/server.py"
+          sudo grep -Fq 'cdg-v2-studio.js' "$STAGE/editor_v1/index.html"
+          sudo grep -Fq 'DJGABO_CDG_ENGINE_V2_PATCH' "$STAGE/vendor/nomad_cdgmaker/composer.py"
+          sudo python3 -m py_compile "$STAGE/server.py" "$STAGE/engine_v2.py" "$STAGE/cdg_v2_routes.py"
+
+          echo "=== INSTALL ISOLATED APP ==="
+          if [ -d "$CLONE" ]; then
+            sudo mkdir -p "$CLONE/backups"
+            sudo tar -C "$CLONE" --exclude='.venv' --exclude='backups' -czf "$CLONE/backups/code-$STAMP.tgz" . || true
+          fi
+          sudo mkdir -p "$CLONE"
+          sudo rsync -a --delete --exclude='.venv' --exclude='backups' "$STAGE/" "$CLONE/"
+          sudo mkdir -p "$CLONE/backups"
+          sudo chown -R djgabo-cdg:djgabo-cdg "$CLONE"
+
+          if [ ! -x "$CLONE/.venv/bin/python" ]; then
+            sudo -u djgabo-cdg python3 -m venv "$CLONE/.venv"
+          fi
+          sudo -u djgabo-cdg "$CLONE/.venv/bin/pip" install --disable-pip-version-check -q             -r "$CLONE/renderer/requirements.txt" requests
+          sudo -u djgabo-cdg "$CLONE/.venv/bin/python" -m py_compile             "$CLONE/server.py" "$CLONE/engine_v2.py" "$CLONE/cdg_v2_routes.py"             "$CLONE/vendor/nomad_cdgmaker/composer.py" "$CLONE/vendor/nomad_cdgmaker/config.py"
+
+          echo "=== ISOLATED DATA SNAPSHOT ==="
+          sudo mkdir -p "$DATA/jobs" "$DATA/output" "$DATA/v2_renders"
+          PID="$(sudo systemctl show djgabo-cdg -p MainPID --value)"
+          test -n "$PID"; test "$PID" != 0
+          PROD_DATA="$(sudo sh -c "tr '\\0' '\\n' < /proc/$PID/environ" | sed -n 's/^DJGABO_DATA_DIR=//p' | head -1)"
+          [ -n "$PROD_DATA" ] || PROD_DATA="$PROD/data"
+          PROD_DB="$PROD_DATA/local.db"
+          test -f "$PROD_DB"
+          if [ ! -f "$DATA/.seeded_from_prod" ]; then
+            sudo python3 - "$PROD_DB" "$DATA/local.db" <<'PY'
+          import sqlite3,sys
+          src=sqlite3.connect(sys.argv[1]); dst=sqlite3.connect(sys.argv[2])
+          src.backup(dst); dst.close(); src.close()
+          PY
+            if sudo test -d "$PROD_DATA/jobs/LET-0088"; then
+              sudo cp -a --reflink=auto "$PROD_DATA/jobs/LET-0088" "$DATA/jobs/" || sudo cp -a "$PROD_DATA/jobs/LET-0088" "$DATA/jobs/"
+            fi
+            echo "seeded_at=$(date -Is)" | sudo tee "$DATA/.seeded_from_prod" >/dev/null
+          fi
+          sudo rm -f "$DATA/dropbox_oauth.json" "$DATA/drive_bridge.json"
+          sudo chown -R djgabo-cdg:djgabo-cdg "$DATA"
+
+          echo "=== COPY LOGIN SECRETS ONLY, NO DROPBOX/DRIVE SECRETS ==="
+          sudo python3 - "$PID" /etc/djgabo-cdg-v2.env <<'PY'
+          import sys
+          pid=sys.argv[1]; out=sys.argv[2]
+          raw=open(f"/proc/{pid}/environ","rb").read().split(b"\0")
+          env={}
+          for item in raw:
+              if b"=" in item:
+                  k,v=item.split(b"=",1)
+                  env[k.decode("utf-8","ignore")]=v.decode("utf-8","ignore")
+          keys=("DJGABO_ADMIN_PASSWORD","DJGABO_CORRECTORA_PASSWORD")
+          with open(out,"w",encoding="utf-8") as f:
+              for k in keys:
+                  if env.get(k):
+                      v=env[k].replace("\\","\\\\").replace('"','\\"')
+                      f.write(f'{k}="{v}"\n')
+          PY
+          sudo chmod 600 /etc/djgabo-cdg-v2.env
+
+          echo "=== SYSTEMD ISOLATED ==="
+          sudo tee /etc/systemd/system/${SERVICE}.service >/dev/null <<UNIT
+          [Unit]
+          Description=DJGABO CDG Engine V2 clone - isolated
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=djgabo-cdg
+          Group=djgabo-cdg
+          WorkingDirectory=$CLONE
+          EnvironmentFile=-/etc/djgabo-cdg-v2.env
+          Environment=DJGABO_ENV=local
+          Environment=DJGABO_BIND_PORT=$PORT
+          Environment=DJGABO_DATA_DIR=$DATA
+          Environment=DJGABO_JOBS_DIR=$DATA/jobs
+          Environment=DJGABO_OUTPUT_DIR=$DATA/output
+          Environment=DJGABO_DB_PATH=$DATA/local.db
+          Environment=DJGABO_SKIP_PREV_MIGRATION=1
+          Environment=DJGABO_V2_CLONE_SAFE=1
+          Environment=DJGABO_PUBLIC_BASE_URL=https://panel.kitkaraoke.com/cdg-v2
+          ExecStart=$CLONE/.venv/bin/python $CLONE/server.py
+          Restart=on-failure
+          RestartSec=3
+          TimeoutStartSec=90
+          TimeoutStopSec=120
+          UMask=0077
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo systemctl daemon-reload
+          sudo systemctl enable "$SERVICE" >/dev/null
+          sudo systemctl restart "$SERVICE"
+
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:$PORT/api/v2/healthz" >/tmp/v2-health.json 2>/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          test "$ok" = 1
+          echo "V2_HEALTH=$(cat /tmp/v2-health.json)"
+          test "$(sudo systemctl is-active "$SERVICE")" = active
+
+          echo "=== ENGINE SMOKE ==="
+          sudo -u djgabo-cdg "$CLONE/.venv/bin/python" "$CLONE/engine_v2.py" --smoke --out "$DATA/v2_renders/SMOKE" >/tmp/v2-smoke.txt
+          cat /tmp/v2-smoke.txt
+          test -s "$DATA/v2_renders/SMOKE/output_v2.cdg"
+          test -s "$DATA/v2_renders/SMOKE/timeline_v2.json"
+          test -s "$DATA/v2_renders/SMOKE/diagnostic_v2.json"
+          echo "SMOKE=PASS"
+
+          echo "=== EL PERFUME EQUALITY TEST ==="
+          sudo -u djgabo-cdg "$CLONE/.venv/bin/python" "$BUNDLE/deploy/verify_v2.py"             --db "$DATA/local.db" --job LET-0088             --out "$DATA/v2_renders/LET-0088" --engine-root "$CLONE"             | tee /tmp/el-perfume-v2-equality.txt
+          test -s "$DATA/v2_renders/LET-0088/output_v2.cdg"
+          test -s "$DATA/v2_renders/LET-0088/equality_report_v2.json"
+          python3 - "$DATA/v2_renders/LET-0088/equality_report_v2.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert d["intro_delay_actual_frames"] == 0, d
+          assert d["sync_offset_frames"] == 0, d
+          assert d["max_source_to_timeline_delta_ms"] <= 1.1, d
+          assert d["max_timeline_to_compiled_delta_ms"] <= 5.1, d
+          assert d["canonical_words"] == d["rendered_words"], d
+          print("EQUALITY_STRUCTURAL=PASS")
+          PY
+
+          echo "=== INSTALL /cdg-v2/ ROUTE ==="
+          sudo cp "$NGINX" "${NGINX}.bak-cdg-v2-$STAMP"
+          sudo python3 "$BUNDLE/deploy/install_nginx_route.py" "$NGINX"
+          if sudo test -f /etc/nginx/sites-available/djgabo-cdg; then
+            sudo python3 "$BUNDLE/deploy/install_nginx_route.py" /etc/nginx/sites-available/djgabo-cdg || true
+          fi
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          echo "=== PRODUCTION SAFETY ==="
+          PROD_HASH_AFTER="$(sudo sha256sum             "$PROD/server.py" "$PROD/panel.html" "$PROD/editor_v1/index.html"             "$PROD/renderer/render.py" "$PROD/renderer/normalize.py" | sha256sum | awk '{print $1}')"
+          PROD_HTTP_AFTER="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)"
+          test "$PROD_HASH_BEFORE" = "$PROD_HASH_AFTER"
+          test "$PROD_HTTP_AFTER" = 200
+          test "$(sudo systemctl is-active djgabo-cdg)" = active
+          echo "PROD_CODE_HASH_AFTER=$PROD_HASH_AFTER"
+          echo "PRODUCTION_CODE_UNCHANGED=YES"
+          echo "PROD_HTTP_AFTER=$PROD_HTTP_AFTER"
+          echo "V2_SERVICE=$(sudo systemctl is-active "$SERVICE")"
+          echo "V2_HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/)"
+          echo "SCRIBE_GATEWAY=$(sudo ss -ltn | grep -c ':8097 ' || true)"
+          echo "DEPLOY=OK"
+          REMOTE
+
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/tmp/el-perfume-v2-equality.txt" diagnostics/el-perfume-v2-equality.txt || true
+          scp -P "$OVH_PORT" "$OVH_USER@$OVH_HOST:/var/lib/djgabo-cdg-v2/v2_renders/LET-0088/equality_report_v2.json" diagnostics/el-perfume-v2-equality.json || true
+
+      - name: Verify public isolated route
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://panel.kitkaraoke.com/cdg-v2/ || true)"
+          echo "PUBLIC_CDG_V2_HTTP=$code" | tee -a diagnostics/cdg-engine-v2-deploy.txt
+          case "$code" in
+            200|301|302|303|307|308|401|403) ;;
+            *) echo "Unexpected /cdg-v2/ status: $code" >&2; exit 1 ;;
+          esac
+
+      - name: Save V2 validation report
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/cdg-engine-v2-deploy.txt diagnostics/el-perfume-v2-equality.txt diagnostics/el-perfume-v2-equality.json 2>/dev/null || true
+          git commit -m "diag: record CDG Engine V2 El Perfume validation" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
