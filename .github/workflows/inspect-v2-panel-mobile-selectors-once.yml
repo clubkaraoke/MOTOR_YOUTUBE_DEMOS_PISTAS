@@ -1,0 +1,48 @@
+name: Inspect V2 panel mobile selectors once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-v2-panel-mobile-selectors-once.yml"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Print panel selectors
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'python3 -' <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("/opt/djgabo-cdg-v2/panel.html").read_text(encoding="utf-8")
+          print("LEN",len(s))
+          for pat in [r'<aside[^>]*>',r'<nav[^>]*>',r'<main[^>]*>',r'<header[^>]*>',r'id="[^"]+"',r'class="[^"]+"']:
+              vals=[]
+              for m in re.finditer(pat,s,re.I):
+                  v=m.group(0)
+                  if v not in vals: vals.append(v)
+              print("\nPAT",pat)
+              for v in vals[:180]: print(v)
+          print("\nAROUND NAV TEXT")
+          for word in ["Consola","Home","Trabajos","Papelera","Nueva canción","Actividad reciente"]:
+              i=s.find(word)
+              print("\n",word,i)
+              if i>=0: print(s[max(0,i-1600):i+2600])
+          PY
