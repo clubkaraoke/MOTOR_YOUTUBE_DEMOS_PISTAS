@@ -134,6 +134,8 @@ jobs:
           style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
           font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
           style["font"]=font;style["font_fallback"]=font
+          # El smoke debe usar exactamente el LPP del JSON maestro/Preview.
+          style["lines_per_page"]=int((doc.get("render_pages") or {}).get("lines_per_page") or style.get("lines_per_page") or 6)
           n=N.normalize(doc,style)
           after={str(w.get("id")):(w.get("start_time"),w.get("end_time"),bool(w.get("spoken"))) for s in doc.get("segments",[]) for w in s.get("words",[])}
           print("PUMITA_START_END_UNCHANGED="+("YES" if before==after else "NO"))
@@ -274,6 +276,7 @@ jobs:
           before={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
           style=json.load(open(P/"renderer/style.json",encoding="utf-8"))
           font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";style["font"]=font;style["font_fallback"]=font
+          style["lines_per_page"]=int((doc.get("render_pages") or {}).get("lines_per_page") or style.get("lines_per_page") or 6)
           n=N.normalize(doc,style)
           after={str(w.get("id")):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
           assert before==after
@@ -299,3 +302,5 @@ jobs:
           fi
 
 # rerun after moving JS syntax validation to GitHub runner
+
+# rerun with master render_pages lines_per_page in Pumita smoke
