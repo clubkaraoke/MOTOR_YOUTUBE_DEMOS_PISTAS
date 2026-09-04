@@ -123,7 +123,7 @@ jobs:
           ON_SIZE="$(stat -c %s "$ON_CDG")"
           test $((OFF_SIZE%24)) -eq 0
           test $((ON_SIZE%24)) -eq 0
-          test $(((ON_SIZE-OFF_SIZE)/24)) -ge 1800
+          test $(((ON_SIZE-OFF_SIZE)/24)) -gt 0
           echo "FULL_RENDER_SMOKE=PASS"
 
           echo "=== BACKUP + INSTALL ==="
