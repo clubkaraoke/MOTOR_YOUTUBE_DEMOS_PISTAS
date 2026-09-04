@@ -62,6 +62,7 @@ jobs:
           echo "=== CORRECTED SMOKE ==="
           sudo rm -rf "$TEST"
           sudo mkdir -p "$TEST/off" "$TEST/on"
+          sudo chmod -R 0777 "$TEST"
           sudo env TEST="$TEST" STAGE="$STAGE" "$PROD/.venv/bin/python" - <<'PY'
           import copy,json,os,wave,sys
           from pathlib import Path
