@@ -1,0 +1,44 @@
+name: Inspect Nomad multilyrics event merge once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-nomad-multilyrics-event-merge-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect merge
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          sudo env F=/opt/djgabo-cdg/renderer/vendor/cdgmaker/composer.py python3 - <<'PY'
+          from pathlib import Path
+          import os
+          t=Path(os.environ["F"]).read_text(encoding="utf-8")
+          for key in ["self.lyrics.append","LyricInfo(","for lyric in self.lyrics","for lyric in lyrics","compose","events.sort","sorted(events","self.events","event_queue"]:
+              print("\n==",key,"==")
+              p=0
+              for _ in range(10):
+                  i=t.find(key,p)
+                  if i<0:break
+                  print(t[max(0,i-1800):min(len(t),i+6000)])
+                  p=i+len(key)
+          PY
+          REMOTE
