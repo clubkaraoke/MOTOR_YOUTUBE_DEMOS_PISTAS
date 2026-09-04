@@ -28,7 +28,8 @@ def patch_html(path: Path, is_panel: bool = False) -> None:
         text = text.replace("</body>", script + "\n<!-- " + MARK + " -->\n</body>", 1)
         text = text.replace("Sincronizador de karaoke · DJGABO · IA TEST", "Sincronizador de karaoke · DJGABO · CDG ENGINE V2 LAB")
     if is_panel:
-        text = text.replace("</body>", "<!-- " + MARK + " -->\n</body>", 1)
+        script = f'<script src="{PREFIX}/api/vendor/cdg-v2-lab.js"></script>'
+        text = text.replace("</body>", script + "\n<!-- " + MARK + " -->\n</body>", 1)
     path.write_text(text, encoding="utf-8")
 
 
@@ -78,7 +79,7 @@ def patch_server(path: Path) -> None:
     anchor = "if __name__=='__main__':"
     if anchor not in text:
         raise RuntimeError("server.py: no encuentro bloque __main__")
-    register = '''# DJGABO_CDG_ENGINE_V2_CLONE_PATCH\n# Rutas exclusivas del clon. Nunca se registran en /opt/djgabo-cdg.\nfrom cdg_v2_routes import register_cdg_v2_routes\nregister_cdg_v2_routes(app, globals())\n\n'''
+    register = '''# DJGABO_CDG_ENGINE_V2_CLONE_PATCH\n# Rutas exclusivas del clon. Nunca se registran en /opt/djgabo-cdg.\n# En modo LAB anulamos cualquier respaldo/escritura externa heredada del panel.\nif env_bool("DJGABO_V2_CLONE_SAFE", False):\n    master_sync = lambda *args, **kwargs: {"ok": True, "v2_disabled": True}\n    schedule_timings_backup = lambda *args, **kwargs: None\n    backup_voice_to_drive = lambda *args, **kwargs: {"ok": True, "v2_disabled": True}\nfrom cdg_v2_routes import register_cdg_v2_routes\nregister_cdg_v2_routes(app, globals())\n\n'''
     text = text.replace(anchor, register + anchor, 1)
     path.write_text(text, encoding="utf-8")
 
@@ -101,6 +102,11 @@ def main() -> int:
     vendor.mkdir(parents=True, exist_ok=True)
     (vendor / "__init__.py").write_text("# DJGABO CDG V2 vendor namespace\n", encoding="utf-8")
     shutil.copy2(src / "cdg-v2-studio.js", vendor / "cdg-v2-studio.js")
+    shutil.copy2(src / "cdg-v2-lab.js", vendor / "cdg-v2-lab.js")
+    qr_src = src / "vendor"
+    shutil.copy2(qr_src / "jsQR.js", vendor / "jsQR.js")
+    shutil.copy2(qr_src / "jsQR.LICENSE.txt", vendor / "jsQR.LICENSE.txt")
+    shutil.copy2(qr_src / "jsQR.UPSTREAM.txt", vendor / "jsQR.UPSTREAM.txt")
     shutil.copy2(src / "LICENSE.nomad-karaoke.txt", root / "LICENSE.nomad-karaoke.txt")
     shutil.copy2(src / "UPSTREAM.txt", root / "UPSTREAM.txt")
 
