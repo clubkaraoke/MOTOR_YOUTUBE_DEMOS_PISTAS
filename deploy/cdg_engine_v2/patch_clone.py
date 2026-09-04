@@ -52,6 +52,12 @@ def patch_server(path: Path) -> None:
         1,
     )
 
+    # Cookie propia del LAB: nunca sobrescribir djgabo_portal_session de producción.
+    old_cookie = "PORTAL_COOKIE_NAME='djgabo_portal_session'"
+    if old_cookie not in text:
+        raise RuntimeError("server.py: no encuentro PORTAL_COOKIE_NAME de producción")
+    text = text.replace(old_cookie, "PORTAL_COOKIE_NAME='djgabo_v2_portal_session'", 1)
+
     old_status = "status_url='/api/render/status/'+task_id"
     if old_status not in text:
         raise RuntimeError("server.py: no encuentro render status_url")
