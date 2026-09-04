@@ -141,7 +141,7 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
             "text":str(seg.get("text") or ""),
             "word_ids":[str(w.get("id") or "") for w in (seg.get("words") or []) if isinstance(w,dict)]
         })
-    return {
+    timeline={
         "schema":"djgabo.timeline.v2","schema_version":2,
         "engine":ENGINE_VERSION,"upstream":"nomadkaraoke/karaoke-gen","upstream_commit":UPSTREAM_COMMIT,
         "policy":{"elevenlabs_word_start_end_are_immutable":True,"preview_and_cdg_share_this_timeline":True,
@@ -157,6 +157,7 @@ def build_timeline(project:dict, options:dict|None=None)->dict:
         "layout":cdg_layout,"lines":lines,
         "warnings":warnings,"source_word_count":len(words),"rendered_line_count":len(lines),
     }
+    return apply_nomad_line_delayed(project,timeline,options)
 
 def silent_wav(path:Path, seconds:float, rate:int=44100):
     frames=max(1,int((seconds+.5)*rate)); path.parent.mkdir(parents=True,exist_ok=True)
@@ -165,6 +166,116 @@ def silent_wav(path:Path, seconds:float, rate:int=44100):
         block=b"\0\0"*rate
         while frames:
             n=min(frames,rate); wf.writeframes(block[:n*2]); frames-=n
+
+def apply_nomad_line_delayed(project:dict, tl:dict, options:dict|None=None)->dict:
+    """Deja a Nomad decidir la coreografía de filas/páginas.
+
+    START/END de cada palabra permanecen inmutables. Nomad sólo calcula
+    line_draw / line_erase / geometría de filas usando su LINE_DELAYED real.
+    Ese resultado se guarda en layouts.cdg y después lo consumen tanto
+    Preview V2 como el compositor CDG.
+    """
+    options=dict(options or {})
+    try:
+        from vendor.nomad_cdgmaker.composer import KaraokeComposer
+        from vendor.nomad_cdgmaker.config import Settings,SettingsLyric,SettingsSinger
+    except Exception as e:
+        raise EngineV2Error("No se pudo cargar Nomad para calcular filas V2: "+str(e)) from e
+
+    layout=tl["layout"]
+    sync=[]; ends=[]
+    for line in tl["lines"]:
+        for w in line["words"]:
+            sync.append(int(round(float(w["start"])*100)))
+            ends.append(int(round(float(w["end"])*100)))
+
+    song=project.get("song") or {}
+    title=str(song.get("title") or "CDG V2")
+    artist=str(song.get("artist") or "DJGABO")
+    lyric=SettingsLyric(
+        sync=sync,
+        end_sync=ends,
+        text="\n".join(x["text"] for x in tl["lines"]),
+        line_tile_height=int(layout["line_tile_height"]),
+        lines_per_page=int(layout["lines_per_screen"]),
+        singer=1,
+        row=int(layout["row"]),
+        explicit_timeline=False,
+    )
+    singer=SettingsSinger(
+        inactive_fill="#FFFFFF",inactive_stroke="#000000",
+        active_fill="#F2B705",active_stroke="#000000"
+    )
+    cfg=Settings(
+        title=title,artist=artist,
+        file=Path("unused-v2-clock.wav"),
+        font=Path(layout["font_path_server"]),
+        title_screen_background=Path("unused-v2-black.png"),
+        outro_background=Path("unused-v2-black.png"),
+        outname="nomad-layout-preview",
+        clear_mode="delayed",
+        sync_offset=0,
+        highlight_bandwidth=int(options.get("highlight_bandwidth") or 4),
+        draw_bandwidth=int(options.get("draw_bandwidth") or 1),
+        background="#000000",border="#000000",
+        font_size=int(layout["font_size"]),
+        stroke_width=int(layout["stroke_width"]),
+        stroke_type="octagon",
+        instrumentals=[],
+        singers=[singer],
+        lyrics=[lyric],
+        intro_duration_seconds=0.0,
+        first_syllable_buffer_seconds=0.0,
+        outro_text_line1="",
+        outro_text_line2="",
+    )
+    kc=KaraokeComposer(cfg,relative_dir=Path("."))
+    if len(kc.lyrics)!=1 or len(kc.lyric_times)!=1:
+        raise EngineV2Error("Nomad devolvió un layout de filas inesperado.")
+    nlines=kc.lyrics[0].lines
+    ntimes=kc.lyric_times[0]
+    if len(nlines)!=len(tl["lines"]) or len(ntimes.line_draw)!=len(tl["lines"]):
+        raise EngineV2Error(
+            f"Nomad rows mismatch: timeline={len(tl['lines'])}, "
+            f"nomad_lines={len(nlines)}, draws={len(ntimes.line_draw)}"
+        )
+
+    duration=float(tl["duration"])
+    for i,(item,nline) in enumerate(zip(tl["lines"],nlines)):
+        draw_frame=int(ntimes.line_draw[i])
+        erase_frame=int(ntimes.line_erase[i]) if ntimes.line_erase and i<len(ntimes.line_erase) else 0
+        display=max(0.0,draw_frame/300.0)
+        remove=(erase_frame/300.0) if erase_frame>0 else (duration+0.5)
+        item["display_at"]=round(display,6)
+        item["remove_at"]=round(remove,6)
+        item["read_ahead_seconds"]=round(max(0.0,float(item["sweep_start"])-display),6)
+        item["shortfall_seconds"]=0.0
+        item["nomad"]={
+            "clear_mode":"delayed",
+            "line_draw_frame":draw_frame,
+            "line_erase_frame":erase_frame,
+            "line_draw":round(draw_frame/300.0,6),
+            "line_erase":round(erase_frame/300.0,6) if erase_frame>0 else None,
+            "x":int(nline.x),"y":int(nline.y),
+            "width":int(nline.image.width),"height":int(nline.image.height),
+            "line_index":int(nline.line_index),
+            "page_index":int(nline.line_index)//int(layout["lines_per_screen"])+1,
+            "slot":int(nline.line_index)%int(layout["lines_per_screen"])+1,
+        }
+        item["page_index"]=item["nomad"]["page_index"]
+        item["slot"]=item["nomad"]["slot"]
+
+    layout["clear_mode"]="delayed"
+    layout["row_scheduler"]="NOMAD_LINE_DELAYED"
+    layout["line_draw_erase_gap_frames"]=int(getattr(kc,"LINE_DRAW_ERASE_GAP",50))
+    tl["layouts"]["cdg"]["timing_source"]="nomadkaraoke.cdgmaker.LINE_DELAYED"
+    tl["layouts"]["cdg"]["layout"]=layout
+    tl["layouts"]["cdg"]["lines"]=tl["lines"]
+    tl["render_metadata"]["cdg_row_scheduler"]="NOMAD_LINE_DELAYED"
+    tl["render_metadata"]["cdg_row_scheduler_upstream_commit"]=UPSTREAM_COMMIT
+    tl["policy"]["nomad_controls_cdg_row_draw_erase"]=True
+    tl["policy"]["word_start_end_still_immutable"]=True
+    return tl
 
 def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
     options=dict(options or {}); tl=build_timeline(project,options)
@@ -189,6 +300,8 @@ def render_cdg(project:dict, output_dir:Path, options:dict|None=None)->dict:
             sync=sync,end_sync=ends,text="\n".join(x["text"] for x in tl["lines"]),
             line_tile_height=int(layout["line_tile_height"]),lines_per_page=int(layout["lines_per_screen"]),
             singer=1,row=int(layout["row"]),explicit_timeline=True,
+            # Estos tiempos NO son nuestro algoritmo anterior: fueron calculados
+            # por Nomad LINE_DELAYED dentro de apply_nomad_line_delayed().
             line_draw=[int(round(float(x["display_at"])*100)) for x in tl["lines"]],
             line_erase=[int(round(float(x["remove_at"])*100)) for x in tl["lines"]],
         )
