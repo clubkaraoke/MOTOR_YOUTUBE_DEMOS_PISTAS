@@ -1,0 +1,38 @@
+name: Inspect five improvement grep once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-five-improvement-grep-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep exact markers
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          E=/opt/djgabo-cdg/editor_v1/index.html
+          S=/opt/djgabo-cdg/server.py
+          echo "=== EDITOR GREP ==="
+          sudo grep -nE 'aiToolsBar|vocalRoles|btnAiBlock|btnAiFull|btnDiagJson|cdgStatus|cdg.*status|CDG final|actualizar CDG|render.*status|btn.*Cdg|lyricsPane|lyricsList|lyricsScroll' "$E" | head -160 || true
+          echo "=== SERVER GREP ==="
+          sudo grep -nE "@app\.(get|post).*render|def .*render|timings|render_status|cdg_local_filename|cdg_dropbox|preview/cdg|cdg/status|cdg_preview" "$S" | tail -220 || true
+          REMOTE
