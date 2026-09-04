@@ -127,9 +127,32 @@ jobs:
           test -n "$PID"; test "$PID" != 0
           PROD_DATA="$(sudo sh -c "tr '\\0' '\\n' < /proc/$PID/environ" | sed -n 's/^DJGABO_DATA_DIR=//p' | head -1)"
           [ -n "$PROD_DATA" ] || PROD_DATA="$PROD/data"
-          PROD_DB="$PROD_DATA/local.db"
-          test -f "$PROD_DB"
-          if [ ! -f "$DATA/.seeded_from_prod" ]; then
+
+          # No asumimos dónde está SQLite: elegimos una DB real de producción
+          # comprobando que contenga LET-0088 / El Perfume. Sólo lectura.
+          PROD_DB=""
+          for candidate in             "$PROD_DATA/local.db"             "$PROD/data/local.db"             "/var/lib/djgabo-cdg/local.db"             "/var/lib/djgabo-cdg/data/local.db"; do
+            if sudo test -f "$candidate"; then
+              if sudo python3 - "$candidate" <<'PY' >/dev/null 2>&1
+          import sqlite3,sys
+          c=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro",uri=True)
+          ok=c.execute("SELECT count(*) FROM jobs WHERE id='LET-0088'").fetchone()[0]
+          c.close()
+          raise SystemExit(0 if ok else 1)
+          PY
+              then PROD_DB="$candidate"; break; fi
+            fi
+          done
+          if [ -z "$PROD_DB" ]; then
+            echo "PROD_DB_WITH_LET_0088=NOT_FOUND"
+            echo "Candidates under /opt and /var/lib:"
+            sudo find /opt /var/lib -maxdepth 5 -type f -name local.db -path '*djgabo*' -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "PROD_DATA_RESOLVED=$PROD_DATA"
+          echo "PROD_DB_RESOLVED=$PROD_DB"
+
+          if [ ! -f "$DATA/.seeded_from_prod" ] || [ ! -f "$DATA/local.db" ]; then
             sudo python3 - "$PROD_DB" "$DATA/local.db" <<'PY'
           import sqlite3,sys
           src=sqlite3.connect(sys.argv[1]); dst=sqlite3.connect(sys.argv[2])
