@@ -1,0 +1,179 @@
+name: Diagnose CDG V2 A-B visual layers once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diag-cdg-v2-ab-visual-layers-once.yml"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Render latest LAB job with A-B combinations
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo -u djgabo-cdg /opt/djgabo-cdg-v2/.venv/bin/python -' <<'PY'
+          import json, shutil, sqlite3, sys
+          from pathlib import Path
+
+          ROOT=Path("/opt/djgabo-cdg-v2")
+          DATA=Path("/var/lib/djgabo-cdg-v2")
+          sys.path.insert(0,str(ROOT))
+          from engine_v2 import render_cdg
+
+          db=sqlite3.connect(DATA/"local.db")
+          db.row_factory=sqlite3.Row
+          row=db.execute("""
+            SELECT id,artist,title,project_json,updated
+            FROM jobs
+            WHERE origin='V2_LAB' AND project_json IS NOT NULL AND length(project_json)>20
+            ORDER BY updated DESC LIMIT 1
+          """).fetchone()
+          if not row:
+              row=db.execute("""
+                SELECT id,artist,title,project_json,updated
+                FROM jobs
+                WHERE project_json IS NOT NULL AND length(project_json)>20
+                ORDER BY updated DESC LIMIT 1
+              """).fetchone()
+          if not row:
+              raise SystemExit("NO_PROJECT_JSON")
+          project=json.loads(row["project_json"])
+          print("JOB",row["id"],row["artist"],"-",row["title"],"updated",row["updated"])
+
+          combos={
+            "OFF":{"show_title_artist":False,"show_instrumental":False,"show_lead_in":False,"show_ending":False},
+            "OPENING":{"show_title_artist":True,"show_instrumental":False,"show_lead_in":False,"show_ending":False},
+            "INSTRUMENTAL":{"show_title_artist":False,"show_instrumental":True,"show_lead_in":False,"show_ending":False},
+            "LEADIN":{"show_title_artist":False,"show_instrumental":False,"show_lead_in":True,"show_ending":False},
+            "ENDING":{"show_title_artist":False,"show_instrumental":False,"show_lead_in":False,"show_ending":True},
+            "ALL":{"show_title_artist":True,"show_instrumental":True,"show_lead_in":True,"show_ending":True},
+          }
+
+          W,H,PPS=300,216,300
+          class Dec:
+              def __init__(self):
+                  self.frame=bytearray(W*H); self.pal=[(0,0,0)]*16
+              def packet(self,p):
+                  if len(p)!=24 or (p[0]&63)!=9:return
+                  ins=p[1]&63; d=[p[4+i]&63 for i in range(16)]
+                  if ins==1:
+                      self.frame[:]=bytes([d[0]&15])*(W*H)
+                  elif ins in (6,38):
+                      c0=d[0]&15;c1=d[1]&15;y0=(d[2]&31)*12;x0=(d[3]&63)*6
+                      for yy in range(12):
+                          y=y0+yy
+                          if y>=H:continue
+                          bits=d[4+yy]
+                          for xx in range(6):
+                              x=x0+xx
+                              if x>=W:continue
+                              v=c1 if bits&(1<<(5-xx)) else c0
+                              idx=y*W+x
+                              self.frame[idx]=(self.frame[idx]^v) if ins==38 else v
+          def count_idx(fr,bbox,idx):
+              x0,y0,x1,y1=[int(v) for v in bbox]
+              x0=max(0,min(W,x0));x1=max(0,min(W,x1));y0=max(0,min(H,y0));y1=max(0,min(H,y1))
+              return sum(fr[y*W+x0:y*W+x1].count(idx) for y in range(y0,y1))
+          def decode_samples(cdg,compiled,indices):
+              raw=cdg.read_bytes(); total=len(raw)//24; dec=Dec()
+              wanted={}
+              for i in indices:
+                  w=compiled[i];st=int(w["cdg_start_frame"]);en=int(w["cdg_end_frame"])
+                  wanted[i]={"lo":max(0,st-18),"hi":min(total-1,en+75),"samples":[]}
+              active=set(); starts={}; ends={}
+              for i,v in wanted.items():
+                  starts.setdefault(v["lo"],[]).append(i);ends.setdefault(v["hi"]+1,[]).append(i)
+              for f in range(total):
+                  for i in starts.get(f,[]):active.add(i)
+                  dec.packet(raw[f*24:(f+1)*24])
+                  for i in tuple(active):
+                      w=compiled[i];wanted[i]["samples"].append((f,count_idx(dec.frame,w["bbox"],int(w["active_fill_index"]))))
+                  for i in ends.get(f+1,[]):active.discard(i)
+              out={}
+              for i,v in wanted.items():
+                  w=compiled[i]; prev=None; changes=[]
+                  for f,c in v["samples"]:
+                      if prev is not None and c>prev:changes.append(f)
+                      prev=c
+                  obs0=changes[0] if changes else None;obs1=changes[-1] if changes else None
+                  out[w["word_id"]]={
+                    "start":None if obs0 is None else obs0/PPS,
+                    "end":None if obs1 is None else obs1/PPS,
+                    "timeline_start":float(w["timeline_start"]),"timeline_end":float(w["timeline_end"])
+                  }
+              return out
+
+          results={}
+          base_words=None
+          sample_ids=None
+          for name,opt in combos.items():
+              out=Path("/tmp")/("v2-ab-"+name.lower())
+              shutil.rmtree(out,ignore_errors=True)
+              rr=render_cdg(project,out,dict(opt,clear_mode="delayed"))
+              diag=json.loads((out/"diagnostic_v2.json").read_text())
+              comp=diag["compiled_words"]
+              byid={w["word_id"]:w for w in comp}
+              if base_words is None:
+                  base_words={k:(float(v["timeline_start"]),float(v["timeline_end"]),float(v["cdg_start"]),float(v["cdg_end"])) for k,v in byid.items()}
+                  n=len(comp)
+                  idx=sorted(set([0,1,max(0,n//5),max(0,n//2),max(0,(4*n)//5),max(0,n-2),max(0,n-1)]))
+                  sample_ids=[comp[i]["word_id"] for i in idx if i<n]
+              structural=0.0
+              for wid,b in base_words.items():
+                  if wid not in byid:continue
+                  w=byid[wid]
+                  structural=max(structural,abs(float(w["timeline_start"])-b[0]),abs(float(w["timeline_end"])-b[1]),abs(float(w["cdg_start"])-b[2]),abs(float(w["cdg_end"])-b[3]))
+              idx=[i for i,w in enumerate(comp) if w["word_id"] in sample_ids]
+              dec=decode_samples(out/"output_v2.cdg",comp,idx)
+              deltas=[]
+              for wid,d in dec.items():
+                  if d["start"] is not None:deltas.append(abs(d["start"]-d["timeline_start"])*1000)
+                  if d["end"] is not None:deltas.append(abs(d["end"]-d["timeline_end"])*1000)
+              results[name]={
+                  "structural_max_ms":round(structural*1000,3),
+                  "decoded_sample_max_abs_ms":round(max(deltas),3) if deltas else None,
+                  "intro_delay":diag.get("intro_delay_actual_frames"),
+                  "sync_offset":diag.get("sync_offset_frames"),
+                  "features":diag.get("features"),
+                  "instrumentals":len(diag.get("instrumentals") or []),
+                  "lead_ins":len(diag.get("lead_ins") or []),
+                  "packets":diag.get("writer_packet_count"),
+                  "decoded":dec,
+              }
+              print(name,json.dumps({k:v for k,v in results[name].items() if k!="decoded"},ensure_ascii=False))
+
+          off=results["OFF"]["decoded"]
+          for name in ("OPENING","INSTRUMENTAL","LEADIN","ENDING","ALL"):
+              diffs=[]
+              cur=results[name]["decoded"]
+              for wid,b in off.items():
+                  c=cur.get(wid)
+                  if not c:continue
+                  if b["start"] is not None and c["start"] is not None:diffs.append(abs(c["start"]-b["start"])*1000)
+                  if b["end"] is not None and c["end"] is not None:diffs.append(abs(c["end"]-b["end"])*1000)
+              print("VS_OFF",name,"decoded_max_change_ms",round(max(diffs),3) if diffs else None)
+
+          assert all(v["intro_delay"]==0 for v in results.values()),results
+          assert all(v["sync_offset"]==0 for v in results.values()),results
+          assert all(v["structural_max_ms"]<=1.1 for v in results.values()),results
+          print("AB_WORD_CLOCK_INVARIANT=PASS")
+          PY
