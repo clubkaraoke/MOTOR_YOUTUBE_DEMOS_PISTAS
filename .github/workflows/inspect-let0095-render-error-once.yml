@@ -1,0 +1,40 @@
+name: Inspect LET0095 render error once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0095-render-error-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect exact render error
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          sudo /opt/djgabo-cdg/.venv/bin/python - <<'PY'
+          import sqlite3,json
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db");db.row_factory=sqlite3.Row
+          r=db.execute("select render_status,render_progress,render_error,updated from jobs where id='LET-0095'").fetchone()
+          print("STATUS="+str(r["render_status"]))
+          print("PROGRESS="+str(r["render_progress"]))
+          print("UPDATED="+str(r["updated"]))
+          print("ERROR_JSON="+json.dumps(str(r["render_error"] or ""),ensure_ascii=False))
+          PY
+          REMOTE
