@@ -31,72 +31,115 @@ jobs:
           set -u
           echo "=== SERVER TIME ==="
           date --iso-8601=seconds
-          timedatectl 2>/dev/null | sed -n '1,8p' || true
 
-          echo "=== SQLITE RENDER DATA ==="
+          echo "=== SQLITE NORMALIZED DATA ==="
           sudo /opt/djgabo-cdg/.venv/bin/python - <<'PY'
-          import sqlite3, json, os, time
+          import sqlite3, json, time, re
           from pathlib import Path
+          from datetime import datetime, timezone
+          from zoneinfo import ZoneInfo
 
-          dbp="/var/lib/djgabo-cdg/local.db"
-          db=sqlite3.connect(dbp)
+          LIMA=ZoneInfo("America/Lima")
+          UTC=timezone.utc
+          start=datetime(2026,9,4,0,0,0,tzinfo=LIMA).timestamp()
+          end=datetime(2026,9,6,0,0,0,tzinfo=LIMA).timestamp()
+
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db")
           db.row_factory=sqlite3.Row
 
-          def cols(table):
-              return [r[1] for r in db.execute(f"pragma table_info({table})").fetchall()]
+          def cols(t): return [r[1] for r in db.execute(f"pragma table_info({t})").fetchall()]
+          def ep(v):
+              if v is None: return None
+              if isinstance(v,(int,float)):
+                  x=float(v); return x/1000 if x>1e11 else x
+              s=str(v).strip()
+              try:
+                  x=float(s); return x/1000 if x>1e11 else x
+              except: pass
+              try:
+                  z=s.replace("Z","+00:00")
+                  d=datetime.fromisoformat(z)
+                  if d.tzinfo is None: d=d.replace(tzinfo=UTC)
+                  return d.timestamp()
+              except: return None
+          def fmt(x):
+              if x is None: return None
+              return datetime.fromtimestamp(x,LIMA).isoformat()
 
-          print("JOBS_COLUMNS="+json.dumps(cols("jobs"), ensure_ascii=False))
-          print("LOGS_COLUMNS="+json.dumps(cols("logs"), ensure_ascii=False))
+          print("WINDOW_LIMA=2026-09-04T00:00:00-05:00..2026-09-06T00:00:00-05:00")
+          print("JOBS_COLUMNS="+json.dumps(cols("jobs"),ensure_ascii=False))
+          print("LOGS_COLUMNS="+json.dumps(cols("logs"),ensure_ascii=False))
 
-          print("=== LOG_ROWS_DATE_WINDOW ===")
-          lc=cols("logs")
-          wanted=[c for c in ["id","job_id","action","state","at"] if c in lc]
-          if "at" in lc:
-              q=f"select {','.join(wanted)} from logs where at >= ? and at < ? order by at asc"
-              rows=db.execute(q,("2026-09-04","2026-09-06")).fetchall()
-              print("LOG_COUNT="+str(len(rows)))
-              for r in rows:
-                  d=dict(r)
-                  blob=(" ".join(str(d.get(k,"")) for k in ("action","state"))).lower()
-                  if any(x in blob for x in ("render","cdg","export","creando","final","complete","error")):
-                      print("LOGROW="+json.dumps(d,ensure_ascii=False,default=str))
-          else:
-              print("NO_AT_COLUMN")
+          jobs={}
+          for r in db.execute("select * from jobs").fetchall():
+              d=dict(r); jobs[str(d.get("id"))]=d
 
-          print("=== JOB_ROWS_UPDATED_WINDOW ===")
-          jc=cols("jobs")
-          fields=[c for c in ["id","artist","title","status","render_status","render_progress","render_error","updated","cdg_local_filename","cdg_dropbox_path","version"] if c in jc]
-          if "updated" in jc:
-              q=f"select {','.join(fields)} from jobs where updated >= ? and updated < ? order by updated asc"
-              rows=db.execute(q,("2026-09-04","2026-09-06")).fetchall()
-              print("JOB_COUNT="+str(len(rows)))
-              for r in rows:
-                  print("JOBROW="+json.dumps(dict(r),ensure_ascii=False,default=str))
+          print("=== JOBS_WITH_RENDER_FIELDS ===")
+          jrows=[]
+          for d in jobs.values():
+              u=ep(d.get("updated"))
+              if (u and start<=u<end) or str(d.get("render_status") or "").lower() not in ("","none"):
+                  jrows.append((u or 0,d))
+          for u,d in sorted(jrows):
+              out={k:d.get(k) for k in ["id","artist","title","status","render_status","render_progress","render_error","updated","duration","cdg_local_filename","cdg_dropbox_path","version"]}
+              out["updated_lima"]=fmt(u)
+              print("JOB="+json.dumps(out,ensure_ascii=False,default=str))
 
-          print("=== CDG_FILE_MTIMES ===")
-          roots=[Path("/var/lib/djgabo-cdg"),Path("/opt/djgabo-cdg")]
-          seen=set()
-          start=time.mktime((2026,9,4,0,0,0,0,0,-1))
-          end=time.mktime((2026,9,6,0,0,0,0,0,-1))
+          print("=== LOGS_IN_LIMA_WINDOW ===")
+          logs=[]
+          for r in db.execute("select * from logs order by id asc").fetchall():
+              d=dict(r); a=ep(d.get("at"))
+              if a and start<=a<end:
+                  d["at_lima"]=fmt(a); logs.append(d)
+          print("LOGS_WINDOW_COUNT="+str(len(logs)))
+          for d in logs:
+              print("LOG="+json.dumps(d,ensure_ascii=False,default=str))
+
+          print("=== CDG_CACHE_IN_LIMA_WINDOW ===")
+          cache=Path("/var/lib/djgabo-cdg/preview_cache_cdg")
+          rows=[]
+          if cache.exists():
+              for p in cache.glob("*.cdg"):
+                  st=p.stat()
+                  if start<=st.st_mtime<end:
+                      jid=p.stem
+                      j=jobs.get(jid,{})
+                      rows.append((st.st_mtime,p,j))
+          for mt,p,j in sorted(rows):
+              print("CACHECDG="+json.dumps({
+                  "job_id":p.stem,
+                  "artist":j.get("artist"),
+                  "title":j.get("title"),
+                  "mtime_lima":fmt(mt),
+                  "size":p.stat().st_size,
+                  "duration":j.get("duration"),
+                  "render_status":j.get("render_status")
+              },ensure_ascii=False,default=str))
+          print("CACHECDG_COUNT="+str(len(rows)))
+
+          print("=== POSSIBLE_RENDER_AUX_FILES ===")
+          roots=[Path("/var/lib/djgabo-cdg"),Path("/tmp")]
           for root in roots:
               if not root.exists(): continue
-              for p in root.rglob("*.cdg"):
-                  try: st=p.stat()
-                  except Exception: continue
-                  if start <= st.st_mtime < end:
-                      key=(str(p),st.st_mtime,st.st_size)
-                      if key in seen: continue
-                      seen.add(key)
-                      print("CDGFILE="+json.dumps({
-                          "path":str(p),
-                          "mtime_local":time.strftime("%Y-%m-%dT%H:%M:%S%z",time.localtime(st.st_mtime)),
-                          "mtime_epoch":st.st_mtime,
-                          "size":st.st_size
-                      },ensure_ascii=False))
+              try:
+                  it=root.rglob("*")
+                  for p in it:
+                      try:
+                          if not p.is_file(): continue
+                          n=p.name.lower()
+                          if not any(x in n for x in ("render",".toml",".log")): continue
+                          st=p.stat()
+                          if start<=st.st_mtime<end:
+                              print("AUX="+json.dumps({"path":str(p),"mtime_lima":fmt(st.st_mtime),"size":st.st_size},ensure_ascii=False))
+                      except Exception: continue
+              except Exception: pass
           PY
 
-          echo "=== JOURNAL RENDER LINES 2026-09-04..06 ==="
-          sudo journalctl -u djgabo-cdg --since "2026-09-04 00:00:00" --until "2026-09-06 00:00:00" --no-pager -o short-iso 2>/dev/null \
-            | grep -Ei 'render|cdg|DJGABO_PROGRESS|export|complete|error|creando' \
-            | tail -n 12000 || true
+          echo "=== SERVER RENDER SOURCE HINTS ==="
+          sudo grep -nEi 'preview_cache_cdg|render_status|render_progress|renderer|Popen|subprocess|render\.py|cdg_local_filename' /opt/djgabo-cdg/server.py 2>/dev/null | tail -n 400 || true
+
+          echo "=== JOURNAL ENDPOINT/RENDER LINES ==="
+          sudo journalctl -u djgabo-cdg --since "2026-09-04 05:00:00 UTC" --until "2026-09-06 05:00:00 UTC" --no-pager -o short-iso 2>/dev/null \
+            | grep -Ei 'LET-[0-9]+|render|DJGABO_PROGRESS|cdg' \
+            | tail -n 16000 || true
           REMOTE
