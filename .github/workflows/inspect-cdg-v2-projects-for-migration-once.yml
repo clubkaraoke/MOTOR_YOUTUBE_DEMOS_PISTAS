@@ -1,0 +1,128 @@
+name: Inspect CDG V2 projects for migration once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-v2-projects-for-migration-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Compare V2 clone projects with production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json, sqlite3, hashlib, os
+          from pathlib import Path
+          from datetime import datetime
+
+          V2=Path("/var/lib/djgabo-cdg-v2")
+          PROD=Path("/var/lib/djgabo-cdg")
+
+          def loadj(p):
+              try:
+                  return json.load(open(p,encoding="utf-8"))
+              except Exception:
+                  return None
+
+          def words(doc):
+              out=[]
+              if not isinstance(doc,dict): return out
+              for s in doc.get("segments") or []:
+                  if isinstance(s,dict):
+                      for w in s.get("words") or []:
+                          if isinstance(w,dict): out.append(w)
+              return out
+
+          def identity(doc):
+              song=(doc or {}).get("song") or {}
+              return str(song.get("artist") or "").strip(), str(song.get("title") or "").strip()
+
+          def sha(p):
+              h=hashlib.sha256()
+              with open(p,"rb") as f:
+                  for c in iter(lambda:f.read(1024*1024),b""): h.update(c)
+              return h.hexdigest()
+
+          def db_rows(root):
+              p=root/"local.db"
+              if not p.is_file(): return {}
+              con=sqlite3.connect(f"file:{p}?mode=ro",uri=True);con.row_factory=sqlite3.Row
+              try:
+                  return {str(r["id"]):dict(r) for r in con.execute("select * from jobs").fetchall()}
+              finally: con.close()
+
+          v2db=db_rows(V2); proddb=db_rows(PROD)
+          print("MODE=READ_ONLY")
+          print("V2_SERVICE_ACTIVE="+str(os.system("systemctl is-active --quiet djgabo-cdg-v2")==0))
+          print("PROD_SERVICE_ACTIVE="+str(os.system("systemctl is-active --quiet djgabo-cdg")==0))
+
+          ids=set(v2db)
+          jobsdir=V2/"jobs"
+          if jobsdir.exists():
+              ids.update(p.name for p in jobsdir.iterdir() if p.is_dir())
+
+          rows=[]
+          for jid in sorted(ids):
+              p=V2/"jobs"/jid/"proyecto.timings.json"
+              if not p.is_file():
+                  continue
+              doc=loadj(p)
+              if not doc: continue
+              ws=words(doc)
+              art,title=identity(doc)
+              locked=sum(1 for w in ws if w.get("locked") or w.get("start_time") is not None)
+              spoken=sum(1 for w in ws if w.get("spoken"))
+              roles=sum(1 for w in ws if str(w.get("role") or w.get("vocal_role") or "").strip())
+              rp=(doc.get("render_pages") or {}) if isinstance(doc,dict) else {}
+              pages=len(rp.get("pages") or []) if isinstance(rp,dict) else 0
+              st=p.stat()
+              prodp=PROD/"jobs"/jid/"proyecto.timings.json"
+              same_id_prod=prodp.is_file()
+              prod_sha=sha(prodp) if same_id_prod else None
+              clone_sha=sha(p)
+              prod_ident=None
+              if same_id_prod:
+                  pd=loadj(prodp); prod_ident=identity(pd) if pd else None
+              row={
+                "id":jid,"artist":art,"title":title,"words":len(ws),"timed":locked,
+                "spoken":spoken,"roles":roles,"pages":pages,
+                "mtime":datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+                "clone_sha":clone_sha[:12],
+                "prod_same_id":same_id_prod,
+                "prod_same_content":bool(prod_sha and prod_sha==clone_sha),
+                "prod_identity":prod_ident,
+                "db_status":(v2db.get(jid) or {}).get("status") or (v2db.get(jid) or {}).get("render_status")
+              }
+              rows.append(row)
+
+          rows.sort(key=lambda r:r["mtime"],reverse=True)
+          print("V2_PROJECT_COUNT="+str(len(rows)))
+          for r in rows:
+              print("PROJECT="+json.dumps(r,ensure_ascii=False,default=str))
+          PY
