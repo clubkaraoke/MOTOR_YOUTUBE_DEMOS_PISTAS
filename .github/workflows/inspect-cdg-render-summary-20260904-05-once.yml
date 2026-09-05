@@ -80,7 +80,7 @@ jobs:
               u=ep(d.get("updated"))
               if (u and start<=u<end) or str(d.get("render_status") or "").lower() not in ("","none"):
                   jrows.append((u or 0,d))
-          for u,d in sorted(jrows):
+          for u,d in sorted(jrows, key=lambda x:(x[0], str(x[1].get('id') or ''))):
               out={k:d.get(k) for k in ["id","artist","title","status","render_status","render_progress","render_error","updated","duration","cdg_local_filename","cdg_dropbox_path","version"]}
               out["updated_lima"]=fmt(u)
               print("JOB="+json.dumps(out,ensure_ascii=False,default=str))
@@ -135,11 +135,8 @@ jobs:
               except Exception: pass
           PY
 
-          echo "=== SERVER RENDER SOURCE HINTS ==="
-          sudo grep -nEi 'preview_cache_cdg|render_status|render_progress|renderer|Popen|subprocess|render\.py|cdg_local_filename' /opt/djgabo-cdg/server.py 2>/dev/null | tail -n 400 || true
-
-          echo "=== JOURNAL ENDPOINT/RENDER LINES ==="
-          sudo journalctl -u djgabo-cdg --since "2026-09-04 05:00:00 UTC" --until "2026-09-06 05:00:00 UTC" --no-pager -o short-iso 2>/dev/null \
-            | grep -Ei 'LET-[0-9]+|render|DJGABO_PROGRESS|cdg' \
-            | tail -n 16000 || true
+          echo "=== SERVER RENDER SOURCE 3540-3690 ==="
+          sudo sed -n '3540,3695p' /opt/djgabo-cdg/server.py 2>/dev/null || true
+          echo "=== NOW FUNCTION ==="
+          sudo grep -nE '^def now|now\(\)' /opt/djgabo-cdg/server.py 2>/dev/null | head -n 30 || true
           REMOTE
