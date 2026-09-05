@@ -1,0 +1,76 @@
+name: Inspect OVH exact pending and backup policy once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-ovh-exact-pending-backup-policy-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          echo "=== YOUTUBE PENDING ROWS ==="
+          python3 - <<'PY'
+          import sqlite3,json,os
+          p="/opt/djgabo-youtube/data/db/djgabo_engine.db"
+          db=sqlite3.connect(f"file:{p}?mode=ro",uri=True);db.row_factory=sqlite3.Row
+          cols=[r[1] for r in db.execute("pragma table_info(jobs)")]
+          print("JOB_COLS="+json.dumps(cols))
+          statuses=("WAITING_COVER","DOWNLOADING_AUDIO","UPLOADING_TO_DRIVE","UPLOADING_YOUTUBE","PROCESSING","QUEUED","PENDING","CLEANUP")
+          marks=",".join("?" for _ in statuses)
+          rows=db.execute(f"select * from jobs where upper(coalesce(status,'')) in ({marks}) order by rowid desc",statuses).fetchall()
+          print("PENDING_COUNT="+str(len(rows)))
+          safe_keys=["id","job_id","artist","title","status","source_url","youtube_url","drive_url","input_path","audio_path","video_path","created_at","updated_at","error","cover_path","cover_url"]
+          for r in rows:
+              d=dict(r)
+              print("PENDING="+json.dumps({k:d.get(k) for k in safe_keys if k in d},ensure_ascii=False,default=str))
+          db.close()
+          PY
+
+          echo "=== YOUTUBE QUEUE FILE NAMES ==="
+          for d in /opt/djgabo-youtube/data/incoming /opt/djgabo-youtube/data/processing /opt/djgabo-youtube/data/ready /opt/djgabo-youtube/data/failed; do
+            [ -d "$d" ] || continue
+            echo "--- $d"
+            find "$d" -mindepth 1 -maxdepth 2 -type f -printf '%s|%TY-%Tm-%Td %TH:%TM|%p\n' | sort
+          done
+
+          echo "=== BACKUP SCRIPT ==="
+          sed -n '1,260p' /opt/djgabo-cdg/deploy/backup_production.py 2>/dev/null || true
+
+          echo "=== BACKUP ARCHIVE TOP CONTENT LATEST ==="
+          latest=$(ls -1t /var/backups/djgabo-cdg/*.tar.gz 2>/dev/null | head -n1 || true)
+          echo "LATEST=$latest"
+          if [ -n "$latest" ]; then
+            tar -tzf "$latest" 2>/dev/null | sed -n '1,160p'
+          fi
+
+          echo "=== DOCKER PROJECT LABELS / PORTS ==="
+          docker ps --format '{{.Names}}' | while read -r n; do
+            docker inspect "$n" --format '{{.Name}}|project={{index .Config.Labels "com.docker.compose.project"}}|service={{index .Config.Labels "com.docker.compose.service"}}|ports={{json .NetworkSettings.Ports}}|started={{.State.StartedAt}}' 2>/dev/null || true
+          done
+          REMOTE
