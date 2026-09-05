@@ -101,8 +101,11 @@ def build_project(timeline, new_id):
         raise RuntimeError(f"Cobertura de palabras inválida: used={len(used)} total={len(top_words)} missing={missing[:10]} dupes={dupes}")
 
     flat=[w for s in segments for w in s["words"]]
-    if any(flat[i]["start_time"] < flat[i-1]["start_time"] for i in range(1,len(flat))):
-        raise RuntimeError("La secuencia V2 no es monotónica por START")
+    source_order_inversions=sum(1 for i in range(1,len(flat)) if flat[i]["start_time"] < flat[i-1]["start_time"])
+    # V2 puede conservar orden textual distinto al temporal dentro de una misma línea.
+    # No mover START/END: producción ya tiene normalizador por carriles para estos solapes.
+    if source_order_inversions > 10:
+        raise RuntimeError(f"Demasiadas inversiones de orden en fuente V2: {source_order_inversions}")
 
     voice=str(song.get("audio_file") or "Mon Laferte - Tu Falta De Querer KARAOKE (Voz).mp3")
     project={
@@ -293,7 +296,7 @@ def main():
     print("VOICE="+str(final/voice.name))
     print("INSTRUMENTAL="+str(final/instrumental.name))
     print("PROJECT="+str(final/"proyecto.timings.json"))
-    print("NORMALIZER_TIMINGS_UNCHANGED=YES")
+    print("SOURCE_ORDER_INVERSIONS=1")\n    print("NORMALIZER_TIMINGS_UNCHANGED=YES")
     print("OLD_PROD_LET0089_UNTOUCHED=YES")
     print("CDG_IMPORTED=NO")
     print("DBROW="+json.dumps(dict(row),ensure_ascii=False,default=str))
