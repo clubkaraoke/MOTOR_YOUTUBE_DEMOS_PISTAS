@@ -1,0 +1,97 @@
+name: Inspect OVH reclaimable storage and all queues once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-ovh-reclaimable-and-queues-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Read-only inspect reclaimables and queues
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          echo "=== BACKUPS DETAIL ==="
+          if [ -d /var/backups/djgabo-cdg ]; then
+            du -sh /var/backups/djgabo-cdg
+            find /var/backups/djgabo-cdg -mindepth 1 -maxdepth 1 -printf '%s %TY-%Tm-%Td %TH:%TM %f\n' | sort -n | tail -n 120
+          fi
+
+          echo "=== TMP DETAIL ==="
+          du -sh /tmp 2>/dev/null || true
+          find /tmp -mindepth 1 -maxdepth 2 -printf '%s %TY-%Tm-%Td %TH:%TM %p\n' 2>/dev/null | sort -n | tail -n 100
+
+          echo "=== DATA HOME DETAIL ==="
+          du -h -d2 /data 2>/dev/null | sort -h | tail -n 80
+          du -h -d2 /home 2>/dev/null | sort -h | tail -n 80
+
+          echo "=== DOCKER STATS ==="
+          docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}|{{.PIDs}}' 2>/dev/null || true
+
+          echo "=== DOCKER BUILDER RECLAIMABLE ==="
+          docker system df 2>/dev/null || true
+          docker builder du 2>/dev/null | tail -n 100 || true
+
+          echo "=== YOUTUBE DATA QUEUE FILES ==="
+          for d in /opt/djgabo-youtube/data/incoming /opt/djgabo-youtube/data/processing /opt/djgabo-youtube/data/ready /opt/djgabo-youtube/data/failed; do
+            [ -d "$d" ] || continue
+            echo "--- $d count=$(find "$d" -mindepth 1 -maxdepth 1 -type f | wc -l) size=$(du -sh "$d" | awk '{print $1}')"
+            find "$d" -mindepth 1 -maxdepth 1 -type f -printf '%s %TY-%Tm-%Td %TH:%TM %f\n' | sort | tail -n 100
+          done
+
+          echo "=== SQLITE DB INVENTORY / QUEUES ==="
+          find /opt /var/lib /data -xdev -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -size -200M -print 2>/dev/null | sort | while read -r db; do
+            echo "--- DB $db"
+            python3 - "$db" <<'PY'
+          import sqlite3,sys,json,os
+          p=sys.argv[1]
+          try:
+              con=sqlite3.connect(f"file:{p}?mode=ro",uri=True);con.row_factory=sqlite3.Row
+              tabs=[r[0] for r in con.execute("select name from sqlite_master where type='table' and name not like 'sqlite_%'")]
+              print("TABLES",tabs[:50])
+              for t in tabs:
+                  try:
+                      cols=[r[1] for r in con.execute(f'pragma table_info("{t}")')]
+                      status_col=next((c for c in ("status","state","render_status","job_status") if c in cols),None)
+                      if not status_col: continue
+                      rows=con.execute(f'select "{status_col}",count(*) n from "{t}" group by "{status_col}" order by n desc limit 30').fetchall()
+                      print("STATUS_COUNTS",t,[(r[0],r[1]) for r in rows])
+                  except Exception as e:
+                      pass
+              con.close()
+          except Exception as e:
+              print("DB_READ_ERROR",repr(e))
+          PY
+          done
+
+          echo "=== RUNNING PROCESS TREES LIKELY WORKERS ==="
+          ps -eo pid,ppid,user,stat,%cpu,%mem,rss,etime,comm,args --forest | grep -Ei 'worker|queue|ffmpeg|cdgmaker|yt-dlp|rclone|uvicorn|gunicorn|node server' | grep -v grep | head -n 160 || true
+
+          echo "=== BACKUP TIMER ==="
+          systemctl list-timers --all --no-pager | grep -Ei 'djgabo|backup' || true
+          systemctl cat djgabo-cdg-backup.timer 2>/dev/null || true
+          systemctl cat djgabo-cdg-backup.service 2>/dev/null || true
+          REMOTE
