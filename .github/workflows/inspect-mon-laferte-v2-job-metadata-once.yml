@@ -1,0 +1,59 @@
+name: Inspect Mon Laferte V2 job metadata once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-mon-laferte-v2-job-metadata-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Read metadata
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          roots=[
+            Path("/var/lib/djgabo-cdg-v2/jobs/LET-0089"),
+            Path("/var/lib/djgabo-cdg/jobs/LET-0088"),
+            Path("/var/lib/djgabo-cdg/jobs/LET-0118"),
+          ]
+          for root in roots:
+              print("=== "+str(root)+" ===")
+              for name in ("trabajo.json","proyecto.timings.json","letra_moises.txt"):
+                  p=root/name
+                  print(name+"_EXISTS="+str(p.is_file()))
+                  if p.is_file() and name=="trabajo.json":
+                      print("TRABAJO="+p.read_text(encoding="utf-8",errors="replace"))
+          db=sqlite3.connect("file:/var/lib/djgabo-cdg/local.db?mode=ro",uri=True);db.row_factory=sqlite3.Row
+          for jid in ("LET-0088","LET-0118","LET-0119"):
+              r=db.execute("select * from jobs where id=?",(jid,)).fetchone()
+              if r:
+                  d=dict(r)
+                  print("DBROW_"+jid+"="+json.dumps(d,ensure_ascii=False,default=str))
+          db.close()
+          PY
