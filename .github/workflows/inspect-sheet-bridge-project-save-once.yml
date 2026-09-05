@@ -1,0 +1,45 @@
+name: Inspect sheet bridge policy around project save once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-sheet-bridge-project-save-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect functions
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          from pathlib import Path
+          s=Path("/opt/djgabo-cdg/server.py").read_text(encoding="utf-8")
+          for needle in ["def _sheet_managed", "def drive_bridge_call", "def schedule_timings_backup", "def backup_timings_to_drive", "def master_sync", "def master_reserve"]:
+              i=s.find(needle)
+              print("\n====",needle,"====")
+              if i<0: print("NOT_FOUND"); continue
+              print(s[max(0,i-1000):min(len(s),i+6000)])
+          PY
