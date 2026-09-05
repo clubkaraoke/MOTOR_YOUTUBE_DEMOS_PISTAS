@@ -1,0 +1,97 @@
+name: Inspect LET-0120 JSON master HTTP 500 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-let0120-json-master-500-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Read-only diagnose LET-0120 JSON master save 500
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          set -euo pipefail
+
+          echo "=== SERVICE ==="
+          systemctl is-active djgabo-cdg || true
+          curl -sS -o /dev/null -w 'HTTP=%{http_code}\n' http://127.0.0.1:8765/editor-v1 || true
+
+          echo "=== JOB FILES ==="
+          find /var/lib/djgabo-cdg/jobs/LET-0120 -maxdepth 1 -type f -printf '%M %u:%g %s %TY-%Tm-%Td %TH:%TM:%TS %f\n' | sort || true
+
+          echo "=== DB ROW ==="
+          python3 - <<'PY'
+          import sqlite3, json
+          db=sqlite3.connect("file:/var/lib/djgabo-cdg/local.db?mode=ro",uri=True)
+          db.row_factory=sqlite3.Row
+          r=db.execute("select id,artist,title,status,origin,render_status,render_progress,render_error,dropbox_status,timings_sha256,cdg_source_sha256,project_json from jobs where id='LET-0120'").fetchone()
+          if not r:
+              print("NO_DB_ROW")
+          else:
+              d=dict(r)
+              pj=d.pop("project_json",None)
+              print(json.dumps(d,ensure_ascii=False,default=str))
+              print("PROJECT_JSON_DB_LEN", len(pj or ""))
+          db.close()
+          PY
+
+          echo "=== PROJECT JSON SUMMARY ==="
+          python3 - <<'PY'
+          import json, pathlib, hashlib
+          p=pathlib.Path("/var/lib/djgabo-cdg/jobs/LET-0120/proyecto.timings.json")
+          print("EXISTS",p.exists())
+          if p.exists():
+              raw=p.read_bytes()
+              print("BYTES",len(raw))
+              print("SHA256",hashlib.sha256(raw).hexdigest())
+              d=json.loads(raw)
+              print("TOP_KEYS",list(d.keys()))
+              print("SONG",json.dumps(d.get("song"),ensure_ascii=False))
+              segs=d.get("segments") or []
+              ws=[w for s in segs if isinstance(s,dict) for w in (s.get("words") or []) if isinstance(w,dict)]
+              print("SEGMENTS",len(segs),"WORDS",len(ws))
+              print("MISSING_START",sum(w.get("start_time") is None for w in ws))
+              print("MISSING_END",sum(w.get("end_time") is None for w in ws))
+              print("HAS_RENDER_PAGES", isinstance(d.get("render_pages"),dict))
+              print("HAS_RENDER_PLAN", isinstance(d.get("render_plan"),dict))
+              print("HAS_CDG_SETTINGS", isinstance(d.get("cdg_settings"),dict))
+              print("FIRST_WORD",json.dumps(ws[0] if ws else None,ensure_ascii=False,default=str))
+          PY
+
+          echo "=== CLIENT ERROR STRING / SAVE CALL ==="
+          grep -n -B12 -A30 -F "No se pudo guardar JSON maestro" /opt/djgabo-cdg/editor_v1/index.html || true
+          grep -n -B10 -A25 -Ei "JSON maestro|master.*json|guardar.*json|save.*project|timings.*sha|cdg_source_sha" /opt/djgabo-cdg/editor_v1/index.html | tail -n 260 || true
+
+          echo "=== SERVER ROUTES / SAVE CODE ==="
+          grep -n -B12 -A45 -Ei "project_json|timings_sha256|cdg_source_sha256|proyecto\.timings\.json|save.*project|guardar.*json|master.*json" /opt/djgabo-cdg/server.py | tail -n 420 || true
+
+          echo "=== JOURNAL LAST 60 MIN ==="
+          journalctl -u djgabo-cdg --since "60 min ago" --no-pager -o short-iso | grep -Ei "LET-0120|Traceback|Exception|ERROR|500|timings|project|json" | tail -n 500 || true
+          REMOTE
