@@ -1,0 +1,78 @@
+name: Quick OVH health snapshot once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/quick-ovh-health-snapshot-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Snapshot
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          echo "=== DATE ==="; date -Is; uptime
+          echo "=== DF ==="; df -hT /
+          echo "=== FREE ==="; free -h
+          echo "=== LOAD ==="; cat /proc/loadavg; nproc
+          echo "=== DU KNOWN ==="
+          du -sh /opt/djgabo-cdg /var/lib/djgabo-cdg /opt/djgabo-cdg-ia-test /var/lib/djgabo-cdg-ia-test /opt/djgabo-cdg-v2 /var/lib/djgabo-cdg-v2 2>/dev/null || true
+          du -sh /opt/djgabo-cdg/backups /var/lib/djgabo-cdg/backups 2>/dev/null || true
+          echo "=== SERVICES ==="
+          systemctl list-units --type=service --all --no-pager | grep -Ei 'djgabo|karaoke|cdg|youtube|uvr|drive|caster|portal' || true
+          echo "=== PROCESSES ==="
+          ps -eo pid,ppid,%cpu,%mem,rss,etime,comm,args --sort=-rss | head -n 25
+          echo "=== MEDIA ==="
+          ps -eo pid,ppid,%cpu,%mem,rss,etime,comm,args | grep -Ei 'ffmpeg|cdgmaker|yt-dlp|rclone|eleven|uvr' | grep -v grep || true
+          echo "=== DB ==="
+          python3 - <<'PY'
+          import sqlite3,json,os
+          p="/var/lib/djgabo-cdg/local.db"
+          db=sqlite3.connect(f"file:{p}?mode=ro",uri=True);db.row_factory=sqlite3.Row
+          cols={r[1] for r in db.execute("pragma table_info(jobs)")}
+          cs=[x for x in ["id","artist","title","status","render_status","render_progress","render_error","dropbox_status","sheet_master_status","sheet_master_error","updated","origin"] if x in cols]
+          rows=[dict(r) for r in db.execute("select "+",".join(cs)+" from jobs order by id desc")]
+          print("COUNT",len(rows))
+          active=[];probs=[]
+          for d in rows:
+            rs=str(d.get("render_status") or "").upper()
+            if rs in ("RENDERIZANDO","QUEUED","PROCESANDO","SUBIENDO","PUBLICANDO"): active.append(d)
+            if rs=="ERROR" or str(d.get("sheet_master_status") or "").upper() in ("ERROR","PENDIENTE") or "ERROR" in str(d.get("dropbox_status") or "").upper(): probs.append(d)
+          print("ACTIVE_COUNT",len(active))
+          for d in active: print("ACTIVE",json.dumps(d,ensure_ascii=False,default=str))
+          print("PROBLEM_COUNT",len(probs))
+          for d in probs[:50]: print("PROBLEM",json.dumps(d,ensure_ascii=False,default=str))
+          db.close()
+          PY
+          echo "=== NETWORK ==="
+          for i in /sys/class/net/*; do n=$(basename "$i"); [ "$n" = lo ] && continue; echo -n "$n "; cat "$i/statistics/rx_bytes" "$i/statistics/tx_bytes" 2>/dev/null | tr '\n' ' '; echo; done
+          if command -v vnstat >/dev/null 2>&1; then vnstat --oneline 2>/dev/null || true; else echo VNSTAT_NOT_INSTALLED; fi
+          echo "=== DOCKER SUMMARY ==="
+          if command -v docker >/dev/null 2>&1; then docker system df || true; docker ps -a --format '{{.Names}}	{{.Status}}	{{.Image}}	{{.Size}}' || true; fi
+          echo "=== JOURNAL ==="; journalctl --disk-usage || true
+          echo "=== FAILED ==="; systemctl --failed --no-pager || true
+          echo "=== OOM7D ==="; journalctl -k --since "7 days ago" --no-pager 2>/dev/null | grep -Ei 'oom|out of memory|killed process' | tail -n 40 || true
+          REMOTE
