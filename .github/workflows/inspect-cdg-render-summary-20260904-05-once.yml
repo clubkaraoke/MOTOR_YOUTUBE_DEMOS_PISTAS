@@ -1,0 +1,102 @@
+name: Inspect CDG render summary 2026-09-04 05 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-render-summary-20260904-05-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect production render history read-only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          echo "=== SERVER TIME ==="
+          date --iso-8601=seconds
+          timedatectl 2>/dev/null | sed -n '1,8p' || true
+
+          echo "=== SQLITE RENDER DATA ==="
+          sudo /opt/djgabo-cdg/.venv/bin/python - <<'PY'
+          import sqlite3, json, os, time
+          from pathlib import Path
+
+          dbp="/var/lib/djgabo-cdg/local.db"
+          db=sqlite3.connect(dbp)
+          db.row_factory=sqlite3.Row
+
+          def cols(table):
+              return [r[1] for r in db.execute(f"pragma table_info({table})").fetchall()]
+
+          print("JOBS_COLUMNS="+json.dumps(cols("jobs"), ensure_ascii=False))
+          print("LOGS_COLUMNS="+json.dumps(cols("logs"), ensure_ascii=False))
+
+          print("=== LOG_ROWS_DATE_WINDOW ===")
+          lc=cols("logs")
+          wanted=[c for c in ["id","job_id","action","state","at"] if c in lc]
+          if "at" in lc:
+              q=f"select {','.join(wanted)} from logs where at >= ? and at < ? order by at asc"
+              rows=db.execute(q,("2026-09-04","2026-09-06")).fetchall()
+              print("LOG_COUNT="+str(len(rows)))
+              for r in rows:
+                  d=dict(r)
+                  blob=(" ".join(str(d.get(k,"")) for k in ("action","state"))).lower()
+                  if any(x in blob for x in ("render","cdg","export","creando","final","complete","error")):
+                      print("LOGROW="+json.dumps(d,ensure_ascii=False,default=str))
+          else:
+              print("NO_AT_COLUMN")
+
+          print("=== JOB_ROWS_UPDATED_WINDOW ===")
+          jc=cols("jobs")
+          fields=[c for c in ["id","artist","title","status","render_status","render_progress","render_error","updated","cdg_local_filename","cdg_dropbox_path","version"] if c in jc]
+          if "updated" in jc:
+              q=f"select {','.join(fields)} from jobs where updated >= ? and updated < ? order by updated asc"
+              rows=db.execute(q,("2026-09-04","2026-09-06")).fetchall()
+              print("JOB_COUNT="+str(len(rows)))
+              for r in rows:
+                  print("JOBROW="+json.dumps(dict(r),ensure_ascii=False,default=str))
+
+          print("=== CDG_FILE_MTIMES ===")
+          roots=[Path("/var/lib/djgabo-cdg"),Path("/opt/djgabo-cdg")]
+          seen=set()
+          start=time.mktime((2026,9,4,0,0,0,0,0,-1))
+          end=time.mktime((2026,9,6,0,0,0,0,0,-1))
+          for root in roots:
+              if not root.exists(): continue
+              for p in root.rglob("*.cdg"):
+                  try: st=p.stat()
+                  except Exception: continue
+                  if start <= st.st_mtime < end:
+                      key=(str(p),st.st_mtime,st.st_size)
+                      if key in seen: continue
+                      seen.add(key)
+                      print("CDGFILE="+json.dumps({
+                          "path":str(p),
+                          "mtime_local":time.strftime("%Y-%m-%dT%H:%M:%S%z",time.localtime(st.st_mtime)),
+                          "mtime_epoch":st.st_mtime,
+                          "size":st.st_size
+                      },ensure_ascii=False))
+          PY
+
+          echo "=== JOURNAL RENDER LINES 2026-09-04..06 ==="
+          sudo journalctl -u djgabo-cdg --since "2026-09-04 00:00:00" --until "2026-09-06 00:00:00" --no-pager -o short-iso 2>/dev/null \
+            | grep -Ei 'render|cdg|DJGABO_PROGRESS|export|complete|error|creando' \
+            | tail -n 12000 || true
+          REMOTE
