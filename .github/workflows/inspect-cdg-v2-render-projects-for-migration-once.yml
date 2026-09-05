@@ -1,0 +1,130 @@
+name: Inspect CDG V2 render projects for migration once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-cdg-v2-render-projects-for-migration-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inventory V2 render data and compare production
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json, os, hashlib
+          from pathlib import Path
+          from datetime import datetime
+
+          V2=Path("/var/lib/djgabo-cdg-v2/v2_renders")
+          PROD=Path("/var/lib/djgabo-cdg/jobs")
+
+          def loadj(p):
+              try: return json.load(open(p,encoding="utf-8"))
+              except Exception: return None
+
+          def find_first(obj, keys):
+              if isinstance(obj,dict):
+                  for k in keys:
+                      if k in obj and obj[k] not in (None,"",[],{}): return obj[k]
+                  for v in obj.values():
+                      x=find_first(v,keys)
+                      if x not in (None,"",[],{}): return x
+              elif isinstance(obj,list):
+                  for v in obj[:200]:
+                      x=find_first(v,keys)
+                      if x not in (None,"",[],{}): return x
+              return None
+
+          def collect_words(obj):
+              best=[]
+              def walk(x):
+                  nonlocal best
+                  if isinstance(x,dict):
+                      w=x.get("words")
+                      if isinstance(w,list) and len(w)>len(best) and (not w or isinstance(w[0],dict)):
+                          best=w
+                      for v in x.values(): walk(v)
+                  elif isinstance(x,list):
+                      for v in x[:5000]: walk(v)
+              walk(obj)
+              return best
+
+          print("MODE=READ_ONLY")
+          print("ROOT_EXISTS="+str(V2.exists()))
+          dirs=[p for p in V2.iterdir() if p.is_dir()] if V2.exists() else []
+          print("V2_RENDER_JOB_COUNT="+str(len(dirs)))
+          for d in sorted(dirs,key=lambda p:p.stat().st_mtime,reverse=True):
+              files=[]
+              identity=None
+              max_words=0
+              candidate_editables=[]
+              for p in sorted(d.rglob("*")):
+                  if not p.is_file(): continue
+                  rel=str(p.relative_to(d))
+                  st=p.stat()
+                  item={"name":rel,"size":st.st_size,"mtime":datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")}
+                  if p.suffix.lower()==".json" and st.st_size<30000000:
+                      doc=loadj(p)
+                      if doc is not None:
+                          art=find_first(doc,("artist","artista"))
+                          title=find_first(doc,("title","titulo"))
+                          jid=find_first(doc,("job_id","jobId"))
+                          ws=collect_words(doc)
+                          wc=len(ws)
+                          timed=sum(1 for w in ws if isinstance(w,dict) and (w.get("start_time") is not None or w.get("start") is not None))
+                          spoken=sum(1 for w in ws if isinstance(w,dict) and w.get("spoken"))
+                          item.update({"artist":art,"title":title,"job_id":jid,"words":wc,"timed":timed,"spoken":spoken,"top_keys":list(doc.keys())[:20] if isinstance(doc,dict) else []})
+                          if (art or title) and identity is None: identity=(art,title)
+                          if wc>max_words:
+                              max_words=wc
+                          if wc and timed:
+                              candidate_editables.append({"file":rel,"words":wc,"timed":timed,"spoken":spoken,"artist":art,"title":title})
+                  files.append(item)
+
+              prodp=PROD/d.name/"proyecto.timings.json"
+              prod_doc=loadj(prodp) if prodp.is_file() else None
+              prod_identity=None
+              prod_words=0
+              prod_timed=0
+              if prod_doc:
+                  prod_identity=(find_first(prod_doc,("artist","artista")),find_first(prod_doc,("title","titulo")))
+                  pws=collect_words(prod_doc);prod_words=len(pws)
+                  prod_timed=sum(1 for w in pws if isinstance(w,dict) and w.get("start_time") is not None)
+
+              print("JOB="+json.dumps({
+                  "id":d.name,
+                  "dir_mtime":datetime.fromtimestamp(d.stat().st_mtime).isoformat(timespec="seconds"),
+                  "identity":identity,
+                  "editable_candidates":candidate_editables,
+                  "prod_exists":prodp.is_file(),
+                  "prod_identity":prod_identity,
+                  "prod_words":prod_words,
+                  "prod_timed":prod_timed,
+                  "files":files
+              },ensure_ascii=False,default=str))
+          PY
