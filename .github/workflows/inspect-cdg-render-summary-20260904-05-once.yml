@@ -27,116 +27,64 @@ jobs:
           printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
-          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'bash -s' <<'REMOTE'
-          set -u
-          echo "=== SERVER TIME ==="
-          date --iso-8601=seconds
-
-          echo "=== SQLITE NORMALIZED DATA ==="
-          sudo /opt/djgabo-cdg/.venv/bin/python - <<'PY'
-          import sqlite3, json, time, re
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo /opt/djgabo-cdg/.venv/bin/python -' <<'PY'
+          import sqlite3,json,time,base64
           from pathlib import Path
-          from datetime import datetime, timezone
+          from datetime import datetime,timezone
           from zoneinfo import ZoneInfo
 
-          LIMA=ZoneInfo("America/Lima")
-          UTC=timezone.utc
-          start=datetime(2026,9,4,0,0,0,tzinfo=LIMA).timestamp()
-          end=datetime(2026,9,6,0,0,0,tzinfo=LIMA).timestamp()
+          LIMA=ZoneInfo("America/Lima"); UTC=timezone.utc
+          start=datetime(2026,9,4,0,0,tzinfo=LIMA).timestamp()
+          end=datetime(2026,9,6,0,0,tzinfo=LIMA).timestamp()
+          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db"); db.row_factory=sqlite3.Row
 
-          db=sqlite3.connect("/var/lib/djgabo-cdg/local.db")
-          db.row_factory=sqlite3.Row
-
-          def cols(t): return [r[1] for r in db.execute(f"pragma table_info({t})").fetchall()]
-          def ep(v):
+          def parse(v):
               if v is None: return None
               if isinstance(v,(int,float)):
                   x=float(v); return x/1000 if x>1e11 else x
               s=str(v).strip()
+              for f in ("%d/%m/%Y %H:%M:%S","%d/%m/%Y %H:%M","%Y-%m-%d %H:%M:%S","%Y-%m-%dT%H:%M:%S"):
+                  try: return datetime.strptime(s,f).replace(tzinfo=UTC).timestamp()
+                  except: pass
               try:
-                  x=float(s); return x/1000 if x>1e11 else x
-              except: pass
-              try:
-                  z=s.replace("Z","+00:00")
-                  d=datetime.fromisoformat(z)
+                  d=datetime.fromisoformat(s.replace("Z","+00:00"))
                   if d.tzinfo is None: d=d.replace(tzinfo=UTC)
                   return d.timestamp()
               except: return None
-          def fmt(x):
-              if x is None: return None
-              return datetime.fromtimestamp(x,LIMA).isoformat()
-
-          print("WINDOW_LIMA=2026-09-04T00:00:00-05:00..2026-09-06T00:00:00-05:00")
-          print("JOBS_COLUMNS="+json.dumps(cols("jobs"),ensure_ascii=False))
-          print("LOGS_COLUMNS="+json.dumps(cols("logs"),ensure_ascii=False))
+          def lima(ep): return datetime.fromtimestamp(ep,LIMA).isoformat() if ep else None
 
           jobs={}
-          for r in db.execute("select * from jobs").fetchall():
+          for r in db.execute("select * from jobs"):
               d=dict(r); jobs[str(d.get("id"))]=d
 
-          print("=== JOBS_WITH_RENDER_FIELDS ===")
-          jrows=[]
-          for d in jobs.values():
-              u=ep(d.get("updated"))
-              if (u and start<=u<end) or str(d.get("render_status") or "").lower() not in ("","none"):
-                  jrows.append((u or 0,d))
-          for u,d in sorted(jrows, key=lambda x:(x[0], str(x[1].get('id') or ''))):
-              out={k:d.get(k) for k in ["id","artist","title","status","render_status","render_progress","render_error","updated","duration","cdg_local_filename","cdg_dropbox_path","version"]}
-              out["updated_lima"]=fmt(u)
-              print("JOB="+json.dumps(out,ensure_ascii=False,default=str))
-
-          print("=== LOGS_IN_LIMA_WINDOW ===")
           logs=[]
-          for r in db.execute("select * from logs order by id asc").fetchall():
-              d=dict(r); a=ep(d.get("at"))
+          for r in db.execute("select * from logs order by id"):
+              d=dict(r); a=parse(d.get("at"))
               if a and start<=a<end:
-                  d["at_lima"]=fmt(a); logs.append(d)
-          print("LOGS_WINDOW_COUNT="+str(len(logs)))
-          for d in logs:
-              print("LOG="+json.dumps(d,ensure_ascii=False,default=str))
+                  d["at_epoch"]=a; d["at_lima"]=lima(a); logs.append(d)
 
-          print("=== CDG_CACHE_IN_LIMA_WINDOW ===")
-          cache=Path("/var/lib/djgabo-cdg/preview_cache_cdg")
-          rows=[]
-          if cache.exists():
-              for p in cache.glob("*.cdg"):
-                  st=p.stat()
+          cache=[]
+          p=Path("/var/lib/djgabo-cdg/preview_cache_cdg")
+          if p.exists():
+              for f in p.glob("*.cdg"):
+                  st=f.stat()
                   if start<=st.st_mtime<end:
-                      jid=p.stem
-                      j=jobs.get(jid,{})
-                      rows.append((st.st_mtime,p,j))
-          for mt,p,j in sorted(rows):
-              print("CACHECDG="+json.dumps({
-                  "job_id":p.stem,
-                  "artist":j.get("artist"),
-                  "title":j.get("title"),
-                  "mtime_lima":fmt(mt),
-                  "size":p.stat().st_size,
-                  "duration":j.get("duration"),
-                  "render_status":j.get("render_status")
-              },ensure_ascii=False,default=str))
-          print("CACHECDG_COUNT="+str(len(rows)))
+                      j=jobs.get(f.stem,{})
+                      cache.append({
+                        "job_id":f.stem,"artist":j.get("artist"),"title":j.get("title"),
+                        "mtime_epoch":st.st_mtime,"mtime_lima":lima(st.st_mtime),
+                        "size":st.st_size,"song_duration":j.get("duration"),
+                        "render_status":j.get("render_status"),"updated":j.get("updated"),
+                        "status":j.get("status")
+                      })
+          cache.sort(key=lambda x:x["mtime_epoch"])
 
-          print("=== POSSIBLE_RENDER_AUX_FILES ===")
-          roots=[Path("/var/lib/djgabo-cdg"),Path("/tmp")]
-          for root in roots:
-              if not root.exists(): continue
-              try:
-                  it=root.rglob("*")
-                  for p in it:
-                      try:
-                          if not p.is_file(): continue
-                          n=p.name.lower()
-                          if not any(x in n for x in ("render",".toml",".log")): continue
-                          st=p.stat()
-                          if start<=st.st_mtime<end:
-                              print("AUX="+json.dumps({"path":str(p),"mtime_lima":fmt(st.st_mtime),"size":st.st_size},ensure_ascii=False))
-                      except Exception: continue
-              except Exception: pass
+          recent_jobs=[]
+          for d in jobs.values():
+              u=parse(d.get("updated"))
+              if u and start<=u<end:
+                  recent_jobs.append({k:d.get(k) for k in ["id","artist","title","status","render_status","render_progress","render_error","updated","duration","cdg_local_filename","cdg_dropbox_path"]})
+          report={"server_now_utc":datetime.now(UTC).isoformat(),"logs":logs,"cache":cache,"recent_jobs":recent_jobs}
+          raw=json.dumps(report,ensure_ascii=False,separators=(",",":"),default=str).encode()
+          print("REPORT_B64="+base64.b64encode(raw).decode())
           PY
-
-          echo "=== SERVER RENDER SOURCE 3540-3690 ==="
-          sudo sed -n '3540,3695p' /opt/djgabo-cdg/server.py 2>/dev/null || true
-          echo "=== NOW FUNCTION ==="
-          sudo grep -nE '^def now|now\(\)' /opt/djgabo-cdg/server.py 2>/dev/null | head -n 30 || true
-          REMOTE
