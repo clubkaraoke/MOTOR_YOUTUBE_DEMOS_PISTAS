@@ -38,11 +38,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p diagnostics
+          python3 -m py_compile deploy/migrate_mon_laferte_v2_to_prod.py
+          echo "MIGRATION_SCRIPT_SYNTAX=PASS"
           scp -P "$OVH_PORT" deploy/migrate_mon_laferte_v2_to_prod.py "$OVH_USER@$OVH_HOST:/tmp/migrate_mon_laferte_v2_to_prod.py"
           {
             echo "TIMESTAMP=$(date -Is)"
             ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "echo PROD_BEFORE=\$(sudo systemctl is-active djgabo-cdg); echo V2_BEFORE=\$(sudo systemctl is-active djgabo-cdg-v2); echo PROD_HTTP_BEFORE=\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
-            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo python3 /tmp/migrate_mon_laferte_v2_to_prod.py"
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo /opt/djgabo-cdg/.venv/bin/python /tmp/migrate_mon_laferte_v2_to_prod.py"
             ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "echo PROD_AFTER=\$(sudo systemctl is-active djgabo-cdg); echo V2_AFTER=\$(sudo systemctl is-active djgabo-cdg-v2); echo PROD_HTTP_AFTER=\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
           } > diagnostics/migrate-mon-laferte-v2-to-prod.txt
 
