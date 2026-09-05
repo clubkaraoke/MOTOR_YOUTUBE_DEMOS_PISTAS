@@ -1,0 +1,94 @@
+name: Migrate Mon Laferte V2 to production once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/migrate-mon-laferte-v2-to-prod-once.yml"
+      - "deploy/migrate_mon_laferte_v2_to_prod.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Migrate Mon Laferte project only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          scp -P "$OVH_PORT" deploy/migrate_mon_laferte_v2_to_prod.py "$OVH_USER@$OVH_HOST:/tmp/migrate_mon_laferte_v2_to_prod.py"
+          {
+            echo "TIMESTAMP=$(date -Is)"
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "echo PROD_BEFORE=\$(sudo systemctl is-active djgabo-cdg); echo V2_BEFORE=\$(sudo systemctl is-active djgabo-cdg-v2); echo PROD_HTTP_BEFORE=\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "sudo python3 /tmp/migrate_mon_laferte_v2_to_prod.py"
+            ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" "echo PROD_AFTER=\$(sudo systemctl is-active djgabo-cdg); echo V2_AFTER=\$(sudo systemctl is-active djgabo-cdg-v2); echo PROD_HTTP_AFTER=\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          } > diagnostics/migrate-mon-laferte-v2-to-prod.txt
+
+      - name: Verify imported project and original LET-0089
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import sqlite3,json
+          from pathlib import Path
+          db=sqlite3.connect("file:/var/lib/djgabo-cdg/local.db?mode=ro",uri=True);db.row_factory=sqlite3.Row
+          mon=db.execute("select id,artist,title,status,origin from jobs where artist='Mon Laferte' and title like 'Tu Falta De Querer%' order by id desc limit 1").fetchone()
+          assert mon, "No aparece Mon Laferte en producción"
+          jid=mon["id"]
+          p=Path("/var/lib/djgabo-cdg/jobs")/jid/"proyecto.timings.json"
+          assert p.is_file()
+          doc=json.load(open(p,encoding="utf-8"))
+          ws=[w for s in doc.get("segments",[]) for w in s.get("words",[])]
+          assert len(ws)==187
+          assert all(w.get("start_time") is not None and w.get("end_time") is not None for w in ws)
+          assert (Path("/var/lib/djgabo-cdg/jobs")/jid/"Mon Laferte - Tu Falta De Querer KARAOKE (Voz).mp3").is_file()
+          assert (Path("/var/lib/djgabo-cdg/jobs")/jid/"Mon Laferte - Tu Falta De Querer (Other).wav").is_file()
+          old=db.execute("select artist,title from jobs where id='LET-0089'").fetchone()
+          assert old and old["artist"]=="JP El Chamaco"
+          print("VERIFY_NEW_ID="+jid)
+          print("VERIFY_MON_LAFERTE=PASS")
+          print("VERIFY_187_TIMINGS=PASS")
+          print("VERIFY_ASSETS=PASS")
+          print("VERIFY_OLD_LET0089_UNTOUCHED=PASS")
+          db.close()
+          PY
+
+      - name: Save safe diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f diagnostics/migrate-mon-laferte-v2-to-prod.txt ]; then
+            grep -E '^(TIMESTAMP=|PROD_|V2_|BACKUP=|NEW_ID=|ARTIST=|TITLE=|WORDS=|TIMED=|VOICE=|INSTRUMENTAL=|PROJECT=|NORMALIZER_|OLD_PROD_|CDG_IMPORTED=|DBROW=|IMPORT_)' diagnostics/migrate-mon-laferte-v2-to-prod.txt > diagnostics/migrate-mon-laferte-v2-to-prod.safe.txt || true
+            rm -f diagnostics/migrate-mon-laferte-v2-to-prod.txt
+            git add diagnostics/migrate-mon-laferte-v2-to-prod.safe.txt
+            git commit -m "diag: record Mon Laferte V2 migration" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
