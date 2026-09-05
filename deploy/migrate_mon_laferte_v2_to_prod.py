@@ -7,6 +7,7 @@ SRC_JOB = SRC_ROOT / "jobs" / SRC_ID
 SRC_TIMELINE = SRC_ROOT / "v2_renders" / SRC_ID / "timeline_v2.json"
 
 DST_ROOT = pathlib.Path("/var/lib/djgabo-cdg")
+APP_ROOT = pathlib.Path("/opt/djgabo-cdg")
 DST_JOBS = DST_ROOT / "jobs"
 DST_DB = DST_ROOT / "local.db"
 
@@ -189,10 +190,10 @@ def main():
     pj.write_text(json.dumps(project,ensure_ascii=False,indent=2),encoding="utf-8")
 
     # Validación con normalizador de producción sin modificar timings.
-    sys.path.insert(0,str(DST_ROOT/"renderer"))
-    sys.path.insert(0,str(DST_ROOT/"renderer/vendor"))
+    sys.path.insert(0,str(APP_ROOT/"renderer"))
+    sys.path.insert(0,str(APP_ROOT/"renderer/vendor"))
     import normalize as N
-    style=json.load(open(DST_ROOT/"renderer/style.json",encoding="utf-8"))
+    style=json.load(open(APP_ROOT/"renderer/style.json",encoding="utf-8"))
     doc=N.load(pj)
     before={str(w["id"]):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
     N.normalize(doc,style)
