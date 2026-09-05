@@ -1,0 +1,61 @@
+name: Inspect Mon Laferte V2 ordering once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-mon-laferte-v2-ordering-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect ordering only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json
+          d=json.load(open("/var/lib/djgabo-cdg-v2/v2_renders/LET-0089/timeline_v2.json",encoding="utf-8"))
+          ws=d.get("words") or []
+          inv=[]
+          for i in range(1,len(ws)):
+              if float(ws[i]["start"]) < float(ws[i-1]["start"]):
+                  inv.append({"i":i,"prev":{k:ws[i-1].get(k) for k in ("id","text","start","end")},"cur":{k:ws[i].get(k) for k in ("id","text","start","end")}})
+          print("TOP_WORD_INVERSIONS="+json.dumps(inv,ensure_ascii=False))
+          by={str(w["id"]):w for w in ws}
+          seq=[]
+          for si,s in enumerate(d.get("segments") or []):
+              for wid in s.get("word_ids") or []:
+                  w=by[str(wid)]
+                  seq.append((si,str(wid),float(w["start"]),str(s.get("text") or "")))
+          sinv=[]
+          for i in range(1,len(seq)):
+              if seq[i][2] < seq[i-1][2]:
+                  sinv.append({"i":i,"prev":seq[i-1],"cur":seq[i]})
+          print("SEGMENT_ORDER_INVERSIONS="+json.dumps(sinv[:30],ensure_ascii=False))
+          print("SEGMENT_ORDER_INVERSION_COUNT="+str(len(sinv)))
+          print("TOP_WORD_COUNT="+str(len(ws)))
+          print("SEGMENT_REF_COUNT="+str(len(seq)))
+          print("UNIQUE_SEGMENT_REFS="+str(len(set(x[1] for x in seq))))
+          PY
