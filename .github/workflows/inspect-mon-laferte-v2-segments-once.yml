@@ -1,0 +1,47 @@
+name: Inspect Mon Laferte V2 segment schema once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-mon-laferte-v2-segments-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+      - name: Inspect segment schema
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json
+          p="/var/lib/djgabo-cdg-v2/v2_renders/LET-0089/timeline_v2.json"
+          d=json.load(open(p,encoding="utf-8"))
+          print("SEGMENTS="+json.dumps((d.get("segments") or [])[:12],ensure_ascii=False,default=str))
+          print("WORDS_LAST="+json.dumps((d.get("words") or [])[-8:],ensure_ascii=False,default=str))
+          print("OPENING="+json.dumps(d.get("opening"),ensure_ascii=False,default=str))
+          print("INSTRUMENTALS="+json.dumps(d.get("instrumentals"),ensure_ascii=False,default=str))
+          print("LEAD_INS="+json.dumps(d.get("lead_ins"),ensure_ascii=False,default=str))
+          print("ENDING="+json.dumps(d.get("ending"),ensure_ascii=False,default=str))
+          PY
