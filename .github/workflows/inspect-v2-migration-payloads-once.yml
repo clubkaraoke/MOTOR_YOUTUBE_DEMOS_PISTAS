@@ -1,0 +1,108 @@
+name: Inspect V2 migration payloads once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-v2-migration-payloads-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Inspect clone payloads and production schema
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY'
+          import json,sqlite3,os
+          from pathlib import Path
+
+          V2=Path("/var/lib/djgabo-cdg-v2")
+          PROD=Path("/var/lib/djgabo-cdg")
+          IDS=["LET-0088","LET-0089"]
+
+          def load(p): return json.load(open(p,encoding="utf-8"))
+          def slim_word(w):
+              return {k:w.get(k) for k in ("id","text","word","start","end","start_time","end_time","locked","spoken","role","vocal_role") if k in w}
+          def flatten_segments(d):
+              return [w for s in d.get("segments") or [] if isinstance(s,dict) for w in s.get("words") or [] if isinstance(w,dict)]
+          def all_files(root):
+              out=[]
+              if root.exists():
+                  for p in root.rglob("*"):
+                      if p.is_file():
+                          out.append({"path":str(p),"size":p.stat().st_size})
+              return out
+
+          print("MODE=READ_ONLY")
+          con=sqlite3.connect(f"file:{PROD/'local.db'}?mode=ro",uri=True);con.row_factory=sqlite3.Row
+          cols=[r[1] for r in con.execute("pragma table_info(jobs)")]
+          print("PROD_JOB_COLUMNS="+json.dumps(cols))
+          rows=con.execute("select * from jobs order by id desc limit 5").fetchall()
+          for r in rows:
+              d=dict(r)
+              safe={k:d.get(k) for k in ("id","artist","title","status","origin","voice_local_path","instrumental_local_path","voice_drive_url","instrumental_dropbox_path","render_status","dropbox_status") if k in d}
+              print("PROD_RECENT="+json.dumps(safe,ensure_ascii=False,default=str))
+          con.close()
+
+          for jid in IDS:
+              t=V2/"v2_renders"/jid/"timeline_v2.json"
+              if not t.is_file():
+                  print("MISSING="+jid);continue
+              d=load(t)
+              print("=== "+jid+" ===")
+              print("TOP_KEYS="+json.dumps(list(d.keys())))
+              print("SONG="+json.dumps(d.get("song"),ensure_ascii=False,default=str))
+              print("AUDIO="+json.dumps(d.get("audio"),ensure_ascii=False,default=str))
+              print("UPSTREAM="+json.dumps(d.get("upstream"),ensure_ascii=False,default=str))
+              print("RENDER_METADATA="+json.dumps(d.get("render_metadata"),ensure_ascii=False,default=str))
+              print("SEGMENT_COUNT="+str(len(d.get("segments") or [])))
+              print("TOP_WORD_COUNT="+str(len(d.get("words") or [])))
+              sw=flatten_segments(d)
+              print("SEGMENT_WORD_COUNT="+str(len(sw)))
+              print("FIRST_TOP_WORDS="+json.dumps([slim_word(w) for w in (d.get("words") or [])[:6]],ensure_ascii=False,default=str))
+              print("FIRST_SEGMENT_WORDS="+json.dumps([slim_word(w) for w in sw[:6]],ensure_ascii=False,default=str))
+              print("V2_RENDER_FILES="+json.dumps(all_files(V2/"v2_renders"/jid),ensure_ascii=False))
+              # Search likely source/audio assets by jid and title fragments only in V2 data root.
+              matches=[]
+              title=str((d.get("song") or {}).get("title") or "").replace(" KARAOKE","").lower()
+              artist=str((d.get("song") or {}).get("artist") or "").lower()
+              for p in V2.rglob("*"):
+                  if not p.is_file(): continue
+                  s=str(p).lower()
+                  if jid.lower() in s or (artist and artist in s) or (title and title[:12] in s):
+                      matches.append({"path":str(p),"size":p.stat().st_size})
+              print("V2_ASSET_MATCHES="+json.dumps(matches[:100],ensure_ascii=False))
+
+              pp=PROD/"jobs"/jid/"proyecto.timings.json"
+              print("PROD_SAME_ID_FILE="+str(pp.is_file()))
+              if pp.is_file():
+                  pd=load(pp);pws=flatten_segments(pd)
+                  print("PROD_SAME_ID_SONG="+json.dumps(pd.get("song"),ensure_ascii=False,default=str))
+                  print("PROD_SAME_ID_TOP_KEYS="+json.dumps(list(pd.keys())))
+                  print("PROD_SAME_ID_WORDS="+str(len(pws)))
+                  print("PROD_SAME_ID_FIRST_WORDS="+json.dumps([slim_word(w) for w in pws[:6]],ensure_ascii=False,default=str))
+                  print("PROD_SAME_ID_FILES="+json.dumps(all_files(PROD/"jobs"/jid),ensure_ascii=False))
+          PY
