@@ -194,6 +194,10 @@ def main():
     sys.path.insert(0,str(APP_ROOT/"renderer/vendor"))
     import normalize as N
     style=json.load(open(APP_ROOT/"renderer/style.json",encoding="utf-8"))
+    # Fuente Linux únicamente para esta validación en memoria; NO modifica style.json real.
+    validation_font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    style["font"]=validation_font
+    style["font_fallback"]=validation_font
     doc=N.load(pj)
     before={str(w["id"]):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
     N.normalize(doc,style)
