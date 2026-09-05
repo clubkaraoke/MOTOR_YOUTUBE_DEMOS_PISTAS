@@ -1,0 +1,195 @@
+name: Audit OVH capacity engines bandwidth and pending work once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/audit-ovh-capacity-engines-bandwidth-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Read-only OVH audit
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          set -u
+
+          echo "===== BASIC ====="
+          date -Is
+          hostname
+          uptime
+          uname -a
+          echo "CPU_COUNT=$(nproc)"
+          echo "LOAD=$(cat /proc/loadavg)"
+
+          echo "===== MEMORY ====="
+          free -h
+          echo "--- meminfo selected ---"
+          egrep 'MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree|Dirty|Writeback|Slab|SReclaimable' /proc/meminfo || true
+          echo "--- top memory processes ---"
+          ps -eo pid,user,comm,%cpu,%mem,rss,vsz,etime,args --sort=-rss | head -n 30
+
+          echo "===== DISK FILESYSTEMS ====="
+          df -hT
+          echo "--- inodes ---"
+          df -ih
+
+          echo "===== TOP LEVEL DISK ====="
+          du -x -h -d1 / 2>/dev/null | sort -h | tail -n 30
+          echo "===== /OPT ====="
+          du -x -h -d2 /opt 2>/dev/null | sort -h | tail -n 80
+          echo "===== /VAR ====="
+          du -x -h -d2 /var 2>/dev/null | sort -h | tail -n 100
+          echo "===== /HOME ====="
+          du -x -h -d2 /home 2>/dev/null | sort -h | tail -n 60
+          echo "===== DJGABO DATA ====="
+          for p in /var/lib/djgabo* /opt/djgabo*; do
+            [ -e "$p" ] || continue
+            echo "--- $p ---"
+            du -x -h -d2 "$p" 2>/dev/null | sort -h | tail -n 80
+          done
+
+          echo "===== LARGE FILES >500MB ====="
+          find / -xdev -type f -size +500M -printf '%s %TY-%Tm-%Td %TH:%TM %p\n' 2>/dev/null | sort -n | tail -n 80
+
+          echo "===== BACKUPS ====="
+          if [ -d /var/lib/djgabo-cdg/backups ]; then
+            echo "BACKUP_COUNT=$(find /var/lib/djgabo-cdg/backups -mindepth 1 -maxdepth 1 | wc -l)"
+            du -sh /var/lib/djgabo-cdg/backups 2>/dev/null || true
+            find /var/lib/djgabo-cdg/backups -mindepth 1 -maxdepth 1 -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -n 120
+          fi
+          if [ -d /opt/djgabo-cdg/backups ]; then
+            echo "OPT_BACKUP_COUNT=$(find /opt/djgabo-cdg/backups -mindepth 1 -maxdepth 1 | wc -l)"
+            du -sh /opt/djgabo-cdg/backups 2>/dev/null || true
+            find /opt/djgabo-cdg/backups -mindepth 1 -maxdepth 1 -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -n 120
+          fi
+
+          echo "===== SYSTEMD DJGABO / KARAOKE ENGINES ====="
+          systemctl list-units --type=service --all --no-pager | grep -Ei 'djgabo|karaoke|cdg|youtube|uvr|drive|caster|portal' || true
+          echo "--- unit files ---"
+          systemctl list-unit-files --type=service --no-pager | grep -Ei 'djgabo|karaoke|cdg|youtube|uvr|drive|caster|portal' || true
+          echo "--- service resource detail ---"
+          for u in $(systemctl list-units --type=service --all --no-legend --plain | awk '{print $1}' | grep -Ei 'djgabo|karaoke|cdg|youtube|uvr|drive|caster|portal'); do
+            echo "### $u"
+            systemctl show "$u" -p ActiveState -p SubState -p MainPID -p MemoryCurrent -p MemoryPeak -p CPUUsageNSec -p TasksCurrent -p ExecMainStartTimestamp -p FragmentPath 2>/dev/null || true
+          done
+
+          echo "===== LISTENING PORTS ====="
+          ss -lntup || true
+
+          echo "===== ACTIVE HEAVY / MEDIA PROCESSES ====="
+          ps -eo pid,ppid,user,stat,%cpu,%mem,rss,etime,comm,args --sort=-%cpu | grep -Ei 'ffmpeg|cdgmaker|python|gunicorn|node|docker|rclone|yt-dlp|youtube|eleven|uvr' | head -n 100 || true
+
+          echo "===== PRODUCTION DB WORK STATUS ====="
+          python3 - <<'PY'
+          import sqlite3, json, os, glob
+          dbp="/var/lib/djgabo-cdg/local.db"
+          if not os.path.isfile(dbp):
+              print("NO_PROD_DB")
+              raise SystemExit
+          db=sqlite3.connect(f"file:{dbp}?mode=ro",uri=True);db.row_factory=sqlite3.Row
+          cols={r[1] for r in db.execute("pragma table_info(jobs)")}
+          wanted=[c for c in ["id","artist","title","status","render_status","render_progress","render_error","dropbox_status","sheet_master_status","sheet_master_error","updated","origin"] if c in cols]
+          rows=db.execute("select "+",".join(wanted)+" from jobs order by id desc").fetchall()
+          busy=[]
+          problematic=[]
+          for r in rows:
+              d=dict(r)
+              rs=str(d.get("render_status") or "").upper()
+              st=str(d.get("status") or "").upper()
+              if rs and rs not in ("EXPORTADO","CDG_LISTO",""):
+                  busy.append(d)
+              if rs=="ERROR" or "ERROR" in str(d.get("dropbox_status") or "").upper() or str(d.get("sheet_master_status") or "").upper() in ("ERROR","PENDIENTE"):
+                  problematic.append(d)
+          print("JOB_COUNT",len(rows))
+          print("NONFINAL_RENDER_COUNT",len(busy))
+          for d in busy[:100]: print("NONFINAL_RENDER",json.dumps(d,ensure_ascii=False,default=str))
+          print("PROBLEM_COUNT",len(problematic))
+          for d in problematic[:100]: print("PROBLEM",json.dumps(d,ensure_ascii=False,default=str))
+          db.close()
+          PY
+
+          echo "===== TIMERS / CRON / QUEUES ====="
+          systemctl list-timers --all --no-pager || true
+          echo "--- root crontab ---"
+          crontab -l 2>/dev/null || true
+          echo "--- cron dirs ---"
+          grep -RInE 'djgabo|karaoke|cdg|youtube|drive|rclone|backup|render' /etc/cron* 2>/dev/null | head -n 200 || true
+          echo "--- at queue ---"
+          atq 2>/dev/null || true
+
+          echo "===== DOCKER ====="
+          if command -v docker >/dev/null 2>&1; then
+            docker ps -a --no-trunc || true
+            echo "--- docker system df ---"
+            docker system df -v || true
+            echo "--- images ---"
+            docker images --digests || true
+            echo "--- volumes ---"
+            docker volume ls || true
+          else
+            echo "DOCKER_NOT_INSTALLED"
+          fi
+
+          echo "===== JOURNAL SIZE ====="
+          journalctl --disk-usage || true
+          du -sh /var/log 2>/dev/null || true
+          echo "--- large logs ---"
+          find /var/log -type f -size +20M -printf '%s %TY-%Tm-%Td %p\n' 2>/dev/null | sort -n | tail -n 80
+
+          echo "===== NETWORK ====="
+          ip -br link || true
+          ip -br addr || true
+          cat /proc/net/dev
+          echo "--- interface stats bytes ---"
+          for i in /sys/class/net/*; do
+            n=$(basename "$i")
+            [ "$n" = "lo" ] && continue
+            rx=$(cat "$i/statistics/rx_bytes" 2>/dev/null || echo 0)
+            tx=$(cat "$i/statistics/tx_bytes" 2>/dev/null || echo 0)
+            echo "IFACE=$n RX_BYTES=$rx TX_BYTES=$tx"
+          done
+          echo "--- vnstat ---"
+          if command -v vnstat >/dev/null 2>&1; then
+            vnstat --json 2>/dev/null || vnstat 2>/dev/null || true
+          else
+            echo "VNSTAT_NOT_INSTALLED"
+          fi
+
+          echo "===== FAILED UNITS ====="
+          systemctl --failed --no-pager || true
+
+          echo "===== RECENT KERNEL / OOM / DISK ERRORS ====="
+          journalctl -k --since "7 days ago" --no-pager 2>/dev/null | grep -Ei 'oom|out of memory|killed process|I/O error|ext4.*error|xfs.*error|nvme.*error|segfault|thermal|throttl' | tail -n 200 || true
+
+          echo "===== RECENT PROD SERVICE ERRORS ====="
+          journalctl -u djgabo-cdg --since "24 hours ago" --no-pager -o short-iso 2>/dev/null | grep -Ei 'error|exception|traceback|warning|failed|timeout|no se pudo|pendiente' | tail -n 300 || true
+
+          echo "===== GITHUB RUNNER / SELF HOSTED CHECK ====="
+          ps aux | grep -Ei 'actions.runner|Runner.Listener|Runner.Worker' | grep -v grep || true
+          REMOTE
