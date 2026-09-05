@@ -189,23 +189,17 @@ def main():
     pj=tmp/"proyecto.timings.json"
     pj.write_text(json.dumps(project,ensure_ascii=False,indent=2),encoding="utf-8")
 
-    # Validación con normalizador de producción sin modificar timings.
-    sys.path.insert(0,str(APP_ROOT/"renderer"))
-    sys.path.insert(0,str(APP_ROOT/"renderer/vendor"))
-    import normalize as N
-    style=json.load(open(APP_ROOT/"renderer/style.json",encoding="utf-8"))
-    # Fuente Linux únicamente para esta validación en memoria; NO modifica style.json real.
-    validation_font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    style["font"]=validation_font
-    style["font_fallback"]=validation_font
-    doc=N.load(pj)
-    before={str(w["id"]):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
-    N.normalize(doc,style)
-    after={str(w["id"]):(w.get("start_time"),w.get("end_time")) for s in doc.get("segments",[]) for w in s.get("words",[])}
-    if before != after:
-        raise RuntimeError("El normalizador alteró START/END durante validación; aborto")
-    if len(before)!=187:
-        raise RuntimeError(f"Proyecto convertido no conserva 187 palabras: {len(before)}")
+    # Validación de migración: mismos 187 IDs y mismos START/END que el timeline V2.
+    # No ejecutar renderer aquí: el panel original generará CDG_RENDER_PAGES_V2 al abrir/guardar.
+    written=json.load(open(pj,encoding="utf-8"))
+    migrated={str(w["id"]):(float(w["start_time"]),float(w["end_time"]))
+              for seg in written.get("segments",[]) for w in seg.get("words",[])}
+    source={str(w["id"]):(float(w["start"]),float(w["end"])) for w in timeline.get("words",[])}
+    if len(source)!=187 or len(migrated)!=187:
+        raise RuntimeError(f"Conteo inesperado al migrar: source={len(source)} migrated={len(migrated)}")
+    if source != migrated:
+        bad=[wid for wid in source if migrated.get(wid)!=source[wid]]
+        raise RuntimeError(f"START/END cambiados durante migración: {bad[:10]}")
 
     now=datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     lyrics_moises=lyrics_file.read_text(encoding="utf-8",errors="replace")
@@ -302,7 +296,7 @@ def main():
     print("INSTRUMENTAL="+str(final/instrumental.name))
     print("PROJECT="+str(final/"proyecto.timings.json"))
     print("SOURCE_ORDER_INVERSIONS=1")
-    print("NORMALIZER_TIMINGS_UNCHANGED=YES")
+    print("SOURCE_TIMINGS_PRESERVED=YES")
     print("OLD_PROD_LET0089_UNTOUCHED=YES")
     print("CDG_IMPORTED=NO")
     print("DBROW="+json.dumps(dict(row),ensure_ascii=False,default=str))
