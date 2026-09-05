@@ -1,0 +1,186 @@
+name: Remove LET-0120 Mon Laferte from production once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/remove-let0120-mon-laferte-prod-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$OVH_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$OVH_PORT" -t ed25519 "$OVH_HOST" 2>/dev/null > "$HOME/.ssh/known_hosts"
+
+      - name: Remove LET-0120 from production only
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo python3 -' <<'PY' | tee diagnostics/remove-let0120-mon-laferte-prod.txt
+          import sqlite3, json, shutil, os
+          from pathlib import Path
+
+          JID="LET-0120"
+          ROOT=Path("/var/lib/djgabo-cdg")
+          JOB=ROOT/"jobs"/JID
+          DB=ROOT/"local.db"
+
+          con=sqlite3.connect(DB)
+          con.row_factory=sqlite3.Row
+          row=con.execute("select * from jobs where id=?",(JID,)).fetchone()
+          if row is None:
+              print("ROW_ALREADY_ABSENT=YES")
+          else:
+              d=dict(row)
+              artist=str(d.get("artist") or "")
+              title=str(d.get("title") or "")
+              origin=str(d.get("origin") or "")
+              print("FOUND_ARTIST="+artist)
+              print("FOUND_TITLE="+title)
+              print("FOUND_ORIGIN="+origin)
+              if artist!="Mon Laferte" or not title.lower().startswith("tu falta de querer") or origin!="V2_LAB_IMPORT":
+                  raise SystemExit("SAFETY_ABORT: LET-0120 identity/origin does not match expected migrated Mon Laferte project")
+              # Report remote references before deletion, but do not delete remote files here.
+              for k in ("dropbox_path","dropbox_folder_id","dropbox_display_path","cdg_dropbox_path","cdg_dropbox_id",
+                        "instrumental_dropbox_path","instrumental_dropbox_id",
+                        "voice_drive_id","legacy_audio_drive_id","timings_drive_id"):
+                  v=str(d.get(k) or "").strip()
+                  if v:
+                      print("REMOTE_REF_"+k.upper()+"="+v)
+              # Remove DB-side auxiliary rows that reference this job where schemas permit.
+              tables=[r[0] for r in con.execute("select name from sqlite_master where type='table'").fetchall()]
+              removed_aux=[]
+              with con:
+                  for t in tables:
+                      if t=="jobs": continue
+                      cols=[r[1] for r in con.execute(f'pragma table_info("{t}")').fetchall()]
+                      key=None
+                      for cand in ("job_id","jid","idTrabajo","job"):
+                          if cand in cols:
+                              key=cand;break
+                      if key:
+                          try:
+                              cur=con.execute(f'delete from "{t}" where "{key}"=?',(JID,))
+                              if cur.rowcount and cur.rowcount>0:
+                                  removed_aux.append((t,key,cur.rowcount))
+                          except Exception:
+                              pass
+                  con.execute("delete from jobs where id=?",(JID,))
+              print("AUX_ROWS_REMOVED="+json.dumps(removed_aux,ensure_ascii=False))
+              print("DB_ROW_DELETED=YES")
+          con.close()
+
+          # Remove local job directory and known local caches/temp files.
+          if JOB.exists():
+              shutil.rmtree(JOB)
+              print("JOB_DIR_DELETED=YES")
+          else:
+              print("JOB_DIR_ALREADY_ABSENT=YES")
+
+          cleanup_roots=[
+              ROOT/"cdg_cache", ROOT/"cache", ROOT/"peaks", ROOT/"renders",
+              Path("/tmp"), Path("/var/tmp")
+          ]
+          deleted=[]
+          for base in cleanup_roots:
+              if not base.exists(): continue
+              try:
+                  for p in base.rglob("*"):
+                      if JID.lower() not in p.name.lower():
+                          continue
+                      try:
+                          if p.is_dir(): shutil.rmtree(p)
+                          else: p.unlink()
+                          deleted.append(str(p))
+                      except Exception:
+                          pass
+              except Exception:
+                  pass
+          print("LOCAL_CACHE_DELETED="+json.dumps(deleted,ensure_ascii=False))
+
+          # Remove ONLY migration-specific backups created for this import.
+          bdir=ROOT/"backups"
+          removed_backups=[]
+          if bdir.exists():
+              for p in bdir.iterdir():
+                  if p.name.startswith("import_v2_mon_laferte_"):
+                      try:
+                          if p.is_dir(): shutil.rmtree(p)
+                          else: p.unlink()
+                          removed_backups.append(str(p))
+                      except Exception:
+                          pass
+          print("MIGRATION_BACKUPS_DELETED="+json.dumps(removed_backups,ensure_ascii=False))
+
+          # Final verification.
+          con=sqlite3.connect(f"file:{DB}?mode=ro",uri=True)
+          left=con.execute("select count(*) from jobs where id=?",(JID,)).fetchone()[0]
+          con.close()
+          print("FINAL_DB_COUNT="+str(left))
+          print("FINAL_JOB_DIR_EXISTS="+str(JOB.exists()))
+          print("PROD_SERVICE="+os.popen("systemctl is-active djgabo-cdg").read().strip())
+          print("REMOVE_LET0120_PROD=OK" if left==0 and not JOB.exists() else "REMOVE_LET0120_PROD=INCOMPLETE")
+          PY
+
+      - name: Verify panel health and clone untouched
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_PORT: ${{ secrets.OVH_PORT }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "$OVH_PORT" "$OVH_USER@$OVH_HOST" 'sudo bash -s' <<'REMOTE'
+          set -euo pipefail
+          test "$(systemctl is-active djgabo-cdg)" = "active"
+          code="$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/editor-v1)"
+          test "$code" = "200"
+          test -d /var/lib/djgabo-cdg-v2/jobs/LET-0089
+          test -f /var/lib/djgabo-cdg-v2/v2_renders/LET-0089/timeline_v2.json
+          python3 - <<'PY'
+          import sqlite3
+          db=sqlite3.connect("file:/var/lib/djgabo-cdg/local.db?mode=ro",uri=True)
+          assert db.execute("select count(*) from jobs where id='LET-0120'").fetchone()[0]==0
+          assert db.execute("select artist from jobs where id='LET-0089'").fetchone()[0]=="JP El Chamaco"
+          db.close()
+          print("VERIFY_PROD_LET0120_ABSENT=PASS")
+          print("VERIFY_PROD_LET0089_UNTOUCHED=PASS")
+          print("VERIFY_V2_MON_LAFERTE_UNTOUCHED=PASS")
+          print("VERIFY_HTTP=200")
+          PY
+          REMOTE
+
+      - name: Save safe diagnostic
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -f diagnostics/remove-let0120-mon-laferte-prod.txt ]; then
+            grep -E '^(FOUND_|REMOTE_REF_|AUX_ROWS_REMOVED=|DB_ROW_DELETED=|JOB_DIR_|LOCAL_CACHE_DELETED=|MIGRATION_BACKUPS_DELETED=|FINAL_|PROD_SERVICE=|REMOVE_)' diagnostics/remove-let0120-mon-laferte-prod.txt > diagnostics/remove-let0120-mon-laferte-prod.safe.txt || true
+            rm -f diagnostics/remove-let0120-mon-laferte-prod.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add diagnostics/remove-let0120-mon-laferte-prod.safe.txt
+            git commit -m "diag: record LET-0120 removal from production" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi
